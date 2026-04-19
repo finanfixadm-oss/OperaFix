@@ -1,0 +1,241 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AppUser {
+  id           String   @id @default(uuid()) @db.Uuid
+  full_name    String   @db.VarChar(150)
+  email        String   @unique @db.VarChar(180)
+  password_hash String
+  role         String   @default("admin") @db.VarChar(50)
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @db.Timestamptz(6)
+
+  companiesOwned      Company[]       @relation("company_owner")
+  collaboratorsOwned  Collaborator[]  @relation("collab_owner")
+}
+
+model Campaign {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique @db.VarChar(150)
+  description String?
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model Company {
+  id               String   @id @default(uuid()) @db.Uuid
+  rut              String   @unique @db.VarChar(20)
+  business_name    String   @db.VarChar(255)
+  mandante         String?  @db.VarChar(150)
+  address          String?
+  email            String?  @db.VarChar(180)
+  estimated_amount Decimal? @db.Decimal(18,2)
+  currency_code    String?  @default("CLP") @db.VarChar(10)
+  exchange_rate    Decimal? @default(1) @db.Decimal(18,4)
+  owner_user_id    String?  @db.Uuid
+  tag              String?  @db.VarChar(100)
+  unsubscribe_mode String?  @db.VarChar(100)
+  unsubscribe_at   DateTime? @db.Timestamptz(6)
+  last_activity_at DateTime? @db.Timestamptz(6)
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @db.Timestamptz(6)
+
+  owner         AppUser?       @relation("company_owner", fields: [owner_user_id], references: [id])
+  collaborators Collaborator[]
+  documents     Document[]
+}
+
+model Collaborator {
+  id                String   @id @default(uuid()) @db.Uuid
+  company_id         String?  @db.Uuid
+  kam_user_id        String?  @db.Uuid
+  owner_user_id      String?  @db.Uuid
+  full_name          String   @db.VarChar(180)
+  position           String?  @db.VarChar(120)
+  email              String?  @db.VarChar(180)
+  phone              String?  @db.VarChar(50)
+  linkedin_url       String?
+  profile_photo_path String?
+  tag                String?  @db.VarChar(100)
+  unsubscribe_mode   String?  @db.VarChar(100)
+  last_activity_at   DateTime? @db.Timestamptz(6)
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime @default(now()) @db.Timestamptz(6)
+
+  company Company? @relation(fields: [company_id], references: [id])
+  owner   AppUser? @relation("collab_owner", fields: [owner_user_id], references: [id])
+}
+
+model LmCompanyGroup {
+  id               String   @id @default(uuid()) @db.Uuid
+  name             String   @unique @db.VarChar(255)
+  mandante         String?  @db.VarChar(150)
+  owner_user_id    String?  @db.Uuid
+  campaign_id      String?  @db.Uuid
+  secondary_email  String?  @db.VarChar(180)
+  group_power_file String?
+  groups_related   String?
+  email_opt_out    Boolean  @default(false)
+  tag              String?  @db.VarChar(100)
+  unsubscribe_mode String?  @db.VarChar(100)
+  unsubscribe_at   DateTime? @db.Timestamptz(6)
+  last_activity_at DateTime? @db.Timestamptz(6)
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model LmRecord {
+  id                         String   @id @default(uuid()) @db.Uuid
+  lm_group_id                String?  @db.Uuid
+  owner_user_id              String?  @db.Uuid
+  modified_by_user_id        String?  @db.Uuid
+  search_group               String?  @db.VarChar(150)
+  rut                        String   @db.VarChar(20)
+  entity                     String?  @db.VarChar(120)
+  management_status          String?  @db.VarChar(120)
+  refund_amount              Decimal? @default(0) @db.Decimal(18,2)
+  confirmation_cc            Boolean? @default(false)
+  confirmation_power         Boolean? @default(false)
+  actual_paid_amount         Decimal? @default(0) @db.Decimal(18,2)
+  excess_type_reason         String?  @db.VarChar(150)
+  worker_status              String?  @db.VarChar(100)
+  request_number             String?  @db.VarChar(100)
+  business_name              String?  @db.VarChar(255)
+  actual_finanfix_amount     Decimal? @default(0) @db.Decimal(18,2)
+  production_months          String?
+  invoice_number             String?  @db.VarChar(100)
+  bank_name                  String?  @db.VarChar(120)
+  account_number             String?  @db.VarChar(100)
+  account_type               String?  @db.VarChar(80)
+  client_contract_status     String?  @db.VarChar(120)
+  fee                        Decimal? @default(0) @db.Decimal(18,2)
+  tag                        String?  @db.VarChar(100)
+  unsubscribe_mode           String?  @db.VarChar(100)
+  unsubscribe_at             DateTime? @db.Timestamptz(6)
+  connected_to               String?  @db.VarChar(255)
+  finanfix_invoice_payment_date DateTime? @db.Date
+  finanfix_invoiced          Boolean? @default(false)
+  client_invoiced            Boolean? @default(false)
+  entity_paid                Boolean? @default(false)
+  afp_payment_date           DateTime? @db.Date
+  address                    String?
+  client_notification_date   DateTime? @db.Date
+  afp_submission_date        DateTime? @db.Date
+  finanfix_invoice_date      DateTime? @db.Date
+  other_banks                String?
+  finanfix_group             String?  @db.VarChar(150)
+  rejection_annulment_reason String?
+  campaign_id                String?  @db.Uuid
+  client_amount              Decimal? @default(0) @db.Decimal(18,2)
+  finanfix_amount            Decimal? @default(0) @db.Decimal(18,2)
+  actual_client_amount       Decimal? @default(0) @db.Decimal(18,2)
+  contract_end_date          DateTime? @db.Date
+  rejection_date             DateTime? @db.Date
+  comment                    String?
+  oc_number                  String?  @db.VarChar(100)
+  afp_shipment               String?  @db.VarChar(120)
+  afp_entry_date             DateTime? @db.Date
+  mandante                   String?  @db.VarChar(150)
+  portal_access              String?  @db.VarChar(100)
+  cen_response               String?  @db.VarChar(120)
+  cen_query                  String?  @db.VarChar(120)
+  request_entry_month        String?  @db.VarChar(40)
+  cen_content                String?
+  note_badge                 Boolean? @default(false)
+  activity_badge             Boolean? @default(false)
+  last_activity_at           DateTime? @db.Timestamptz(6)
+  created_at                 DateTime @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model TpCompanyGroup {
+  id               String   @id @default(uuid()) @db.Uuid
+  name             String   @unique @db.VarChar(255)
+  mandante         String?  @db.VarChar(150)
+  owner_user_id    String?  @db.Uuid
+  email            String?  @db.VarChar(180)
+  group_power_file String?
+  groups_related   String?
+  tag              String?  @db.VarChar(100)
+  unsubscribe_mode String?  @db.VarChar(100)
+  unsubscribe_at   DateTime? @db.Timestamptz(6)
+  last_activity_at DateTime? @db.Timestamptz(6)
+  created_by_user_id String? @db.Uuid
+  modified_by_user_id String? @db.Uuid
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model TpRecord {
+  id                    String   @id @default(uuid()) @db.Uuid
+  tp_group_id           String?  @db.Uuid
+  owner_user_id         String?  @db.Uuid
+  modified_by_user_id   String?  @db.Uuid
+  mandante              String?  @db.VarChar(150)
+  portal_access         String?
+  production_months     String?
+  comment               String?
+  tag                   String?  @db.VarChar(100)
+  client_contract_status String? @db.VarChar(120)
+  contract_end_date     DateTime? @db.Date
+  cen_content           String?
+  cen_query             String?
+  cen_response_file     String?
+  image_path            String?
+  last_activity_at      DateTime? @db.Timestamptz(6)
+  created_at            DateTime @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model Document {
+  id                 String   @id @default(uuid()) @db.Uuid
+  title              String   @db.VarChar(255)
+  original_filename  String   @db.VarChar(255)
+  stored_filename    String   @db.VarChar(255)
+  storage_path       String
+  related_module     String   @db.VarChar(100)
+  related_record_id  String?  @db.Uuid
+  company_id         String?  @db.Uuid
+  mime_type          String?  @db.VarChar(150)
+  file_size          BigInt?  @default(0)
+  uploaded_by_user_id String? @db.Uuid
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+
+  company Company? @relation(fields: [company_id], references: [id])
+}
+
+model Note {
+  id                String   @id @default(uuid()) @db.Uuid
+  related_module    String   @db.VarChar(100)
+  related_record_id String   @db.Uuid
+  author_user_id    String?  @db.Uuid
+  content           String
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model Activity {
+  id                String   @id @default(uuid()) @db.Uuid
+  related_module    String   @db.VarChar(100)
+  related_record_id String   @db.Uuid
+  user_id           String?  @db.Uuid
+  activity_type     String   @db.VarChar(100)
+  description       String
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model AuditLog {
+  id                String   @id @default(uuid()) @db.Uuid
+  related_module    String   @db.VarChar(100)
+  related_record_id String   @db.Uuid
+  user_id           String?  @db.Uuid
+  changed_field     String   @db.VarChar(150)
+  old_value         String?
+  new_value         String?
+  changed_at        DateTime @default(now()) @db.Timestamptz(6)
+}
