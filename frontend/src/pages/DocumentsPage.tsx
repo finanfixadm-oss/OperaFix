@@ -1,32 +1,21 @@
-import { useEffect, useState } from "react";
-import { fetchDocuments, fileUrl } from "../api";
-import type { DocumentItem } from "../types";
-import SimpleTable from "../components/SimpleTable";
+import DataTable from "../components/DataTable";
+
+const rows = [
+  { id: "1", title: "Facturas Optimiza Co", module: "Documentos", uploaded_by: "Luis Mendoza", created_at: "2026-04-15" },
+  { id: "2", title: "Checklist_Documentación_AFP_2026.pdf", module: "Documentos", uploaded_by: "Luis Mendoza", created_at: "2026-03-11" }
+];
 
 export default function DocumentsPage() {
-  const [rows, setRows] = useState<DocumentItem[]>([]);
-  useEffect(() => {
-    fetchDocuments().then(setRows).catch(() => setRows([]));
-  }, []);
-
   return (
-    <SimpleTable
+    <DataTable
       title="Documentos"
-      rows={rows}
       columns={[
         { key: "title", label: "Nombre" },
-        { key: "related_module", label: "Módulo" },
-        { key: "created_at", label: "Fecha", render: (row) => new Date(row.created_at).toLocaleString("es-CL") },
-        {
-          key: "open",
-          label: "Archivo",
-          render: (row) => (
-            <a href={fileUrl(row)} target="_blank" rel="noreferrer" className="text-link">
-              Abrir
-            </a>
-          )
-        }
+        { key: "module", label: "Módulo" },
+        { key: "uploaded_by", label: "Cargado por" },
+        { key: "created_at", label: "Fecha" }
       ]}
+      rows={rows}
     />
   );
 }
