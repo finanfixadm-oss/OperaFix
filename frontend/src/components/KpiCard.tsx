@@ -1,7 +1,7 @@
 interface Props {
   title: string;
   value: string;
-  hint: string;
+  hint?: string;
 }
 
 export default function KpiCard({ title, value, hint }: Props) {
@@ -9,7 +9,7 @@ export default function KpiCard({ title, value, hint }: Props) {
     <article className="kpi-card">
       <span className="kpi-title">{title}</span>
       <strong className="kpi-value">{value}</strong>
-      <small className="kpi-hint">{hint}</small>
+      {hint ? <small className="kpi-hint">{hint}</small> : null}
     </article>
   );
 }
