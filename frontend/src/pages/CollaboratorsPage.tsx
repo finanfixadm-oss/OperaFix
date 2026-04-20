@@ -1,21 +1,24 @@
-import DataTable from "../components/DataTable";
-
-const rows = [
-  { id: "1", full_name: "Fernando Morei", email: "fernando.morey@iansa.cl", position: "Encargado RRHH", company: "Iansa" },
-  { id: "2", full_name: "Renato Ramirez", email: "rramirez@guillaume.cl", position: "Analista", company: "Guillaume" }
-];
+import { useEffect, useState } from "react";
+import { fetchCollaborators } from "../api";
+import type { Collaborator } from "../types";
+import SimpleTable from "../components/SimpleTable";
 
 export default function CollaboratorsPage() {
+  const [rows, setRows] = useState<Collaborator[]>([]);
+  useEffect(() => {
+    fetchCollaborators().then(setRows).catch(() => setRows([]));
+  }, []);
+
   return (
-    <DataTable
+    <SimpleTable
       title="Colaboradores"
+      rows={rows}
       columns={[
         { key: "full_name", label: "Nombre" },
         { key: "email", label: "Correo" },
         { key: "position", label: "Cargo" },
-        { key: "company", label: "Empresa" }
+        { key: "company", label: "Empresa", render: (row) => row.company?.business_name || "" }
       ]}
-      rows={rows}
     />
   );
 }
