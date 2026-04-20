@@ -1,6 +1,5 @@
 import express from "express";
 import cors from "cors";
-import path from "node:path";
 import { env } from "./config/env.js";
 import { healthRouter } from "./routes/health.js";
 import { authRouter } from "./routes/auth.js";
@@ -15,29 +14,26 @@ import { errorHandler } from "./middleware/errorHandler.js";
 
 export const app = express();
 
+// CORS: permite el dominio de producción y localhost en desarrollo
 const allowedOrigins = [
   "http://localhost:5173",
   "https://crm.finanfix.cl",
-  "https://vigilant-wholeness-production.up.railway.app",
+  "https://vigilant-wholeness-production.up.railway.app"
 ];
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error(`Origen no permitido por CORS: ${origin}`));
-    },
-    credentials: true,
-  })
-);
+app.use(cors({
+  origin: (origin, callback) => {
+    // Permite requests sin origin (ej. Postman, curl) y orígenes permitidos
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS bloqueado para: ${origin}`));
+    }
+  },
+  credentials: true
+}));
 
 app.use(express.json());
-app.use("/storage", express.static(path.resolve(process.cwd(), "storage")));
-
-app.get("/", (_req, res) => {
-  res.json({ name: "OperaFix API", status: "ok" });
-});
 
 app.use("/api/health", healthRouter);
 app.use("/api/auth", authRouter);
