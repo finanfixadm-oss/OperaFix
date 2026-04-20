@@ -1,245 +1,259 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import {
-  addLmRecordNote,
-  createLmRecord,
-  fetchLmRecordDetail,
-  fetchLmRecords,
-  fileUrl,
-  updateLmRecord,
-  uploadDocument
-} from "../api";
-import type { DocumentItem, LmRecord, LmRecordDetail, LmRecordListResponse } from "../types";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { fetchJson, postJson, publicBaseUrl, uploadFile } from "../api";
+import { CrmDocument, LmRecord, LmRecordDetailResponse, PaginatedLmRecords } from "../types";
+
+type Filters = {
+  search: string;
+  entity: string;
+  management_status: string;
+  mandante: string;
+  confirmation_cc: string;
+  confirmation_power: string;
+};
 
 const initialForm: Partial<LmRecord> = {
+  search_group: "",
   rut: "",
   business_name: "",
-  entity: "AFP CAPITAL",
+  entity: "",
   management_status: "Pendiente Gestión",
   refund_amount: 0,
   confirmation_cc: false,
   confirmation_power: false,
   mandante: "",
-  comment: "",
-  portal_access: "Sí"
+  request_number: "",
+  portal_access: "Sí",
+  worker_status: "",
+  excess_type_reason: "",
+  comment: ""
 };
 
-const currency = (value: string | number | null | undefined) =>
-  new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Number(value || 0));
+function money(value: unknown) {
+  const num = Number(value || 0);
+  return new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(num);
+}
 
-function boolLabel(value?: boolean | null) {
+function boolText(value: boolean | null | undefined) {
   return value ? "Sí" : "No";
 }
 
+function dateText(value?: string) {
+  if (!value) return "-";
+  return new Date(value).toLocaleString("es-CL");
+}
+
 export default function LmRecordsPage() {
-  const [data, setData] = useState<LmRecordListResponse | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<LmRecordDetail | null>(null);
+  const [data, setData] = useState<PaginatedLmRecords | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"resumen" | "documentos" | "notas" | "actividad">("resumen");
-  const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState<LmRecord | null>(null);
-  const [form, setForm] = useState<Partial<LmRecord>>(initialForm);
-  const [noteText, setNoteText] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [filters, setFilters] = useState({
-    q: "",
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<LmRecordDetailResponse | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [filters, setFilters] = useState<Filters>({
+    search: "",
     entity: "",
     management_status: "",
+    mandante: "",
     confirmation_cc: "",
-    confirmation_power: "",
-    page: 1,
-    pageSize: 15
+    confirmation_power: ""
   });
+  const [page, setPage] = useState(1);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [form, setForm] = useState<Partial<LmRecord>>(initialForm);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string>("");
+  const [noteContent, setNoteContent] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"summary" | "documents" | "notes" | "activity">("summary");
 
-  const loadRecords = async () => {
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams({ page: String(page), pageSize: "15" });
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+    });
+    return `?${params.toString()}`;
+  }, [filters, page]);
+
+  async function loadRecords() {
     setLoading(true);
     try {
-      const response = await fetchLmRecords(filters);
+      const response = await fetchJson<PaginatedLmRecords>(`/lm-records${queryString}`);
       setData(response);
-      if (!selectedId && response.items.length > 0) {
+      if (!selectedId && response.items[0]) {
         setSelectedId(response.items[0].id);
       }
-      if (selectedId && !response.items.some((item) => item.id === selectedId) && response.items[0]) {
-        setSelectedId(response.items[0].id);
-      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo cargar la tabla.");
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  async function loadDetail(id: string) {
+    setDetailLoading(true);
+    try {
+      const response = await fetchJson<LmRecordDetailResponse>(`/lm-records/${id}`);
+      setDetail(response);
+      setForm(response.record);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo cargar el detalle.");
+    } finally {
+      setDetailLoading(false);
+    }
+  }
 
   useEffect(() => {
     loadRecords();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.page, filters.pageSize, filters.entity, filters.management_status, filters.confirmation_cc, filters.confirmation_power]);
+  }, [queryString]);
 
   useEffect(() => {
-    const timeout = setTimeout(() => loadRecords(), 350);
-    return () => clearTimeout(timeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.q]);
-
-  useEffect(() => {
-    if (!selectedId) return;
-    fetchLmRecordDetail(selectedId).then(setDetail).catch(() => setDetail(null));
+    if (selectedId) {
+      loadDetail(selectedId);
+    }
   }, [selectedId]);
 
-  const rows = data?.items || [];
-  const currentPage = data?.pagination.page || 1;
-  const totalPages = data?.pagination.totalPages || 1;
+  function handleFilterChange(event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+    setPage(1);
+    setFilters((prev) => ({ ...prev, [event.target.name]: event.target.value }));
+  }
 
-  const summaryCards = useMemo(() => {
-    const items = rows;
-    return {
-      total: data?.pagination.total || 0,
-      totalRefund: items.reduce((sum, item) => sum + Number(item.refund_amount || 0), 0),
-      readyForAfp: items.filter((item) => item.confirmation_cc && item.confirmation_power).length
-    };
-  }, [data, rows]);
+  function handleFormChange(event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
+    const { name, value, type } = event.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? (event.target as HTMLInputElement).checked : value
+    }));
+  }
 
-  const openCreate = () => {
-    setEditing(null);
-    setForm(initialForm);
-    setShowModal(true);
-  };
-
-  const openEdit = () => {
-    if (!detail) return;
-    setEditing(detail);
-    setForm(detail);
-    setShowModal(true);
-  };
-
-  const submitForm = async (event: FormEvent) => {
+  async function handleSave(event: FormEvent) {
     event.preventDefault();
+    setSaving(true);
+    setMessage("");
     try {
-      if (editing?.id) {
-        await updateLmRecord(editing.id, form);
+      if (form.id) {
+        await postJson(`/lm-records/${form.id}`, form, "PUT");
+        setMessage("Registro actualizado correctamente.");
       } else {
-        await createLmRecord(form);
+        const created = await postJson<LmRecord>("/lm-records", form);
+        setSelectedId(created.id);
+        setMessage("Registro creado correctamente.");
       }
-      setShowModal(false);
+      setIsFormOpen(false);
       await loadRecords();
-      if (editing?.id) setSelectedId(editing.id);
-    } catch (error: any) {
-      alert(error.message);
+      if (selectedId) await loadDetail(selectedId);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo guardar el registro.");
+    } finally {
+      setSaving(false);
     }
-  };
+  }
 
-  const submitNote = async () => {
-    if (!detail || !noteText.trim()) return;
-    await addLmRecordNote(detail.id, noteText);
-    setNoteText("");
-    const updated = await fetchLmRecordDetail(detail.id);
-    setDetail(updated);
-    loadRecords();
-  };
+  async function submitNote() {
+    if (!selectedId || !noteContent.trim()) return;
+    try {
+      await postJson(`/lm-records/${selectedId}/notes`, { content: noteContent.trim() });
+      setNoteContent("");
+      await loadDetail(selectedId);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo guardar la nota.");
+    }
+  }
 
-  const onUpload = async (file: File) => {
-    if (!detail) return;
+  async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file || !selectedId) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("title", file.name);
+    formData.append("related_module", "lm_records");
+    formData.append("related_record_id", selectedId);
     setUploading(true);
     try {
-      await uploadDocument(file, {
-        title: file.name,
-        related_module: "lm_records",
-        related_record_id: detail.id
-      });
-      const updated = await fetchLmRecordDetail(detail.id);
-      setDetail(updated);
-      setActiveTab("documentos");
+      await uploadFile("/documents/upload", formData);
+      await loadDetail(selectedId);
+      setActiveTab("documents");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo subir el documento.");
     } finally {
       setUploading(false);
+      event.target.value = "";
     }
-  };
+  }
+
+  const rows = data?.items ?? [];
 
   return (
-    <div className="page-stack">
-      <div className="table-toolbar">
+    <div className="zoho-page">
+      <div className="page-toolbar">
         <div>
-          <h3>Registros de empresas</h3>
-          <p>Filtra, revisa y abre el detalle completo del registro en una vista lateral.</p>
+          <span className="eyebrow">Módulos / Gestiones LM - TP</span>
+          <h2 className="page-title">Registros de empresas</h2>
         </div>
-        <div className="table-actions">
-          <button className="ghost-btn" onClick={() => loadRecords()}>
-            Actualizar
-          </button>
-          <button className="primary-btn" onClick={openCreate}>
-            Crear registro
-          </button>
+        <div className="toolbar-actions">
+          <button className="ghost-btn" onClick={() => { setForm(initialForm); setIsFormOpen(true); }}>Nuevo registro</button>
+          <button className="primary-btn" onClick={() => selectedId && detail && (setForm(detail.record), setIsFormOpen(true))} disabled={!selectedId}>Editar seleccionado</button>
         </div>
       </div>
 
-      <div className="kpi-grid compact-3">
-        <div className="mini-kpi"><span>Registros visibles</span><strong>{summaryCards.total}</strong></div>
-        <div className="mini-kpi"><span>Monto devolución</span><strong>{currency(summaryCards.totalRefund)}</strong></div>
-        <div className="mini-kpi"><span>Listos para AFP</span><strong>{summaryCards.readyForAfp}</strong></div>
-      </div>
+      {message ? <div className="inline-message">{message}</div> : null}
 
-      <div className="records-layout">
-        <aside className="filters-panel">
-          <h4>Filtrar registros</h4>
-          <label>
-            Buscar
-            <input
-              value={filters.q}
-              onChange={(e) => setFilters((s) => ({ ...s, q: e.target.value, page: 1 }))}
-              placeholder="RUT, razón social, solicitud"
-            />
+      <div className="zoho-layout">
+        <aside className="filter-panel">
+          <div className="panel-title-row"><h3>Filtros</h3><button className="link-btn" onClick={() => setFilters({ search: "", entity: "", management_status: "", mandante: "", confirmation_cc: "", confirmation_power: "" })}>Limpiar</button></div>
+          <label className="field-block">
+            <span>Buscar</span>
+            <input name="search" value={filters.search} onChange={handleFilterChange} placeholder="RUT, razón social, grupo..." />
           </label>
-          <label>
-            Entidad
-            <select
-              value={filters.entity}
-              onChange={(e) => setFilters((s) => ({ ...s, entity: e.target.value, page: 1 }))}
-            >
+          <label className="field-block">
+            <span>Entidad</span>
+            <select name="entity" value={filters.entity} onChange={handleFilterChange}>
               <option value="">Todas</option>
-              {(data?.filters.entities || []).map((item) => (
-                <option key={item} value={item}>{item}</option>
-              ))}
+              {data?.filterOptions.entities.map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
           </label>
-          <label>
-            Estado Gestión
-            <select
-              value={filters.management_status}
-              onChange={(e) => setFilters((s) => ({ ...s, management_status: e.target.value, page: 1 }))}
-            >
+          <label className="field-block">
+            <span>Estado Gestión</span>
+            <select name="management_status" value={filters.management_status} onChange={handleFilterChange}>
               <option value="">Todos</option>
-              {(data?.filters.statuses || []).map((item) => (
-                <option key={item} value={item}>{item}</option>
-              ))}
+              {data?.filterOptions.statuses.map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
           </label>
-          <label>
-            Confirmación CC
-            <select value={filters.confirmation_cc} onChange={(e) => setFilters((s) => ({ ...s, confirmation_cc: e.target.value, page: 1 }))}>
+          <label className="field-block">
+            <span>Mandante</span>
+            <select name="mandante" value={filters.mandante} onChange={handleFilterChange}>
               <option value="">Todos</option>
-              <option value="true">Sí</option>
-              <option value="false">No</option>
+              {data?.filterOptions.mandantes.map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
           </label>
-          <label>
-            Confirmación Poder
-            <select value={filters.confirmation_power} onChange={(e) => setFilters((s) => ({ ...s, confirmation_power: e.target.value, page: 1 }))}>
+          <label className="field-block">
+            <span>Confirmación CC</span>
+            <select name="confirmation_cc" value={filters.confirmation_cc} onChange={handleFilterChange}>
               <option value="">Todos</option>
               <option value="true">Sí</option>
               <option value="false">No</option>
             </select>
           </label>
-          <button
-            className="ghost-btn full"
-            onClick={() => setFilters({ q: "", entity: "", management_status: "", confirmation_cc: "", confirmation_power: "", page: 1, pageSize: 15 })}
-          >
-            Limpiar filtros
-          </button>
+          <label className="field-block">
+            <span>Confirmación Poder</span>
+            <select name="confirmation_power" value={filters.confirmation_power} onChange={handleFilterChange}>
+              <option value="">Todos</option>
+              <option value="true">Sí</option>
+              <option value="false">No</option>
+            </select>
+          </label>
         </aside>
 
-        <section className="records-table-panel">
+        <section className="table-panel">
+          <div className="panel-title-row">
+            <h3>Líneas filtradas</h3>
+            <span className="records-counter">{data?.meta.total ?? 0} registros</span>
+          </div>
+
           <div className="table-scroll">
-            <table className="crm-table selectable">
+            <table className="crm-table enhanced">
               <thead>
                 <tr>
+                  <th>Buscar Grupo</th>
                   <th>RUT</th>
-                  <th>Razón Social</th>
                   <th>Entidad</th>
                   <th>Estado Gestión</th>
                   <th>Monto Devolución</th>
@@ -251,20 +265,19 @@ export default function LmRecordsPage() {
                 {loading ? (
                   <tr><td colSpan={7}>Cargando registros...</td></tr>
                 ) : rows.length === 0 ? (
-                  <tr><td colSpan={7}>No hay resultados</td></tr>
+                  <tr><td colSpan={7}>No hay resultados con esos filtros.</td></tr>
                 ) : rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className={selectedId === row.id ? "active-row" : ""}
-                    onClick={() => setSelectedId(row.id)}
-                  >
+                  <tr key={row.id} className={row.id === selectedId ? "selected" : ""} onClick={() => setSelectedId(row.id)}>
+                    <td>
+                      <div className="row-primary">{row.search_group || row.business_name || "Sin grupo"}</div>
+                      <div className="row-secondary">{row.business_name || "Sin razón social"}</div>
+                    </td>
                     <td>{row.rut}</td>
-                    <td>{row.business_name || row.search_group || ""}</td>
-                    <td>{row.entity || ""}</td>
+                    <td>{row.entity || "-"}</td>
                     <td><span className="status-chip">{row.management_status || "Sin estado"}</span></td>
-                    <td>{currency(row.refund_amount)}</td>
-                    <td>{boolLabel(row.confirmation_cc)}</td>
-                    <td>{boolLabel(row.confirmation_power)}</td>
+                    <td>{money(row.refund_amount)}</td>
+                    <td>{boolText(row.confirmation_cc)}</td>
+                    <td>{boolText(row.confirmation_power)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -272,133 +285,119 @@ export default function LmRecordsPage() {
           </div>
 
           <div className="pagination-row">
-            <span>Registros totales {data?.pagination.total || 0}</span>
-            <div className="pagination-controls">
-              <button className="ghost-btn" disabled={currentPage <= 1} onClick={() => setFilters((s) => ({ ...s, page: s.page - 1 }))}>Anterior</button>
-              <span>{currentPage} / {totalPages}</span>
-              <button className="ghost-btn" disabled={currentPage >= totalPages} onClick={() => setFilters((s) => ({ ...s, page: s.page + 1 }))}>Siguiente</button>
-            </div>
+            <button className="ghost-btn" disabled={(data?.meta.page || 1) <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Anterior</button>
+            <span>Página {data?.meta.page || 1} de {data?.meta.totalPages || 1}</span>
+            <button className="ghost-btn" disabled={(data?.meta.page || 1) >= (data?.meta.totalPages || 1)} onClick={() => setPage((p) => p + 1)}>Siguiente</button>
           </div>
         </section>
 
         <aside className="detail-panel">
-          {!detail ? (
-            <div className="empty-detail">Selecciona una línea para ver toda la información del registro.</div>
-          ) : (
+          <div className="panel-title-row">
+            <h3>Detalle</h3>
+            {detailLoading ? <span className="records-counter">Cargando…</span> : null}
+          </div>
+
+          {detail?.record ? (
             <>
-              <div className="detail-header">
-                <div>
-                  <h4>{detail.business_name || detail.rut}</h4>
-                  <p>{detail.entity || "Sin entidad"} · {detail.management_status || "Sin estado"}</p>
+              <div className="detail-summary-card">
+                <div className="detail-headline">{detail.record.business_name || "Sin razón social"}</div>
+                <div className="detail-subline">{detail.record.rut} · {detail.record.entity || "Sin entidad"}</div>
+                <div className="detail-metrics">
+                  <div><span>Monto devolución</span><strong>{money(detail.record.refund_amount)}</strong></div>
+                  <div><span>Estado</span><strong>{detail.record.management_status || "Sin estado"}</strong></div>
                 </div>
-                <button className="ghost-btn" onClick={openEdit}>Editar</button>
               </div>
 
               <div className="detail-tabs">
-                {[
-                  ["resumen", "Resumen"],
-                  ["documentos", "Documentos"],
-                  ["notas", "Notas"],
-                  ["actividad", "Actividad"]
-                ].map(([key, label]) => (
-                  <button
-                    key={key}
-                    className={activeTab === key ? "tab-btn active" : "tab-btn"}
-                    onClick={() => setActiveTab(key as any)}
-                  >
-                    {label}
-                  </button>
-                ))}
+                <button className={activeTab === "summary" ? "tab-btn active" : "tab-btn"} onClick={() => setActiveTab("summary")}>Resumen</button>
+                <button className={activeTab === "documents" ? "tab-btn active" : "tab-btn"} onClick={() => setActiveTab("documents")}>Documentos</button>
+                <button className={activeTab === "notes" ? "tab-btn active" : "tab-btn"} onClick={() => setActiveTab("notes")}>Notas</button>
+                <button className={activeTab === "activity" ? "tab-btn active" : "tab-btn"} onClick={() => setActiveTab("activity")}>Actividad</button>
               </div>
 
-              {activeTab === "resumen" ? (
-                <div className="detail-body">
-                  <DetailItem label="RUT" value={detail.rut} />
-                  <DetailItem label="Razón Social" value={detail.business_name} />
-                  <DetailItem label="Entidad" value={detail.entity} />
-                  <DetailItem label="Estado Gestión" value={detail.management_status} />
-                  <DetailItem label="Monto Devolución" value={currency(detail.refund_amount)} />
-                  <DetailItem label="Confirmación CC" value={boolLabel(detail.confirmation_cc)} />
-                  <DetailItem label="Confirmación Poder" value={boolLabel(detail.confirmation_power)} />
-                  <DetailItem label="N° Solicitud" value={detail.request_number} />
-                  <DetailItem label="Banco" value={detail.bank_name} />
-                  <DetailItem label="Cuenta" value={detail.account_number} />
-                  <DetailItem label="Tipo Cuenta" value={detail.account_type} />
-                  <DetailItem label="Mandante" value={detail.mandante} />
-                  <DetailItem label="Comentario" value={detail.comment} multiline />
+              {activeTab === "summary" ? (
+                <div className="detail-grid">
+                  <Info label="Buscar Grupo" value={detail.record.search_group} />
+                  <Info label="Razón Social" value={detail.record.business_name} />
+                  <Info label="Mandante" value={detail.record.mandante} />
+                  <Info label="N° Solicitud" value={detail.record.request_number} />
+                  <Info label="Estado Trabajador" value={detail.record.worker_status} />
+                  <Info label="Tipo de exceso" value={detail.record.excess_type_reason} />
+                  <Info label="Confirmación CC" value={boolText(detail.record.confirmation_cc)} />
+                  <Info label="Confirmación Poder" value={boolText(detail.record.confirmation_power)} />
+                  <Info label="Acceso portal" value={detail.record.portal_access} />
+                  <Info label="Última modificación" value={dateText(detail.record.updated_at)} />
+                  <Info label="Comentario" value={detail.record.comment || "-"} full />
                 </div>
               ) : null}
 
-              {activeTab === "documentos" ? (
-                <div className="detail-body">
+              {activeTab === "documents" ? (
+                <div className="stack-block">
                   <label className="upload-box">
-                    <span>{uploading ? "Cargando..." : "Subir documento al registro"}</span>
-                    <input
-                      type="file"
-                      hidden
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) onUpload(file);
-                      }}
-                    />
+                    <span>{uploading ? "Subiendo documento..." : "Cargar documento al registro"}</span>
+                    <input type="file" onChange={handleUpload} disabled={uploading} />
                   </label>
-                  <DocumentList documents={detail.documents} />
+                  {detail.documents.length === 0 ? <p className="muted">No hay documentos vinculados.</p> : detail.documents.map((doc) => <DocumentRow key={doc.id} doc={doc} />)}
                 </div>
               ) : null}
 
-              {activeTab === "notas" ? (
-                <div className="detail-body">
-                  <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Escribe una nota" rows={4} />
-                  <button className="primary-btn small" onClick={submitNote}>Guardar nota</button>
-                  <div className="timeline-list">
-                    {detail.notes.map((note) => (
-                      <div key={note.id} className="timeline-item">
-                        <strong>{new Date(note.created_at).toLocaleString("es-CL")}</strong>
-                        <p>{note.content}</p>
-                      </div>
-                    ))}
-                  </div>
+              {activeTab === "notes" ? (
+                <div className="stack-block">
+                  <textarea className="note-box" rows={4} placeholder="Escribe una nota sobre esta gestión..." value={noteContent} onChange={(e) => setNoteContent(e.target.value)} />
+                  <button className="primary-btn" onClick={submitNote}>Guardar nota</button>
+                  {detail.notes.length === 0 ? <p className="muted">Todavía no hay notas.</p> : detail.notes.map((note) => (
+                    <article key={note.id} className="timeline-card">
+                      <strong>{dateText(note.created_at)}</strong>
+                      <p>{note.content}</p>
+                    </article>
+                  ))}
                 </div>
               ) : null}
 
-              {activeTab === "actividad" ? (
-                <div className="detail-body">
-                  <div className="timeline-list">
-                    {detail.activities.map((item) => (
-                      <div key={item.id} className="timeline-item">
-                        <strong>{item.activity_type}</strong>
-                        <small>{new Date(item.created_at).toLocaleString("es-CL")}</small>
-                        <p>{item.description}</p>
-                      </div>
-                    ))}
-                  </div>
+              {activeTab === "activity" ? (
+                <div className="stack-block">
+                  {detail.activities.length === 0 ? <p className="muted">No hay actividad registrada.</p> : detail.activities.map((activity) => (
+                    <article key={activity.id} className="timeline-card">
+                      <strong>{activity.description}</strong>
+                      <span>{activity.activity_type} · {dateText(activity.created_at)}</span>
+                    </article>
+                  ))}
                 </div>
               ) : null}
             </>
+          ) : (
+            <div className="empty-detail">Selecciona una línea filtrada para ver toda la información.</div>
           )}
         </aside>
       </div>
 
-      {showModal ? (
-        <div className="modal-backdrop">
-          <div className="modal-card">
-            <div className="modal-header">
-              <h3>{editing ? "Editar registro" : "Crear registro"}</h3>
-              <button className="ghost-btn" onClick={() => setShowModal(false)}>Cerrar</button>
-            </div>
-            <form className="form-grid" onSubmit={submitForm}>
-              <label>RUT<input required value={form.rut || ""} onChange={(e) => setForm((s) => ({ ...s, rut: e.target.value }))} /></label>
-              <label>Razón Social<input value={form.business_name || ""} onChange={(e) => setForm((s) => ({ ...s, business_name: e.target.value }))} /></label>
-              <label>Entidad<select value={form.entity || ""} onChange={(e) => setForm((s) => ({ ...s, entity: e.target.value }))}><option>AFP CAPITAL</option><option>AFP MODELO</option><option>AFP CUPRUM</option></select></label>
-              <label>Estado Gestión<select value={form.management_status || ""} onChange={(e) => setForm((s) => ({ ...s, management_status: e.target.value }))}><option>Pendiente Gestión</option><option>Enviado AFP</option><option>Observado</option><option>Pagado</option><option>Rechazado</option></select></label>
-              <label>Monto Devolución<input type="number" value={Number(form.refund_amount || 0)} onChange={(e) => setForm((s) => ({ ...s, refund_amount: Number(e.target.value) }))} /></label>
-              <label>Mandante<input value={form.mandante || ""} onChange={(e) => setForm((s) => ({ ...s, mandante: e.target.value }))} /></label>
-              <label className="checkbox-field"><input type="checkbox" checked={Boolean(form.confirmation_cc)} onChange={(e) => setForm((s) => ({ ...s, confirmation_cc: e.target.checked }))} /> Confirmación CC</label>
-              <label className="checkbox-field"><input type="checkbox" checked={Boolean(form.confirmation_power)} onChange={(e) => setForm((s) => ({ ...s, confirmation_power: e.target.checked }))} /> Confirmación Poder</label>
-              <label className="full-width">Comentario<textarea rows={4} value={form.comment || ""} onChange={(e) => setForm((s) => ({ ...s, comment: e.target.value }))} /></label>
-              <div className="form-actions full-width">
-                <button type="button" className="ghost-btn" onClick={() => setShowModal(false)}>Cancelar</button>
-                <button type="submit" className="primary-btn">Guardar</button>
+      {isFormOpen ? (
+        <div className="modal-overlay" onClick={() => setIsFormOpen(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="panel-title-row"><h3>{form.id ? "Editar registro" : "Nuevo registro"}</h3><button className="link-btn" onClick={() => setIsFormOpen(false)}>Cerrar</button></div>
+            <form className="form-grid" onSubmit={handleSave}>
+              <label className="field-block"><span>Buscar Grupo</span><input name="search_group" value={form.search_group || ""} onChange={handleFormChange} /></label>
+              <label className="field-block"><span>RUT</span><input name="rut" value={form.rut || ""} onChange={handleFormChange} required /></label>
+              <label className="field-block"><span>Razón Social</span><input name="business_name" value={form.business_name || ""} onChange={handleFormChange} /></label>
+              <label className="field-block"><span>Entidad</span><input name="entity" value={form.entity || ""} onChange={handleFormChange} /></label>
+              <label className="field-block"><span>Estado Gestión</span>
+                <select name="management_status" value={form.management_status || ""} onChange={handleFormChange}>
+                  <option value="Pendiente Gestión">Pendiente Gestión</option>
+                  <option value="Enviado AFP">Enviado AFP</option>
+                  <option value="Observado">Observado</option>
+                  <option value="Pagado">Pagado</option>
+                  <option value="Rechazado">Rechazado</option>
+                </select>
+              </label>
+              <label className="field-block"><span>Monto Devolución</span><input name="refund_amount" type="number" value={Number(form.refund_amount || 0)} onChange={handleFormChange} /></label>
+              <label className="field-block"><span>Mandante</span><input name="mandante" value={form.mandante || ""} onChange={handleFormChange} /></label>
+              <label className="field-block"><span>N° Solicitud</span><input name="request_number" value={form.request_number || ""} onChange={handleFormChange} /></label>
+              <label className="field-block checkbox"><input name="confirmation_cc" type="checkbox" checked={Boolean(form.confirmation_cc)} onChange={handleFormChange} /><span>Confirmación CC</span></label>
+              <label className="field-block checkbox"><input name="confirmation_power" type="checkbox" checked={Boolean(form.confirmation_power)} onChange={handleFormChange} /><span>Confirmación Poder</span></label>
+              <label className="field-block form-full"><span>Comentario</span><textarea name="comment" rows={4} value={form.comment || ""} onChange={handleFormChange} /></label>
+              <div className="modal-actions form-full">
+                <button type="button" className="ghost-btn" onClick={() => setIsFormOpen(false)}>Cancelar</button>
+                <button type="submit" className="primary-btn" disabled={saving}>{saving ? "Guardando..." : "Guardar"}</button>
               </div>
             </form>
           </div>
@@ -408,26 +407,24 @@ export default function LmRecordsPage() {
   );
 }
 
-function DetailItem({ label, value, multiline = false }: { label: string; value?: string | null; multiline?: boolean }) {
+function Info({ label, value, full = false }: { label: string; value?: string | null; full?: boolean }) {
   return (
-    <div className={multiline ? "detail-item full-width" : "detail-item"}>
+    <div className={full ? "info-card info-full" : "info-card"}>
       <span>{label}</span>
       <strong>{value || "-"}</strong>
     </div>
   );
 }
 
-function DocumentList({ documents }: { documents: DocumentItem[] }) {
-  if (!documents.length) return <div className="empty-inline">No hay documentos cargados.</div>;
+function DocumentRow({ doc }: { doc: CrmDocument }) {
+  const fileUrl = `${publicBaseUrl}/storage/${doc.stored_filename}`;
   return (
-    <div className="timeline-list">
-      {documents.map((doc) => (
-        <div key={doc.id} className="timeline-item">
-          <strong>{doc.title}</strong>
-          <small>{new Date(doc.created_at).toLocaleString("es-CL")}</small>
-          <a href={fileUrl(doc)} target="_blank" rel="noreferrer" className="text-link">Abrir archivo</a>
-        </div>
-      ))}
-    </div>
+    <a className="document-row" href={fileUrl} target="_blank" rel="noreferrer">
+      <div>
+        <strong>{doc.title}</strong>
+        <span>{doc.original_filename}</span>
+      </div>
+      <small>{dateText(doc.created_at)}</small>
+    </a>
   );
 }
