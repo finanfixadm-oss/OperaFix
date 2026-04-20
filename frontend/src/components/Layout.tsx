@@ -1,4 +1,4 @@
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 const sections = [
   { label: "Dashboard", to: "/" },
@@ -13,6 +13,15 @@ const sections = [
 
 export default function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+  function handleLogout() {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/login");
+  }
 
   return (
     <div className="app-shell">
@@ -36,6 +45,16 @@ export default function Layout() {
             </Link>
           ))}
         </nav>
+
+        <div className="sidebar-footer">
+          <div className="user-info">
+            <span className="user-name">{user.full_name || "Usuario"}</span>
+            <span className="user-role">{user.role || "admin"}</span>
+          </div>
+          <button className="logout-btn" onClick={handleLogout}>
+            Cerrar sesión
+          </button>
+        </div>
       </aside>
 
       <main className="main-content">
@@ -44,7 +63,6 @@ export default function Layout() {
             <span className="eyebrow">Finanfix Solutions SpA</span>
             <h2>OperaFix CRM</h2>
           </div>
-
           <div className="topbar-actions">
             <button className="primary-btn">Nuevo registro</button>
           </div>
