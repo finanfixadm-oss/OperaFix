@@ -1,38 +1,81 @@
-// En producción Railway inyecta VITE_API_URL, ej: https://operafix-production.up.railway.app/api
-// En desarrollo local apunta a localhost:4000/api
-const API_URL = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api`
-  : "http://localhost:4000/api";
+import type {
+  AnalyticsDashboard,
+  Collaborator,
+  Company,
+  DocumentItem,
+  KpiOverview,
+  LmRecord,
+  LmRecordDetail,
+  LmRecordListResponse,
+  Note
+} from "./types";
 
-export async function fetchJson<T>(endpoint: string): Promise<T> {
-  const token = localStorage.getItem("token");
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {}
-  });
-  if (response.status === 401) {
-    localStorage.removeItem("token");
-    window.location.href = "/login";
-    throw new Error("No autorizado");
-  }
+const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:4000/api").replace(/\/$/, "");
+const FILES_BASE_URL = (import.meta.env.VITE_FILES_URL || "http://localhost:4000").replace(/\/$/, "");
+
+async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_URL}${endpoint}`, options);
   if (!response.ok) {
-    throw new Error("Error cargando datos");
+    let message = "Error cargando datos";
+    try {
+      const body = await response.json();
+      message = body.message || message;
+    } catch {
+      // noop
+    }
+    throw new Error(message);
   }
   return response.json();
 }
 
-export async function postJson<T>(endpoint: string, body: unknown): Promise<T> {
-  const token = localStorage.getItem("token");
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    },
-    body: JSON.stringify(body)
+export async function fetchLmRecords(params: Record<string, string | number | boolean | undefined>) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") query.set(key, String(value));
   });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error((err as any).message || "Error en la solicitud");
-  }
-  return response.json();
+  return request<LmRecordListResponse>(`/lm-records?${query.toString()}`);
+}
+
+export const fetchLmRecordDetail = (id: string) => request<LmRecordDetail>(`/lm-records/${id}`);
+export const createLmRecord = (payload: Partial<LmRecord>) =>
+  request<LmRecord>("/lm-records", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+export const updateLmRecord = (id: string, payload: Partial<LmRecord>) =>
+  request<LmRecord>(`/lm-records/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+export const addLmRecordNote = (id: string, content: string) =>
+  request<Note>(`/lm-records/${id}/notes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content })
+  });
+
+export async function uploadDocument(file: File, payload: Record<string, string>) {
+  const formData = new FormData();
+  formData.append("file", file);
+  Object.entries(payload).forEach(([key, value]) => formData.append(key, value));
+  return request<DocumentItem>("/documents/upload", {
+    method: "POST",
+    body: formData
+  });
+}
+
+export const fetchDashboardOverview = () => request<KpiOverview>("/reports/overview");
+export const fetchAnalyticsDashboard = () => request<AnalyticsDashboard>("/analytics/dashboard");
+export const fetchCompanies = () => request<Company[]>("/companies");
+export const fetchCollaborators = () => request<Collaborator[]>("/collaborators");
+export const fetchDocuments = () => request<DocumentItem[]>("/documents");
+
+export function fileUrl(doc: DocumentItem) {
+  if (!doc.storage_path) return "#";
+  const filename = doc.stored_filename || doc.storage_path.split(/[\\/]/).pop();
+  return `${FILES_BASE_URL}/storage/${filename}`;
 }
