@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchDashboardOverview } from "../api";
-import type { KpiOverview } from "../types";
+
 import KpiCard from "../components/KpiCard";
 
 const formatCurrency = (value: number) =>
@@ -8,10 +7,6 @@ const formatCurrency = (value: number) =>
 
 export default function HomePage() {
   const [overview, setOverview] = useState<KpiOverview | null>(null);
-
-  useEffect(() => {
-    fetchDashboardOverview().then(setOverview).catch(() => undefined);
-  }, []);
 
   return (
     <div className="page-stack">
