@@ -17,40 +17,22 @@ export default function ReportsPage() {
 
   useEffect(() => {
     let mounted = true;
-
-    async function load() {
-      try {
-        setLoading(true);
-        setError("");
-
-        const data = await fetchJson<PaginatedLmRecords>("/lm-records?page=1&pageSize=50");
-
-        if (mounted) {
-          setRows(data.items || []);
-        }
-      } catch (err) {
-        console.error(err);
+    fetchJson<PaginatedLmRecords>("/lm-records?page=1&pageSize=100")
+      .then((data) => mounted && setRows(data.items || []))
+      .catch(() => {
         if (mounted) {
           setRows([]);
           setError("No se pudieron cargar los informes.");
         }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    load();
+      })
+      .finally(() => mounted && setLoading(false));
 
     return () => {
       mounted = false;
     };
   }, []);
 
-  const totalMonto = useMemo(() => {
-    return rows.reduce((sum, row) => sum + Number(row.actual_paid_amount || 0), 0);
-  }, [rows]);
+  const totalMonto = useMemo(() => rows.reduce((sum, row) => sum + Number(row.actual_paid_amount || 0), 0), [rows]);
 
   return (
     <div className="page-stack">
@@ -58,9 +40,7 @@ export default function ReportsPage() {
         <div>
           <span className="eyebrow">Informes</span>
           <h3>Informe operativo de registros LM</h3>
-          <p>
-            Listado resumido de registros con sus montos y estado de gestión.
-          </p>
+          <p>Listado resumido de registros con montos y estado de gestión.</p>
         </div>
       </div>
 
@@ -69,17 +49,10 @@ export default function ReportsPage() {
 
       {!loading && !error && (
         <>
-          <div className="kpi-grid">
-            <div className="kpi-card">
-              <span>Total registros</span>
-              <strong>{rows.length}</strong>
-            </div>
-            <div className="kpi-card">
-              <span>Monto total pagado</span>
-              <strong>{formatCurrency(totalMonto)}</strong>
-            </div>
+          <div className="kpi-grid two-cols">
+            <div className="kpi-card"><span>Total registros</span><strong>{rows.length}</strong></div>
+            <div className="kpi-card"><span>Monto total pagado</span><strong>{formatCurrency(totalMonto)}</strong></div>
           </div>
-
           <SimpleTable
             title="Registros LM"
             rows={rows}
@@ -88,16 +61,8 @@ export default function ReportsPage() {
               { key: "business_name", label: "Razón Social" },
               { key: "entity", label: "Entidad" },
               { key: "management_status", label: "Estado Gestión" },
-              {
-                key: "refund_amount",
-                label: "Monto Devolución",
-                render: (row: LmRecord) => formatCurrency(row.refund_amount),
-              },
-              {
-                key: "actual_paid_amount",
-                label: "Monto Pagado",
-                render: (row: LmRecord) => formatCurrency(row.actual_paid_amount),
-              },
+              { key: "refund_amount", label: "Monto Devolución", render: (row) => formatCurrency(row.refund_amount) },
+              { key: "actual_paid_amount", label: "Monto Pagado", render: (row) => formatCurrency(row.actual_paid_amount) },
             ]}
           />
         </>

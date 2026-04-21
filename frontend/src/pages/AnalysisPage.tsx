@@ -14,112 +14,70 @@ const safeNumber = (value: unknown) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-type EntitySummary = {
-  entity: string;
-  count: number;
-  total: number;
-};
-
-type StatusSummary = {
-  status: string;
-  count: number;
-};
-
-type MandanteSummary = {
-  mandante: string;
-  count: number;
-  total: number;
-};
-
 export default function AnalysisPage() {
   const [rows, setRows] = useState<LmRecord[]>([]);
+  const [selectedMandante, setSelectedMandante] = useState<string>("Todos");
+  const [mandantes, setMandantes] = useState<string[]>(["Todos"]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     let mounted = true;
-
-    async function load() {
-      try {
-        setLoading(true);
-        setError("");
-
-        const data = await fetchJson<PaginatedLmRecords>("/lm-records?page=1&pageSize=200");
-
-        if (mounted) {
-          setRows(data.items || []);
-        }
-      } catch (err) {
-        console.error(err);
-        if (mounted) {
-          setRows([]);
-          setError("No se pudo cargar el análisis.");
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    load();
+    fetchJson<PaginatedLmRecords>("/lm-records?page=1&pageSize=300")
+      .then((data) => {
+        if (!mounted) return;
+        setRows(data.items || []);
+        setMandantes(["Todos", ...data.filterOptions.mandantes.filter(Boolean)]);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setRows([]);
+        setMandantes(["Todos"]);
+      })
+      .finally(() => mounted && setLoading(false));
 
     return () => {
       mounted = false;
     };
   }, []);
 
-  const totalPagado = useMemo(() => {
-    return rows.reduce((sum, item) => sum + safeNumber(item.actual_paid_amount), 0);
-  }, [rows]);
+  const scopedRows = useMemo(() => {
+    if (selectedMandante === "Todos") return rows;
+    return rows.filter((item) => item.mandante === selectedMandante);
+  }, [rows, selectedMandante]);
 
-  const byEntity = useMemo<EntitySummary[]>(() => {
-    const map = new Map<string, EntitySummary>();
+  const totalPagado = scopedRows.reduce((sum, item) => sum + safeNumber(item.actual_paid_amount), 0);
 
-    rows.forEach((item) => {
+  const byEntity = useMemo(() => {
+    const map = new Map<string, { entity: string; count: number; total: number }>();
+    scopedRows.forEach((item) => {
       const key = item.entity?.trim() || "Sin entidad";
       const current = map.get(key) || { entity: key, count: 0, total: 0 };
       current.count += 1;
       current.total += safeNumber(item.actual_paid_amount);
       map.set(key, current);
     });
-
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
-  }, [rows]);
+  }, [scopedRows]);
 
-  const byStatus = useMemo<StatusSummary[]>(() => {
+  const byStatus = useMemo(() => {
     const map = new Map<string, number>();
-
-    rows.forEach((item) => {
+    scopedRows.forEach((item) => {
       const key = item.management_status?.trim() || "Sin estado";
       map.set(key, (map.get(key) || 0) + 1);
     });
-
-    return Array.from(map.entries())
-      .map(([status, count]) => ({ status, count }))
-      .sort((a, b) => b.count - a.count);
-  }, [rows]);
-
-  const byMandante = useMemo<MandanteSummary[]>(() => {
-    const map = new Map<string, MandanteSummary>();
-
-    rows.forEach((item) => {
-      const key = item.mandante?.trim() || "Sin mandante";
-      const current = map.get(key) || { mandante: key, count: 0, total: 0 };
-      current.count += 1;
-      current.total += safeNumber(item.actual_paid_amount);
-      map.set(key, current);
-    });
-
-    return Array.from(map.values()).sort((a, b) => b.total - a.total);
-  }, [rows]);
+    return Array.from(map.entries()).map(([status, count]) => ({ status, count }));
+  }, [scopedRows]);
 
   return (
     <div className="page-stack">
       <div className="analysis-toolbar">
         <div className="analysis-filters">
           <button className="ghost-btn">Todos</button>
-          <button className="ghost-btn">Finanfix Solutions SpA</button>
+          <select className="ghost-select" value={selectedMandante} onChange={(e) => setSelectedMandante(e.target.value)}>
+            {mandantes.map((item) => (
+              <option key={item} value={item}>{item}</option>
+            ))}
+          </select>
           <button className="ghost-btn">Solo yo</button>
         </div>
         <div className="analysis-actions">
@@ -128,46 +86,32 @@ export default function AnalysisPage() {
         </div>
       </div>
 
-      {loading && <div className="inline-message">Cargando análisis...</div>}
-      {error && <div className="inline-message">{error}</div>}
+      {loading ? <div className="inline-message">Cargando análisis...</div> : null}
 
-      {!loading && !error && (
+      {!loading && (
         <div className="analysis-grid">
           <section className="widget-card span-2">
-            <div className="widget-header">
-              <h3>Monto pagado por entidad</h3>
-            </div>
-
+            <div className="widget-header"><h3>Monto pagado por entidad</h3></div>
             <div className="donut-list">
               {byEntity.map((item) => {
                 const percent = totalPagado ? (item.total / totalPagado) * 100 : 0;
-
                 return (
                   <div className="metric-row" key={item.entity}>
                     <div>
                       <strong>{item.entity}</strong>
                       <span>{currency(item.total)}</span>
                     </div>
-                    <div className="metric-bar">
-                      <div
-                        className="metric-bar-fill"
-                        style={{ width: `${percent}%` }}
-                      />
-                    </div>
+                    <div className="metric-bar"><div className="metric-bar-fill" style={{ width: `${percent}%` }} /></div>
                     <small>{percent.toFixed(1)}%</small>
                   </div>
                 );
               })}
-
               {byEntity.length === 0 && <div className="empty-state">Sin datos.</div>}
             </div>
           </section>
 
           <section className="widget-card">
-            <div className="widget-header">
-              <h3>Estado Gestión</h3>
-            </div>
-
+            <div className="widget-header"><h3>Estado Gestión</h3></div>
             <div className="mini-table">
               {byStatus.map((item) => (
                 <div className="mini-row" key={item.status}>
@@ -175,44 +119,7 @@ export default function AnalysisPage() {
                   <strong>{item.count}</strong>
                 </div>
               ))}
-
               {byStatus.length === 0 && <div className="empty-state">Sin datos.</div>}
-            </div>
-          </section>
-
-          <section className="widget-card span-2">
-            <div className="widget-header">
-              <h3>Mandantes con mayor monto pagado</h3>
-            </div>
-
-            <div className="mini-table">
-              {byMandante.slice(0, 8).map((item) => (
-                <div className="mini-row" key={item.mandante}>
-                  <span>{item.mandante}</span>
-                  <strong>{currency(item.total)}</strong>
-                </div>
-              ))}
-
-              {byMandante.length === 0 && <div className="empty-state">Sin datos.</div>}
-            </div>
-          </section>
-
-          <section className="widget-card span-2">
-            <div className="widget-header">
-              <h3>Actividad reciente</h3>
-            </div>
-
-            <div className="mini-table">
-              {rows.slice(0, 8).map((item) => (
-                <div className="mini-row" key={item.id}>
-                  <span>
-                    {item.business_name || item.rut} · {item.entity || "Sin entidad"}
-                  </span>
-                  <strong>{item.management_status || "Sin estado"}</strong>
-                </div>
-              ))}
-
-              {rows.length === 0 && <div className="empty-state">Sin datos.</div>}
             </div>
           </section>
         </div>

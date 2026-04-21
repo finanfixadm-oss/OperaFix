@@ -34,6 +34,7 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.use("/storage", express.static("storage"));
 
 app.use("/api/health", healthRouter);
 app.use("/api/auth", authRouter);

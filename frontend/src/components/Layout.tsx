@@ -3,9 +3,9 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 const topSections = [
   { label: "Inicio", to: "/" },
   { label: "Módulos", to: "/registros-empresas" },
-  { label: "Informes", to: "/documentos" },
-  { label: "Análisis", to: "/grupos-lm" },
-  { label: "Mis solicitudes", to: "/gestiones-tp" }
+  { label: "Informes", to: "/informes" },
+  { label: "Análisis", to: "/analisis" },
+  { label: "Mis solicitudes", to: "/mis-solicitudes" }
 ];
 
 const moduleSections = [
@@ -21,6 +21,9 @@ const moduleSections = [
   { title: "Trabajo Pesado", items: [
     { label: "Gestiones - TP", to: "/gestiones-tp" },
     { label: "Grupos empresas - TP", to: "/grupos-tp" }
+  ] },
+  { title: "Solicitudes", items: [
+    { label: "Mis solicitudes", to: "/mis-solicitudes" }
   ] }
 ];
 
@@ -54,11 +57,7 @@ export default function Layout() {
               <h3>{group.title}</h3>
               <nav className="nav-list">
                 {group.items.map((item) => (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    className={location.pathname === item.to ? "nav-item active" : "nav-item"}
-                  >
+                  <Link key={item.to} to={item.to} className={location.pathname === item.to ? "nav-item active" : "nav-item"}>
                     {item.label}
                   </Link>
                 ))}

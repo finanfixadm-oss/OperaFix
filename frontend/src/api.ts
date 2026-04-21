@@ -1,4 +1,6 @@
-const API_URL = (import.meta as any).env?.VITE_API_URL || "http://localhost:4000/api";
+const RAW_API_URL = (import.meta as any).env?.VITE_API_URL || "http://localhost:4000";
+const API_BASE = RAW_API_URL.replace(/\/$/, "");
+const API_URL = API_BASE.endsWith("/api") ? API_BASE : `${API_BASE}/api`;
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -36,4 +38,4 @@ export async function uploadFile<T>(endpoint: string, formData: FormData): Promi
   return handleResponse<T>(response);
 }
 
-export const publicBaseUrl = API_URL.replace(/\/api$/, "");
+export const publicBaseUrl = API_BASE;
