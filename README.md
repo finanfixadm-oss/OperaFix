@@ -93,3 +93,7 @@ CORS_ORIGIN="http://localhost:5173"
 - Carga documental local
 - API REST base
 - SQL y Prisma listos para PostgreSQL
+
+
+## Rediseño vNext
+Este paquete incluye `database/03_vnext_hierarchy_schema.sql` para evolucionar OperaFix a una jerarquía Mandante -> Grupo -> Empresa -> Línea -> AFP -> Gestión, manteniendo intacta la base funcional actual en Railway.

@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { Prisma } from "@prisma/client";
 import { prisma } from "../config/prisma.js";
 
 export const lmRecordsRouter = Router();
@@ -27,7 +26,7 @@ lmRecordsRouter.get("/", async (req, res, next) => {
     const confirmation_cc = parseBoolean(req.query.confirmation_cc);
     const confirmation_power = parseBoolean(req.query.confirmation_power);
 
-    const where: Prisma.LmRecordWhereInput = {
+    const where = {
       AND: [
         search
           ? {
@@ -64,9 +63,9 @@ lmRecordsRouter.get("/", async (req, res, next) => {
       items,
       meta: { total, page, pageSize, totalPages: Math.max(Math.ceil(total / pageSize), 1) },
       filterOptions: {
-        entities: entities.map((x) => x.entity).filter(Boolean),
-        statuses: statuses.map((x) => x.management_status).filter(Boolean),
-        mandantes: mandantes.map((x) => x.mandante).filter(Boolean)
+        entities: entities.map((x: {entity: string | null}) => x.entity).filter(Boolean),
+        statuses: statuses.map((x: {management_status: string | null}) => x.management_status).filter(Boolean),
+        mandantes: mandantes.map((x: {mandante: string | null}) => x.mandante).filter(Boolean)
       }
     });
   } catch (error) {
