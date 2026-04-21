@@ -1,22 +1,10 @@
-import { useEffect, useState } from "react";
 import DataTable from "../components/DataTable";
-import { fetchJson } from "../api";
 
-type TpRecordRow = {
-  id: string;
-  mandante?: string | null;
-  portal_access?: string | null;
-  client_contract_status?: string | null;
-  comment?: string | null;
-};
+const rows = [
+  { id: "1", mandante: "Polpaico", portal_access: "Sí", client_contract_status: "Activo", comment: "Consulta CEN enviada" }
+];
 
 export default function TpRecordsPage() {
-  const [rows, setRows] = useState<TpRecordRow[]>([]);
-
-  useEffect(() => {
-    fetchJson<TpRecordRow[]>("/tp-records").then(setRows).catch(() => setRows([]));
-  }, []);
-
   return (
     <DataTable
       title="Gestiones - TP"

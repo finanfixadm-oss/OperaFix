@@ -1,11 +1,11 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
 
 const topSections = [
-  { label: "Inicio", to: "/registros-empresas" },
+  { label: "Inicio", to: "/" },
   { label: "Módulos", to: "/registros-empresas" },
-  { label: "Informes", to: "/informes" },
-  { label: "Análisis", to: "/analisis" },
-  { label: "Mis solicitudes", to: "/mis-solicitudes" }
+  { label: "Informes", to: "/documentos" },
+  { label: "Análisis", to: "/grupos-lm" },
+  { label: "Mis solicitudes", to: "/gestiones-tp" }
 ];
 
 const moduleSections = [
@@ -24,10 +24,6 @@ const moduleSections = [
   ] }
 ];
 
-function isActive(pathname: string, to: string) {
-  return pathname === to || (to !== "/" && pathname.startsWith(`${to}/`));
-}
-
 export default function Layout() {
   const location = useLocation();
 
@@ -44,7 +40,7 @@ export default function Layout() {
 
         <nav className="global-nav">
           {topSections.map((item) => (
-            <Link key={item.to} to={item.to} className={isActive(location.pathname, item.to) ? "global-nav-link active" : "global-nav-link"}>
+            <Link key={item.to} to={item.to} className={location.pathname === item.to ? "global-nav-link active" : "global-nav-link"}>
               {item.label}
             </Link>
           ))}
@@ -61,7 +57,7 @@ export default function Layout() {
                   <Link
                     key={item.to}
                     to={item.to}
-                    className={isActive(location.pathname, item.to) ? "nav-item active" : "nav-item"}
+                    className={location.pathname === item.to ? "nav-item active" : "nav-item"}
                   >
                     {item.label}
                   </Link>

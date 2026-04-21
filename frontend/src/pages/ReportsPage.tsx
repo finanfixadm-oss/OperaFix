@@ -8,7 +8,6 @@ const formatCurrency = (value: string | number | null | undefined) =>
 
 export default function ReportsPage() {
   const [rows, setRows] = useState<LmRecord[]>([]);
-
   useEffect(() => {
     fetchLmRecords({ page: 1, pageSize: 50 }).then((data) => setRows(data.items)).catch(() => setRows([]));
   }, []);
@@ -23,7 +22,7 @@ export default function ReportsPage() {
         { key: "entity", label: "Entidad" },
         { key: "management_status", label: "Estado Gestión" },
         { key: "refund_amount", label: "Monto Devolución", render: (row) => formatCurrency(row.refund_amount) },
-        { key: "actual_paid_amount", label: "Monto Real Pagado", render: (row) => formatCurrency(row.actual_paid_amount) }
+        { key: "actual_finanfix_amount", label: "Monto Finanfix", render: (row) => formatCurrency(row.actual_finanfix_amount) }
       ]}
     />
   );

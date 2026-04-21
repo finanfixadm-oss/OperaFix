@@ -1,7 +1,4 @@
-import type { PaginatedLmRecords } from "./types";
-
-const rawApiUrl = (import.meta as any).env?.VITE_API_URL || "http://localhost:4000";
-const API_URL = rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl.replace(/\/$/, "")}/api`;
+const API_URL = (import.meta as any).env?.VITE_API_URL || "http://localhost:4000/api";
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -37,16 +34,6 @@ export async function uploadFile<T>(endpoint: string, formData: FormData): Promi
     body: formData
   });
   return handleResponse<T>(response);
-}
-
-export async function fetchLmRecords(params: Record<string, string | number | boolean | undefined>) {
-  const query = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== "") {
-      query.set(key, String(value));
-    }
-  });
-  return fetchJson<PaginatedLmRecords>(`/lm-records?${query.toString()}`);
 }
 
 export const publicBaseUrl = API_URL.replace(/\/api$/, "");

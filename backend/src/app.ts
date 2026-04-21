@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import path from "node:path";
+import { env } from "./config/env.js";
 import { healthRouter } from "./routes/health.js";
 import { authRouter } from "./routes/auth.js";
 import { companiesRouter } from "./routes/companies.js";
@@ -14,6 +14,7 @@ import { errorHandler } from "./middleware/errorHandler.js";
 
 export const app = express();
 
+// CORS: permite el dominio de producción y localhost en desarrollo
 const allowedOrigins = [
   "http://localhost:5173",
   "https://crm.finanfix.cl",
@@ -22,6 +23,7 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
+    // Permite requests sin origin (ej. Postman, curl) y orígenes permitidos
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -32,7 +34,6 @@ app.use(cors({
 }));
 
 app.use(express.json());
-app.use("/storage", express.static(path.resolve(process.cwd(), "storage")));
 
 app.use("/api/health", healthRouter);
 app.use("/api/auth", authRouter);
