@@ -2,7 +2,7 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 
 const topSections = [
   { label: "Inicio", to: "/" },
-  { label: "Módulos", to: "/registros-empresas" },
+  { label: "Módulos", to: "/jerarquia" },
   { label: "Informes", to: "/informes" },
   { label: "Análisis", to: "/analisis" },
   { label: "Mis solicitudes", to: "/mis-solicitudes" }
@@ -10,17 +10,20 @@ const topSections = [
 
 const moduleSections = [
   {
-    title: "Ventas",
+    title: "Jerarquía base",
     items: [
-      { label: "Documentos", to: "/documentos" },
-      { label: "Grupos de empresas - LM", to: "/grupos-lm" },
-      { label: "Registros de empresas", to: "/registros-empresas" }
+      { label: "Mandantes", to: "/mandantes" },
+      { label: "Jerarquía", to: "/jerarquia" },
+      { label: "Grupos de empresas", to: "/company-groups" },
+      { label: "Empresas", to: "/empresas" }
     ]
   },
   {
-    title: "Actividades",
+    title: "Operación",
     items: [
-      { label: "Empresas", to: "/empresas" },
+      { label: "Documentos", to: "/documentos" },
+      { label: "Grupos de empresas - LM", to: "/grupos-lm" },
+      { label: "Registros de empresas", to: "/registros-empresas" },
       { label: "Colaboradores", to: "/colaboradores" },
       { label: "Grupos empresas - TP", to: "/grupos-tp" },
       { label: "Gestiones - TP", to: "/gestiones-tp" }

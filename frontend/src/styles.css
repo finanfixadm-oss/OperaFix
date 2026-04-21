@@ -187,3 +187,19 @@ button { cursor: pointer; }
 .timeline-dot { width: 10px; height: 10px; border-radius: 999px; background: #2563eb; margin-top: 6px; flex: 0 0 auto; }
 .timeline-content { min-width: 0; }
 @media (max-width: 1200px) { .analysis-grid { grid-template-columns:1fr; } .widget-card.span-2 { grid-column: span 1; } .docs-layout, .lm-detail-body, .zoho-layout.single-detailless { grid-template-columns:1fr; } }
+
+
+.hierarchy-board { display:flex; flex-direction:column; gap:18px; }
+.hierarchy-mandante { background:#fff; border:1px solid #e6edf7; border-radius:18px; padding:18px; }
+.hierarchy-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+.hierarchy-head h3 { margin:0; font-size:20px; }
+.hierarchy-head span { color:#64748b; font-size:13px; }
+.hierarchy-columns { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap:14px; }
+.hierarchy-group-card { border:1px solid #dbe4f0; border-radius:14px; padding:14px; background:linear-gradient(180deg,#ffffff,#f8fbff); }
+.hierarchy-group-title { font-weight:700; color:#0f172a; margin-bottom:4px; }
+.hierarchy-group-meta { color:#64748b; font-size:12px; margin-bottom:10px; }
+.hierarchy-company-list { display:flex; flex-direction:column; gap:8px; }
+.hierarchy-company-item { border:1px solid #eef2f7; border-radius:12px; padding:10px; background:#fff; display:flex; flex-direction:column; gap:2px; }
+.hierarchy-company-item span, .hierarchy-company-item small { color:#64748b; }
+.empty-inline { color:#94a3b8; font-size:13px; }
+.card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:16px; }

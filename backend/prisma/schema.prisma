@@ -46,9 +46,14 @@ model Company {
   created_at       DateTime @default(now()) @db.Timestamptz(6)
   updated_at       DateTime @default(now()) @db.Timestamptz(6)
 
+  mandante_id    String?  @db.Uuid
+
   owner         AppUser?       @relation("company_owner", fields: [owner_user_id], references: [id])
+  mandanteRel   Mandante?      @relation(fields: [mandante_id], references: [id])
   collaborators Collaborator[]
   documents     Document[]
+  groupLinks    CompanyGroupCompany[]
+  managementLines ManagementLine[]
 }
 
 model Collaborator {
@@ -238,4 +243,91 @@ model AuditLog {
   old_value         String?
   new_value         String?
   changed_at        DateTime @default(now()) @db.Timestamptz(6)
+}
+
+
+model Mandante {
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String   @unique @db.VarChar(180)
+  code            String?  @unique @db.VarChar(80)
+  status          String   @default("Activo") @db.VarChar(80)
+  owner_name      String?  @db.VarChar(180)
+  commercial_name String?  @db.VarChar(180)
+  email           String?  @db.VarChar(180)
+  phone           String?  @db.VarChar(80)
+  tag             String?  @db.VarChar(100)
+  comment         String?
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  groups          CompanyGroup[]
+  companies       Company[]
+}
+
+model CompanyGroup {
+  id              String   @id @default(uuid()) @db.Uuid
+  mandante_id     String   @db.Uuid
+  name            String   @db.VarChar(255)
+  kind            String   @default("LM") @db.VarChar(30)
+  owner_name      String?  @db.VarChar(180)
+  campaign_name   String?  @db.VarChar(180)
+  secondary_email String?  @db.VarChar(180)
+  power_group     String?
+  related_groups  String?
+  tag             String?  @db.VarChar(100)
+  comments        String?
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  mandante        Mandante @relation(fields: [mandante_id], references: [id])
+  companies       CompanyGroupCompany[]
+  managementLines ManagementLine[]
+
+  @@unique([mandante_id, name, kind])
+}
+
+model CompanyGroupCompany {
+  id               String   @id @default(uuid()) @db.Uuid
+  group_id         String   @db.Uuid
+  company_id       String   @db.Uuid
+  owner_name       String?  @db.VarChar(180)
+  default_entity   String?  @db.VarChar(120)
+  real_finanfix_amount Decimal? @default(0) @db.Decimal(18,2)
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @db.Timestamptz(6)
+
+  group            CompanyGroup @relation(fields: [group_id], references: [id])
+  company          Company      @relation(fields: [company_id], references: [id])
+
+  @@unique([group_id, company_id])
+}
+
+model ManagementLine {
+  id              String   @id @default(uuid()) @db.Uuid
+  mandante_id     String?  @db.Uuid
+  group_id        String?  @db.Uuid
+  company_id      String   @db.Uuid
+  kind            String   @db.VarChar(20)
+  name            String?  @db.VarChar(180)
+  status          String?  @db.VarChar(120)
+  comments        String?
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  company         Company      @relation(fields: [company_id], references: [id])
+  group           CompanyGroup? @relation(fields: [group_id], references: [id])
+  afps            ManagementLineAfp[]
+}
+
+model ManagementLineAfp {
+  id              String   @id @default(uuid()) @db.Uuid
+  line_id         String   @db.Uuid
+  afp_name        String   @db.VarChar(120)
+  status          String?  @db.VarChar(120)
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  line            ManagementLine @relation(fields: [line_id], references: [id])
+
+  @@unique([line_id, afp_name])
 }

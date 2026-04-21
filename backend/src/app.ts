@@ -13,6 +13,9 @@ import { tpRecordsRouter } from "./routes/tp-records.js";
 import { documentsRouter } from "./routes/documents.js";
 import { analyticsRouter } from "./routes/analytics.js";
 import { reportsRouter } from "./routes/reports.js";
+import { mandantesRouter } from "./routes/mandantes.js";
+import { companyGroupsRouter } from "./routes/company-groups.js";
+import { hierarchyRouter } from "./routes/hierarchy.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 export const app = express();
@@ -50,4 +53,7 @@ app.use("/api/tp-records", tpRecordsRouter);
 app.use("/api/documents", documentsRouter);
 app.use("/api/analytics", analyticsRouter);
 app.use("/api/reports", reportsRouter);
+app.use("/api/mandantes", mandantesRouter);
+app.use("/api/company-groups", companyGroupsRouter);
+app.use("/api/hierarchy", hierarchyRouter);
 app.use(errorHandler);

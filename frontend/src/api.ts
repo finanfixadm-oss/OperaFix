@@ -8,6 +8,8 @@ import type {
   PaginatedLmRecords,
   TpGroup,
   TpRecord,
+  Mandante,
+  CompanyGroup,
 } from "./types";
 
 const rawUrl = (import.meta as any).env?.VITE_API_URL || "http://localhost:4000/api";
@@ -67,3 +69,13 @@ export const fetchTpRecords = () => fetchJson<TpRecord[]>("/tp-records");
 export const fetchDocuments = () => fetchJson<any[]>("/documents");
 
 export const publicBaseUrl = API_URL.replace(/\/api$/, "");
+
+export const fetchMandantes = () => fetchJson<Mandante[]>("/mandantes");
+export const fetchCompanyGroups = (params?: { kind?: string; mandante_id?: string }) => {
+  const search = new URLSearchParams();
+  if (params?.kind) search.set("kind", params.kind);
+  if (params?.mandante_id) search.set("mandante_id", params.mandante_id);
+  const suffix = search.toString() ? `?${search.toString()}` : "";
+  return fetchJson<CompanyGroup[]>(`/company-groups${suffix}`);
+};
+export const fetchHierarchyOverview = () => fetchJson<any[]>("/hierarchy/overview");

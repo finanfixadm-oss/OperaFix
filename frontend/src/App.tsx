@@ -2,6 +2,9 @@ import { Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
 import HomePage from "./pages/HomePage";
 import CompaniesPage from "./pages/CompaniesPage";
+import MandantesPage from "./pages/MandantesPage";
+import CompanyGroupsPage from "./pages/CompanyGroupsPage";
+import HierarchyPage from "./pages/HierarchyPage";
 import CollaboratorsPage from "./pages/CollaboratorsPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import LmGroupsPage from "./pages/LmGroupsPage";
@@ -18,6 +21,9 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Layout />}>
         <Route index element={<HomePage />} />
+        <Route path="/mandantes" element={<MandantesPage />} />
+        <Route path="/jerarquia" element={<HierarchyPage />} />
+        <Route path="/company-groups" element={<CompanyGroupsPage />} />
         <Route path="/empresas" element={<CompaniesPage />} />
         <Route path="/colaboradores" element={<CollaboratorsPage />} />
         <Route path="/documentos" element={<DocumentsPage />} />

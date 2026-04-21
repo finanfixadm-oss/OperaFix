@@ -159,3 +159,43 @@ export interface AnalyticsDashboard {
     actual_finanfix_amount?: string | number | null;
   }>;
 }
+
+
+export interface Mandante {
+  id: string;
+  name: string;
+  code?: string | null;
+  status?: string | null;
+  owner_name?: string | null;
+  commercial_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  tag?: string | null;
+  comment?: string | null;
+  _count?: { groups: number; companies: number };
+}
+
+export interface CompanyGroupCompanyLink {
+  id: string;
+  owner_name?: string | null;
+  default_entity?: string | null;
+  real_finanfix_amount?: string | number | null;
+  company: Company;
+}
+
+export interface CompanyGroup {
+  id: string;
+  mandante_id: string;
+  name: string;
+  kind: string;
+  owner_name?: string | null;
+  campaign_name?: string | null;
+  secondary_email?: string | null;
+  power_group?: string | null;
+  related_groups?: string | null;
+  tag?: string | null;
+  comments?: string | null;
+  mandante?: Mandante;
+  companies?: CompanyGroupCompanyLink[];
+  _count?: { companies: number; managementLines: number };
+}
