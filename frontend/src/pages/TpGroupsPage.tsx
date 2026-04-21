@@ -1,41 +1,22 @@
-import { useEffect, useState } from "react";
-import { fetchJson } from "../api";
-import type { PaginatedLmRecords, TpGroup } from "../types";
-import DataTable from "../components/DataTable";
+import { useEffect, useMemo, useState } from "react";
+import { fetchTpGroups } from "../api";
+import type { TpGroup } from "../types";
 
 export default function TpGroupsPage() {
   const [rows, setRows] = useState<TpGroup[]>([]);
-  const [mandantes, setMandantes] = useState<string[]>([]);
-  const [search, setSearch] = useState("");
-  const [mandante, setMandante] = useState("");
-
-  useEffect(() => {
-    fetchJson<PaginatedLmRecords>("/lm-records?page=1&pageSize=200").then((data) => setMandantes(data.filterOptions.mandantes || [])).catch(() => setMandantes([]));
-  }, []);
-
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    if (mandante) params.set("mandante", mandante);
-    fetchJson<TpGroup[]>(`/tp-groups?${params.toString()}`).then(setRows).catch(() => setRows([]));
-  }, [search, mandante]);
-
+  const [search, setSearch] = useState('');
+  useEffect(() => { fetchTpGroups().then(setRows).catch(() => setRows([])); }, []);
+  const filtered = useMemo(() => rows.filter((r) => [r.name, r.email, r.groups_related, r.mandante].join(' ').toLowerCase().includes(search.toLowerCase())), [rows, search]);
   return (
-    <div className="page-stack">
+    <div className="zoho-page">
       <div className="page-toolbar">
-        <div>
-          <span className="eyebrow">Trabajo Pesado</span>
-          <h2 className="page-title">Grupos empresas - TP</h2>
-        </div>
-        <div className="toolbar-actions">
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar grupo TP" className="toolbar-input" />
-          <select value={mandante} onChange={(e) => setMandante(e.target.value)} className="toolbar-input">
-            <option value="">Todos los mandantes</option>
-            {mandantes.map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
-        </div>
+        <div><span className="eyebrow">Actividades</span><h2 className="page-title">Grupos empresas - TP</h2></div>
+        <div className="toolbar-actions"><button className="ghost-btn">Filtrar</button><button className="ghost-btn">Ordenar</button><button className="primary-btn">Crear Grupo de empresa - TP</button></div>
       </div>
-      <DataTable title="Grupos empresas - TP" columns={[{ key: "name", label: "Nombre grupo" }, { key: "email", label: "Correo" }, { key: "mandante", label: "Mandante" }, { key: "created_at", label: "Creación" }]} rows={rows as any} />
+      <div className="zoho-layout single-detailless">
+        <aside className="filter-panel"><label className="field-block"><span>Buscar</span><input value={search} onChange={(e)=>setSearch(e.target.value)} /></label></aside>
+        <section className="table-panel wide-panel"><div className="panel-title-row"><h3>Listado</h3><span className="records-counter">{filtered.length} registros</span></div><div className="table-scroll"><table className="crm-table enhanced"><thead><tr><th>Nombre grupo</th><th>Mandante</th><th>Correo</th><th>Grupos asociados</th></tr></thead><tbody>{filtered.length===0?<tr><td colSpan={4}>Sin registros</td></tr>:filtered.map((r)=><tr key={r.id}><td>{r.name}</td><td>{r.mandante || '-'}</td><td>{r.email || '-'}</td><td>{r.groups_related || '-'}</td></tr>)}</tbody></table></div></section>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,3 @@
-export type UserRole = "mandante" | "super_admin" | "worker";
-
 export interface LmRecord {
   id: string;
   rut: string;
@@ -22,10 +20,9 @@ export interface LmRecord {
   actual_paid_amount?: string | number | null;
   actual_finanfix_amount?: string | number | null;
   client_contract_status?: string | null;
-  afp_payment_date?: string | null;
-  client_notification_date?: string | null;
   created_at?: string;
   updated_at?: string;
+  last_activity_at?: string | null;
 }
 
 export interface LmRecordFilterOptions {
@@ -65,19 +62,7 @@ export interface CrmDocument {
   stored_filename: string;
   storage_path: string;
   mime_type?: string | null;
-  related_module?: string;
-  related_record_id?: string | null;
-  folder_id?: string | null;
   created_at: string;
-}
-
-export interface CrmFolder {
-  id: string;
-  name: string;
-  module?: string | null;
-  mandante?: string | null;
-  parent_id?: string | null;
-  created_at?: string;
 }
 
 export interface LmRecordDetailResponse {
@@ -92,18 +77,19 @@ export interface Company {
   rut: string;
   business_name: string;
   mandante?: string | null;
-  email?: string | null;
   address?: string | null;
+  email?: string | null;
+  estimated_amount?: string | number | null;
   created_at?: string;
 }
 
 export interface Collaborator {
   id: string;
   full_name: string;
-  email?: string | null;
   position?: string | null;
+  email?: string | null;
   phone?: string | null;
-  company_id?: string | null;
+  linkedin_url?: string | null;
   company?: Company | null;
   created_at?: string;
 }
@@ -115,6 +101,7 @@ export interface LmGroup {
   secondary_email?: string | null;
   groups_related?: string | null;
   created_at?: string;
+  updated_at?: string;
 }
 
 export interface TpGroup {
@@ -130,8 +117,45 @@ export interface TpRecord {
   id: string;
   mandante?: string | null;
   portal_access?: string | null;
-  client_contract_status?: string | null;
-  comment?: string | null;
   production_months?: string | null;
+  comment?: string | null;
+  client_contract_status?: string | null;
+  cen_content?: string | null;
+  cen_query?: string | null;
   created_at?: string;
+}
+
+export interface KpiOverview {
+  totalRecords: number;
+  paidRecords: number;
+  pendingPower: number;
+  pendingCC: number;
+  totalRefund: number;
+  totalFinanfix: number;
+}
+
+export interface AnalyticsBucket {
+  entity?: string | null;
+  management_status?: string | null;
+  mandante?: string | null;
+  _count: { _all: number };
+  _sum?: {
+    refund_amount?: number | null;
+    actual_finanfix_amount?: number | null;
+  };
+}
+
+export interface AnalyticsDashboard {
+  byEntity: AnalyticsBucket[];
+  byStatus: AnalyticsBucket[];
+  byMandante: AnalyticsBucket[];
+  recentRecords: Array<{
+    id: string;
+    rut: string;
+    business_name?: string | null;
+    entity?: string | null;
+    management_status?: string | null;
+    updated_at?: string;
+    actual_finanfix_amount?: string | number | null;
+  }>;
 }

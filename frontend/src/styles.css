@@ -110,32 +110,80 @@ button { cursor: pointer; }
 @media (max-width: 1500px) { .zoho-layout { grid-template-columns: 250px minmax(0, 1fr) 340px; } }
 @media (max-width: 1260px) { .app-shell { grid-template-columns: 1fr; } .zoho-layout { grid-template-columns: 1fr; } .filter-panel, .detail-panel { position: static; min-height: auto; } }
 @media (max-width: 900px) { .global-header { flex-direction: column; align-items: flex-start; } .form-grid, .detail-grid, .detail-metrics, .kpi-grid { grid-template-columns: 1fr; } }
-.page-stack { display: flex; flex-direction: column; gap: 18px; }
-.hero-with-selector { display:flex; justify-content:space-between; gap:20px; align-items:flex-start; }
-.mandante-switcher { min-width: 280px; display:flex; flex-direction:column; gap:8px; }
-.mandante-switcher label { font-size: 18px; color: var(--brand-primary); font-weight: 700; }
-.mandante-switcher select, .toolbar-input, .ghost-select { width: 100%; border: 1px solid #cfe0ff; border-radius: 14px; padding: 10px 12px; font-size: 19px; background: white; }
+
+.page-stack { display:flex; flex-direction:column; gap:18px; }
+.table-card { background:white; border:1px solid var(--brand-border); border-radius:20px; overflow:hidden; }
+.table-toolbar.compact { padding:14px 16px; border-bottom:1px solid #eaf0ff; }
 .analysis-toolbar { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-.analysis-filters, .analysis-actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-.analysis-grid { display:grid; gap:16px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.widget-card { background:white; border:1px solid var(--brand-border); border-radius:20px; padding:16px; box-shadow: 0 8px 20px rgba(9,0,204,.06); }
+.analysis-filters,.analysis-actions { display:flex; gap:10px; flex-wrap:wrap; }
+.analysis-grid { display:grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap:16px; }
+.widget-card { background:white; border:1px solid var(--brand-border); border-radius:20px; padding:16px; }
 .widget-card.span-2 { grid-column: span 2; }
-.widget-card.span-full { grid-column: 1 / -1; }
-.widget-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-.donut-list, .mini-table { display:flex; flex-direction:column; gap:10px; }
-.metric-row, .mini-row { display:grid; grid-template-columns: minmax(180px,1fr) 1fr auto; gap:12px; align-items:center; }
+.widget-header { margin-bottom:14px; }
+.widget-header h3 { font-size:22px; color:var(--brand-primary); }
+.donut-list,.mini-table { display:flex; flex-direction:column; gap:10px; }
+.metric-row,.mini-row { display:grid; grid-template-columns: 1.4fr 1fr auto; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid #edf2ff; }
 .mini-row { grid-template-columns: 1fr auto; }
 .metric-row span, .mini-row span { color:#64748b; }
-.metric-bar { height:10px; background:#eef4ff; border-radius:999px; overflow:hidden; }
-.metric-bar-fill { height:100%; background:linear-gradient(90deg,var(--brand-primary),var(--brand-accent)); border-radius:999px; }
-.empty-state { color:#64748b; padding:12px; border:1px dashed #cbd5e1; border-radius:12px; }
-.documents-layout { display:grid; grid-template-columns: 320px 1fr; gap:18px; }
-.documents-sidebar { position: sticky; top: 16px; align-self: start; }
-.folder-card { background:white; border:1px solid var(--brand-border); border-radius:20px; padding:16px; }
-.folder-module-selector, .folder-create-row, .folder-list { display:flex; flex-direction:column; gap:10px; }
-.folder-item { display:flex; align-items:center; gap:10px; background:#f8fbff; border:1px solid #dbeafe; border-radius:12px; padding:10px 12px; text-align:left; font-size:18px; }
-.folder-item.active { background:rgba(37,69,221,.08); border-color: var(--brand-primary-3); color: var(--brand-primary); }
-.upload-inline input { display:none; }
-.kpi-grid.two-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.placeholder-panel { padding:18px; border:1px dashed #cbd5e1; border-radius:16px; font-size:20px; color:#64748b; }
-@media (max-width: 1100px) { .documents-layout, .analysis-grid { grid-template-columns: 1fr; } .widget-card.span-2 { grid-column: span 1; } .hero-with-selector { flex-direction:column; } }
+.metric-bar { height:10px; background:#eef2ff; border-radius:999px; overflow:hidden; }
+.metric-bar-fill { height:100%; background:linear-gradient(90deg, var(--brand-primary-2), var(--brand-accent)); }
+.workspace-switcher { background:#f6f8ff; border:1px solid var(--panel-border); border-radius:10px; padding:10px 12px; font-size:18px; margin-bottom:12px; }
+.sidebar-search { width:100%; border:1px solid var(--panel-border); border-radius:10px; padding:10px 12px; font-size:18px; margin-bottom:16px; }
+.sidebar-group.compact { margin-bottom:10px; }
+.sidebar-group-title { font-size:18px; color:#64748b; }
+.topbar-icons { display:flex; gap:12px; align-items:center; font-size:18px; }
+.zoho-layout.single-detailless { grid-template-columns: 280px minmax(0,1fr); }
+.wide-panel { min-height: 640px; }
+.documents-workdrive .page-title { font-size: 28px; }
+.docs-layout { display:grid; grid-template-columns: 250px 1fr; gap:16px; }
+.docs-sidebar, .docs-main { background:white; border:1px solid var(--panel-border); border-radius:20px; }
+.docs-sidebar { padding:14px; }
+.docs-side-head { font-weight:700; margin-bottom:14px; }
+.docs-tree-title { font-size:14px; color:#64748b; margin-bottom:8px; }
+.docs-tree-item { padding:10px; border-radius:10px; }
+.docs-tree-item.active { background:#eef4ff; color:var(--brand-primary); }
+.docs-main { padding:14px; }
+.docs-toolbar { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:14px; }
+.docs-breadcrumb { color:#64748b; }
+.docs-search { width:260px; max-width:100%; border:1px solid var(--panel-border); border-radius:10px; padding:10px 12px; font-size:18px; }
+.docs-list { display:flex; flex-direction:column; gap:10px; }
+.docs-row { display:flex; justify-content:space-between; gap:12px; align-items:center; border:1px solid #edf2ff; border-radius:14px; padding:14px; }
+.docs-row div:last-child { color:#64748b; }
+.home-hero { display:flex; justify-content:space-between; gap:16px; align-items:end; }
+.hero-select-wrap { min-width:240px; }
+.field-block.compact span { font-size:14px; }
+.lm-detail-page { padding: 20px 0; }
+.lm-detail-header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 20px; }
+.lm-detail-header-left { display: flex; gap: 14px; align-items: center; }
+.icon-back-btn { border: none; background: transparent; font-size: 22px; cursor: pointer; padding: 6px 8px; }
+.lm-avatar { width: 42px; height: 42px; border-radius: 10px; background: #eef2ff; color: #1d4ed8; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+.lm-detail-title { margin: 0; font-size: 28px; font-weight: 700; }
+.lm-detail-subtitle { display: flex; gap: 8px; flex-wrap: wrap; color: #64748b; font-size: 14px; margin-top: 4px; }
+.lm-detail-header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.lm-detail-body { display: grid; grid-template-columns: 220px 1fr; gap: 18px; }
+.lm-related-sidebar { display: flex; flex-direction: column; gap: 14px; }
+.lm-related-block { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 14px; }
+.lm-related-title { font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 10px; }
+.lm-related-link { display: block; width: 100%; text-align: left; border: none; background: transparent; padding: 8px 0; color: #0f172a; cursor: pointer; font-size: 14px; }
+.lm-detail-main { display: flex; flex-direction: column; gap: 16px; }
+.lm-tab-row { display: flex; gap: 8px; }
+.lm-tab { border: 1px solid #cbd5e1; background: #fff; padding: 8px 14px; border-radius: 999px; cursor: pointer; font-weight: 600; }
+.lm-tab.active { border-color: #3b82f6; color: #1d4ed8; background: #eff6ff; }
+.zoho-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; }
+.zoho-card-header,.section-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid #eef2f7; }
+.zoho-card-header h3,.section-row h3 { margin: 0; font-size: 16px; }
+.zoho-card-grid { display: grid; gap: 16px 24px; padding: 18px 16px; }
+.zoho-card-grid.two-cols { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+.zoho-card-grid.three-cols { grid-template-columns: repeat(3, minmax(220px, 1fr)); }
+.info-pair { min-width: 0; }
+.lm-comment-box { padding: 0 16px 18px; }
+.note-input-row { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
+.note-textarea { width: 100%; min-height: 88px; resize: vertical; border: 1px solid #cbd5e1; border-radius: 12px; padding: 12px; font: inherit; }
+.notes-list,.attachment-list,.activity-list,.timeline-list { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+.note-card,.activity-card,.document-row,.timeline-item { border: 1px solid #eef2f7; border-radius: 12px; padding: 12px; background: #fafcff; }
+.note-date,.activity-date,.timeline-date { font-size: 12px; color: #64748b; margin-top: 6px; }
+.activity-type,.timeline-type { font-size: 12px; font-weight: 700; color: #2563eb; margin-bottom: 4px; }
+.timeline-item { display: flex; gap: 12px; align-items: flex-start; }
+.timeline-dot { width: 10px; height: 10px; border-radius: 999px; background: #2563eb; margin-top: 6px; flex: 0 0 auto; }
+.timeline-content { min-width: 0; }
+@media (max-width: 1200px) { .analysis-grid { grid-template-columns:1fr; } .widget-card.span-2 { grid-column: span 1; } .docs-layout, .lm-detail-body, .zoho-layout.single-detailless { grid-template-columns:1fr; } }
