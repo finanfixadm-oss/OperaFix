@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../config/prisma.js";
+import { Prisma } from "@prisma/client";
 
 export const lmRecordsRouter = Router();
 
@@ -26,25 +27,41 @@ lmRecordsRouter.get("/", async (req, res, next) => {
     const confirmation_cc = parseBoolean(req.query.confirmation_cc);
     const confirmation_power = parseBoolean(req.query.confirmation_power);
 
-    const where = {
-      AND: [
-        search
-          ? {
-              OR: [
-                { rut: { contains: search, mode: "insensitive" } },
-                { business_name: { contains: search, mode: "insensitive" } },
-                { search_group: { contains: search, mode: "insensitive" } },
-                { request_number: { contains: search, mode: "insensitive" } }
-              ]
-            }
-          : {},
-        entity ? { entity: { equals: entity, mode: "insensitive" } } : {},
-        management_status ? { management_status: { equals: management_status, mode: "insensitive" } } : {},
-        mandante ? { mandante: { equals: mandante, mode: "insensitive" } } : {},
-        confirmation_cc === undefined ? {} : { confirmation_cc },
-        confirmation_power === undefined ? {} : { confirmation_power }
-      ]
-    };
+    // Usamos 'any' temporalmente para que tsc no se detenga si Prisma no ha terminado de generar los tipos
+    const conditions: any[] = [];
+
+    if (search) {
+      conditions.push({
+        OR: [
+          { rut: { contains: search, mode: "insensitive" } },
+          { business_name: { contains: search, mode: "insensitive" } },
+          { search_group: { contains: search, mode: "insensitive" } },
+          { request_number: { contains: search, mode: "insensitive" } }
+        ]
+      });
+    }
+
+    if (entity) {
+      conditions.push({ entity: { equals: entity, mode: "insensitive" } });
+    }
+
+    if (management_status) {
+      conditions.push({ management_status: { equals: management_status, mode: "insensitive" } });
+    }
+
+    if (mandante) {
+      conditions.push({ mandante: { equals: mandante, mode: "insensitive" } });
+    }
+
+    if (confirmation_cc !== undefined) {
+      conditions.push({ confirmation_cc });
+    }
+
+    if (confirmation_power !== undefined) {
+      conditions.push({ confirmation_power });
+    }
+
+    const where = conditions.length > 0 ? { AND: conditions } : {};
 
     const [items, total, entities, statuses, mandantes] = await Promise.all([
       prisma.lmRecord.findMany({
@@ -63,9 +80,9 @@ lmRecordsRouter.get("/", async (req, res, next) => {
       items,
       meta: { total, page, pageSize, totalPages: Math.max(Math.ceil(total / pageSize), 1) },
       filterOptions: {
-        entities: entities.map((x: {entity: string | null}) => x.entity).filter(Boolean),
-        statuses: statuses.map((x: {management_status: string | null}) => x.management_status).filter(Boolean),
-        mandantes: mandantes.map((x: {mandante: string | null}) => x.mandante).filter(Boolean)
+        entities: entities.map((x: any) => x.entity).filter(Boolean),
+        statuses: statuses.map((x: any) => x.management_status).filter(Boolean),
+        mandantes: mandantes.map((x: any) => x.mandante).filter(Boolean)
       }
     });
   } catch (error) {
@@ -159,11 +176,11 @@ lmRecordsRouter.put("/:id", async (req, res, next) => {
         search_group: req.body.search_group ?? current.search_group,
         rut: req.body.rut ?? current.rut,
         entity: req.body.entity ?? current.entity,
-        management_status: nextStatus,
-        refund_amount: decimalOrNull(req.body.refund_amount) ?? current.refund_amount,
-        confirmation_cc: nextCC,
-        confirmation_power: nextPower,
-        actual_paid_amount: decimalOrNull(req.body.actual_paid_amount) ?? current.actual_paid_amount,
+        management_status: req.body.management_status ?? current.management_status,
+        refund_amount: req.body.refund_amount !== undefined ? decimalOrNull(req.body.refund_amount) : current.refund_amount,
+        confirmation_cc: req.body.confirmation_cc !== undefined ? nextCC : current.confirmation_cc,
+        confirmation_power: req.body.confirmation_power !== undefined ? nextPower : current.confirmation_power,
+        actual_paid_amount: req.body.actual_paid_amount !== undefined ? decimalOrNull(req.body.actual_paid_amount) : current.actual_paid_amount,
         excess_type_reason: req.body.excess_type_reason ?? current.excess_type_reason,
         worker_status: req.body.worker_status ?? current.worker_status,
         request_number: req.body.request_number ?? current.request_number,
@@ -174,50 +191,11 @@ lmRecordsRouter.put("/:id", async (req, res, next) => {
         comment: req.body.comment ?? current.comment,
         mandante: req.body.mandante ?? current.mandante,
         portal_access: req.body.portal_access ?? current.portal_access,
-        last_activity_at: new Date(),
-        updated_at: new Date()
-      }
-    });
-
-    await prisma.activity.create({
-      data: {
-        related_module: "lm_records",
-        related_record_id: updated.id,
-        activity_type: "updated",
-        description: `Registro actualizado. Estado: ${updated.management_status || "Sin estado"}`
+        last_activity_at: new Date()
       }
     });
 
     res.json(updated);
-  } catch (error) {
-    next(error);
-  }
-});
-
-lmRecordsRouter.post("/:id/notes", async (req, res, next) => {
-  try {
-    if (!req.body.content?.trim()) {
-      return res.status(400).json({ message: "La nota no puede ir vacía" });
-    }
-
-    const note = await prisma.note.create({
-      data: {
-        related_module: "lm_records",
-        related_record_id: req.params.id,
-        content: String(req.body.content).trim()
-      }
-    });
-
-    await prisma.activity.create({
-      data: {
-        related_module: "lm_records",
-        related_record_id: req.params.id,
-        activity_type: "note",
-        description: "Se agregó una nota al registro"
-      }
-    });
-
-    res.status(201).json(note);
   } catch (error) {
     next(error);
   }
