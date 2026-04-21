@@ -1,11 +1,22 @@
+import { useEffect, useState } from "react";
 import DataTable from "../components/DataTable";
+import { fetchJson } from "../api";
 
-const rows = [
-  { id: "1", rut: "76.123.456-7", business_name: "Optimiza Consulting", mandante: "Sí", email: "contacto@optimiza.cl" },
-  { id: "2", rut: "77.987.654-3", business_name: "Mundo Previsional", mandante: "Sí", email: "contacto@mundoprevisional.cl" }
-];
+type CompanyRow = {
+  id: string;
+  rut: string;
+  business_name: string;
+  mandante?: string | null;
+  email?: string | null;
+};
 
 export default function CompaniesPage() {
+  const [rows, setRows] = useState<CompanyRow[]>([]);
+
+  useEffect(() => {
+    fetchJson<CompanyRow[]>("/companies").then(setRows).catch(() => setRows([]));
+  }, []);
+
   return (
     <DataTable
       title="Empresas"

@@ -1,18 +1,29 @@
+import { useEffect, useState } from "react";
 import DataTable from "../components/DataTable";
+import { fetchJson } from "../api";
 
-const rows = [
-  { id: "1", title: "Facturas Optimiza Co", module: "Documentos", uploaded_by: "Luis Mendoza", created_at: "2026-04-15" },
-  { id: "2", title: "Checklist_Documentación_AFP_2026.pdf", module: "Documentos", uploaded_by: "Luis Mendoza", created_at: "2026-03-11" }
-];
+type DocumentRow = {
+  id: string;
+  title: string;
+  related_module?: string | null;
+  created_at?: string;
+  original_filename?: string;
+};
 
 export default function DocumentsPage() {
+  const [rows, setRows] = useState<DocumentRow[]>([]);
+
+  useEffect(() => {
+    fetchJson<DocumentRow[]>("/documents").then(setRows).catch(() => setRows([]));
+  }, []);
+
   return (
     <DataTable
       title="Documentos"
       columns={[
         { key: "title", label: "Nombre" },
-        { key: "module", label: "Módulo" },
-        { key: "uploaded_by", label: "Cargado por" },
+        { key: "related_module", label: "Módulo" },
+        { key: "original_filename", label: "Archivo original" },
         { key: "created_at", label: "Fecha" }
       ]}
       rows={rows}

@@ -1,11 +1,27 @@
+import { useEffect, useState } from "react";
 import DataTable from "../components/DataTable";
+import { fetchJson } from "../api";
 
-const rows = [
-  { id: "1", full_name: "Fernando Morei", email: "fernando.morey@iansa.cl", position: "Encargado RRHH", company: "Iansa" },
-  { id: "2", full_name: "Renato Ramirez", email: "rramirez@guillaume.cl", position: "Analista", company: "Guillaume" }
-];
+type CollaboratorRow = {
+  id: string;
+  full_name: string;
+  email?: string | null;
+  position?: string | null;
+  company?: { business_name?: string | null } | null;
+};
 
 export default function CollaboratorsPage() {
+  const [rows, setRows] = useState<CollaboratorRow[]>([]);
+
+  useEffect(() => {
+    fetchJson<CollaboratorRow[]>("/collaborators").then(setRows).catch(() => setRows([]));
+  }, []);
+
+  const normalized = rows.map((row) => ({
+    ...row,
+    company_name: row.company?.business_name || ""
+  })) as Array<CollaboratorRow & { company_name: string }>;
+
   return (
     <DataTable
       title="Colaboradores"
@@ -13,9 +29,9 @@ export default function CollaboratorsPage() {
         { key: "full_name", label: "Nombre" },
         { key: "email", label: "Correo" },
         { key: "position", label: "Cargo" },
-        { key: "company", label: "Empresa" }
+        { key: "company_name", label: "Empresa" }
       ]}
-      rows={rows}
+      rows={normalized}
     />
   );
 }

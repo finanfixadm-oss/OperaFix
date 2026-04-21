@@ -1,10 +1,22 @@
+import { useEffect, useState } from "react";
 import DataTable from "../components/DataTable";
+import { fetchJson } from "../api";
 
-const rows = [
-  { id: "1", name: "Grupo TP Norte", email: "tp@cliente.cl", mandante: "Sí", created_at: "2026-04-01" }
-];
+type TpGroupRow = {
+  id: string;
+  name: string;
+  email?: string | null;
+  mandante?: string | null;
+  created_at?: string;
+};
 
 export default function TpGroupsPage() {
+  const [rows, setRows] = useState<TpGroupRow[]>([]);
+
+  useEffect(() => {
+    fetchJson<TpGroupRow[]>("/tp-groups").then(setRows).catch(() => setRows([]));
+  }, []);
+
   return (
     <DataTable
       title="Grupos empresas - TP"

@@ -1,10 +1,22 @@
+import { useEffect, useState } from "react";
 import DataTable from "../components/DataTable";
+import { fetchJson } from "../api";
 
-const rows = [
-  { id: "1", name: "Optimiza Consulting", secondary_email: "apoyo@optimiza.cl", mandante: "Sí", created_at: "2026-03-17" }
-];
+type LmGroupRow = {
+  id: string;
+  name: string;
+  secondary_email?: string | null;
+  mandante?: string | null;
+  created_at?: string;
+};
 
 export default function LmGroupsPage() {
+  const [rows, setRows] = useState<LmGroupRow[]>([]);
+
+  useEffect(() => {
+    fetchJson<LmGroupRow[]>("/lm-groups").then(setRows).catch(() => setRows([]));
+  }, []);
+
   return (
     <DataTable
       title="Grupos de empresas - LM"
