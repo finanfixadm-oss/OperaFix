@@ -1,18 +1,15 @@
 import { Router } from "express";
 import { prisma } from "../config/prisma.js";
 
-export const mandantesRouter = Router();
+const mandantesRouter = Router();
 
 mandantesRouter.get("/", async (_req, res, next) => {
   try {
-    const rows = await prisma.mandante.findMany({
-      include: {
-        _count: { select: { groups: true, companies: true } },
-        groups: { take: 5, orderBy: { created_at: "desc" } }
-      },
-      orderBy: { name: "asc" }
+    const items = await prisma.mandante.findMany({
+      orderBy: { name: "asc" },
     });
-    res.json(rows);
+
+    res.json(items);
   } catch (error) {
     next(error);
   }
@@ -20,21 +17,24 @@ mandantesRouter.get("/", async (_req, res, next) => {
 
 mandantesRouter.post("/", async (req, res, next) => {
   try {
-    const row = await prisma.mandante.create({
+    const item = await prisma.mandante.create({
       data: {
         name: req.body.name,
-        code: req.body.code || null,
-        status: req.body.status || "Activo",
         owner_name: req.body.owner_name || null,
-        commercial_name: req.body.commercial_name || null,
         email: req.body.email || null,
         phone: req.body.phone || null,
-        tag: req.body.tag || null,
-        comment: req.body.comment || null
-      }
+        campaign: req.body.campaign || null,
+        active_contract: req.body.active_contract || null,
+        end_contract_date: req.body.end_contract_date
+          ? new Date(req.body.end_contract_date)
+          : null,
+      },
     });
-    res.status(201).json(row);
+
+    res.status(201).json(item);
   } catch (error) {
     next(error);
   }
 });
+
+export default mandantesRouter;

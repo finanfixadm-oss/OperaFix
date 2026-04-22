@@ -1,49 +1,63 @@
 import { Router } from "express";
 import { prisma } from "../config/prisma.js";
 
-export const analyticsRouter = Router();
+const analyticsRouter = Router();
 
-analyticsRouter.get("/dashboard", async (_req, res, next) => {
+analyticsRouter.get("/", async (_req, res, next) => {
   try {
-    const [byEntity, byStatus, byMandante, recentRecords] = await Promise.all([
-      prisma.lmRecord.groupBy({
-        by: ["entity"],
-        _sum: { actual_finanfix_amount: true, refund_amount: true },
-        _count: { _all: true },
-        where: { entity: { not: null } },
-        orderBy: { _count: { entity: "desc" } }
-      }),
-      prisma.lmRecord.groupBy({
-        by: ["management_status"],
-        _count: { _all: true },
-        _sum: { refund_amount: true },
-        where: { management_status: { not: null } },
-        orderBy: { _count: { management_status: "desc" } }
-      }),
-      prisma.lmRecord.groupBy({
-        by: ["mandante"],
-        _count: { _all: true },
-        _sum: { actual_finanfix_amount: true },
-        where: { mandante: { not: null } },
-        orderBy: { _sum: { actual_finanfix_amount: "desc" } }
-      }),
-      prisma.lmRecord.findMany({
-        take: 8,
-        orderBy: { updated_at: "desc" },
-        select: {
-          id: true,
-          rut: true,
-          business_name: true,
-          entity: true,
-          management_status: true,
-          updated_at: true,
-          actual_finanfix_amount: true
-        }
-      })
-    ]);
+    const byEntity = await prisma.lmRecord.groupBy({
+      by: ["entity"],
+      _sum: {
+        monto_finanfix_solutions: true,
+        refund_amount: true,
+      },
+      orderBy: {
+        entity: "asc",
+      },
+    });
 
-    res.json({ byEntity, byStatus, byMandante, recentRecords });
+    const byStatus = await prisma.lmRecord.groupBy({
+      by: ["management_status"],
+      _count: {
+        id: true,
+      },
+      orderBy: {
+        management_status: "asc",
+      },
+    });
+
+    const byMandante = await prisma.lmRecord.groupBy({
+      by: ["mandante"],
+      _sum: {
+        monto_finanfix_solutions: true,
+      },
+      orderBy: {
+        mandante: "asc",
+      },
+    });
+
+    const recentRecords = await prisma.lmRecord.findMany({
+      take: 10,
+      orderBy: { created_at: "desc" },
+      select: {
+        id: true,
+        rut: true,
+        business_name: true,
+        entity: true,
+        management_status: true,
+        monto_finanfix_solutions: true,
+      },
+    });
+
+    res.json({
+      byEntity,
+      byStatus,
+      byMandante,
+      recentRecords,
+    });
   } catch (error) {
     next(error);
   }
 });
+
+export default analyticsRouter;

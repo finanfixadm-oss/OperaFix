@@ -7,327 +7,436 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model AppUser {
-  id           String   @id @default(uuid()) @db.Uuid
-  full_name    String   @db.VarChar(150)
-  email        String   @unique @db.VarChar(180)
-  password_hash String
-  role         String   @default("admin") @db.VarChar(50)
-  is_active    Boolean  @default(true)
-  created_at   DateTime @default(now()) @db.Timestamptz(6)
-  updated_at   DateTime @default(now()) @db.Timestamptz(6)
-
-  companiesOwned      Company[]       @relation("company_owner")
-  collaboratorsOwned  Collaborator[]  @relation("collab_owner")
+enum ManagementType {
+  LM
+  TP
 }
 
-model Campaign {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String   @unique @db.VarChar(150)
-  description String?
-  created_at  DateTime @default(now()) @db.Timestamptz(6)
+enum DocumentCategory {
+  ORDEN_COMPRA
+  FACTURA
+  DETALLE_TRABAJADORES
+  ARCHIVO_GESTION
+  CARTA_EXPLICATIVA
+  COMPROBANTE_PAGO
+  ARCHIVO_AFP
+  RESPUESTA_CEN
+  PODER
+  OTRO
 }
 
-model Company {
-  id               String   @id @default(uuid()) @db.Uuid
-  rut              String   @unique @db.VarChar(20)
-  business_name    String   @db.VarChar(255)
-  mandante         String?  @db.VarChar(150)
-  address          String?
-  email            String?  @db.VarChar(180)
-  estimated_amount Decimal? @db.Decimal(18,2)
-  currency_code    String?  @default("CLP") @db.VarChar(10)
-  exchange_rate    Decimal? @default(1) @db.Decimal(18,4)
-  owner_user_id    String?  @db.Uuid
-  tag              String?  @db.VarChar(100)
-  unsubscribe_mode String?  @db.VarChar(100)
-  unsubscribe_at   DateTime? @db.Timestamptz(6)
-  last_activity_at DateTime? @db.Timestamptz(6)
-  created_at       DateTime @default(now()) @db.Timestamptz(6)
-  updated_at       DateTime @default(now()) @db.Timestamptz(6)
+model User {
+  id         String   @id @default(cuid())
+  name       String
+  email      String?  @unique
+  role       String?
+  profile    String?
+  is_active  Boolean  @default(true)
+  phone      String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
-  mandante_id    String?  @db.Uuid
+  notes        Note[]
+  activities   Activity[]
+  uploadedDocs Document[] @relation("UploadedByUser")
 
-  owner         AppUser?       @relation("company_owner", fields: [owner_user_id], references: [id])
-  mandanteRel   Mandante?      @relation(fields: [mandante_id], references: [id])
-  collaborators Collaborator[]
-  documents     Document[]
-  groupLinks    CompanyGroupCompany[]
-  managementLines ManagementLine[]
+  @@map("users")
 }
-
-model Collaborator {
-  id                String   @id @default(uuid()) @db.Uuid
-  company_id         String?  @db.Uuid
-  kam_user_id        String?  @db.Uuid
-  owner_user_id      String?  @db.Uuid
-  full_name          String   @db.VarChar(180)
-  position           String?  @db.VarChar(120)
-  email              String?  @db.VarChar(180)
-  phone              String?  @db.VarChar(50)
-  linkedin_url       String?
-  profile_photo_path String?
-  tag                String?  @db.VarChar(100)
-  unsubscribe_mode   String?  @db.VarChar(100)
-  last_activity_at   DateTime? @db.Timestamptz(6)
-  created_at         DateTime @default(now()) @db.Timestamptz(6)
-  updated_at         DateTime @default(now()) @db.Timestamptz(6)
-
-  company Company? @relation(fields: [company_id], references: [id])
-  owner   AppUser? @relation("collab_owner", fields: [owner_user_id], references: [id])
-}
-
-model LmCompanyGroup {
-  id               String   @id @default(uuid()) @db.Uuid
-  name             String   @unique @db.VarChar(255)
-  mandante         String?  @db.VarChar(150)
-  owner_user_id    String?  @db.Uuid
-  campaign_id      String?  @db.Uuid
-  secondary_email  String?  @db.VarChar(180)
-  group_power_file String?
-  groups_related   String?
-  email_opt_out    Boolean  @default(false)
-  tag              String?  @db.VarChar(100)
-  unsubscribe_mode String?  @db.VarChar(100)
-  unsubscribe_at   DateTime? @db.Timestamptz(6)
-  last_activity_at DateTime? @db.Timestamptz(6)
-  created_at       DateTime @default(now()) @db.Timestamptz(6)
-  updated_at       DateTime @default(now()) @db.Timestamptz(6)
-}
-
-model LmRecord {
-  id                         String   @id @default(uuid()) @db.Uuid
-  lm_group_id                String?  @db.Uuid
-  owner_user_id              String?  @db.Uuid
-  modified_by_user_id        String?  @db.Uuid
-  search_group               String?  @db.VarChar(150)
-  rut                        String   @db.VarChar(20)
-  entity                     String?  @db.VarChar(120)
-  management_status          String?  @db.VarChar(120)
-  refund_amount              Decimal? @default(0) @db.Decimal(18,2)
-  confirmation_cc            Boolean? @default(false)
-  confirmation_power         Boolean? @default(false)
-  actual_paid_amount         Decimal? @default(0) @db.Decimal(18,2)
-  excess_type_reason         String?  @db.VarChar(150)
-  worker_status              String?  @db.VarChar(100)
-  request_number             String?  @db.VarChar(100)
-  business_name              String?  @db.VarChar(255)
-  actual_finanfix_amount     Decimal? @default(0) @db.Decimal(18,2)
-  production_months          String?
-  invoice_number             String?  @db.VarChar(100)
-  bank_name                  String?  @db.VarChar(120)
-  account_number             String?  @db.VarChar(100)
-  account_type               String?  @db.VarChar(80)
-  client_contract_status     String?  @db.VarChar(120)
-  fee                        Decimal? @default(0) @db.Decimal(18,2)
-  tag                        String?  @db.VarChar(100)
-  unsubscribe_mode           String?  @db.VarChar(100)
-  unsubscribe_at             DateTime? @db.Timestamptz(6)
-  connected_to               String?  @db.VarChar(255)
-  finanfix_invoice_payment_date DateTime? @db.Date
-  finanfix_invoiced          Boolean? @default(false)
-  client_invoiced            Boolean? @default(false)
-  entity_paid                Boolean? @default(false)
-  afp_payment_date           DateTime? @db.Date
-  address                    String?
-  client_notification_date   DateTime? @db.Date
-  afp_submission_date        DateTime? @db.Date
-  finanfix_invoice_date      DateTime? @db.Date
-  other_banks                String?
-  finanfix_group             String?  @db.VarChar(150)
-  rejection_annulment_reason String?
-  campaign_id                String?  @db.Uuid
-  client_amount              Decimal? @default(0) @db.Decimal(18,2)
-  finanfix_amount            Decimal? @default(0) @db.Decimal(18,2)
-  actual_client_amount       Decimal? @default(0) @db.Decimal(18,2)
-  contract_end_date          DateTime? @db.Date
-  rejection_date             DateTime? @db.Date
-  comment                    String?
-  oc_number                  String?  @db.VarChar(100)
-  afp_shipment               String?  @db.VarChar(120)
-  afp_entry_date             DateTime? @db.Date
-  mandante                   String?  @db.VarChar(150)
-  portal_access              String?  @db.VarChar(100)
-  cen_response               String?  @db.VarChar(120)
-  cen_query                  String?  @db.VarChar(120)
-  request_entry_month        String?  @db.VarChar(40)
-  cen_content                String?
-  note_badge                 Boolean? @default(false)
-  activity_badge             Boolean? @default(false)
-  last_activity_at           DateTime? @db.Timestamptz(6)
-  created_at                 DateTime @default(now()) @db.Timestamptz(6)
-  updated_at                 DateTime @default(now()) @db.Timestamptz(6)
-}
-
-model TpCompanyGroup {
-  id               String   @id @default(uuid()) @db.Uuid
-  name             String   @unique @db.VarChar(255)
-  mandante         String?  @db.VarChar(150)
-  owner_user_id    String?  @db.Uuid
-  email            String?  @db.VarChar(180)
-  group_power_file String?
-  groups_related   String?
-  tag              String?  @db.VarChar(100)
-  unsubscribe_mode String?  @db.VarChar(100)
-  unsubscribe_at   DateTime? @db.Timestamptz(6)
-  last_activity_at DateTime? @db.Timestamptz(6)
-  created_by_user_id String? @db.Uuid
-  modified_by_user_id String? @db.Uuid
-  created_at       DateTime @default(now()) @db.Timestamptz(6)
-  updated_at       DateTime @default(now()) @db.Timestamptz(6)
-}
-
-model TpRecord {
-  id                    String   @id @default(uuid()) @db.Uuid
-  tp_group_id           String?  @db.Uuid
-  owner_user_id         String?  @db.Uuid
-  modified_by_user_id   String?  @db.Uuid
-  mandante              String?  @db.VarChar(150)
-  portal_access         String?
-  production_months     String?
-  comment               String?
-  tag                   String?  @db.VarChar(100)
-  client_contract_status String? @db.VarChar(120)
-  contract_end_date     DateTime? @db.Date
-  cen_content           String?
-  cen_query             String?
-  cen_response_file     String?
-  image_path            String?
-  last_activity_at      DateTime? @db.Timestamptz(6)
-  created_at            DateTime @default(now()) @db.Timestamptz(6)
-  updated_at            DateTime @default(now()) @db.Timestamptz(6)
-}
-
-model Document {
-  id                 String   @id @default(uuid()) @db.Uuid
-  title              String   @db.VarChar(255)
-  original_filename  String   @db.VarChar(255)
-  stored_filename    String   @db.VarChar(255)
-  storage_path       String
-  related_module     String   @db.VarChar(100)
-  related_record_id  String?  @db.Uuid
-  company_id         String?  @db.Uuid
-  mime_type          String?  @db.VarChar(150)
-  file_size          BigInt?  @default(0)
-  uploaded_by_user_id String? @db.Uuid
-  created_at         DateTime @default(now()) @db.Timestamptz(6)
-
-  company Company? @relation(fields: [company_id], references: [id])
-}
-
-model Note {
-  id                String   @id @default(uuid()) @db.Uuid
-  related_module    String   @db.VarChar(100)
-  related_record_id String   @db.Uuid
-  author_user_id    String?  @db.Uuid
-  content           String
-  created_at        DateTime @default(now()) @db.Timestamptz(6)
-}
-
-model Activity {
-  id                String   @id @default(uuid()) @db.Uuid
-  related_module    String   @db.VarChar(100)
-  related_record_id String   @db.Uuid
-  user_id           String?  @db.Uuid
-  activity_type     String   @db.VarChar(100)
-  description       String
-  created_at        DateTime @default(now()) @db.Timestamptz(6)
-}
-
-model AuditLog {
-  id                String   @id @default(uuid()) @db.Uuid
-  related_module    String   @db.VarChar(100)
-  related_record_id String   @db.Uuid
-  user_id           String?  @db.Uuid
-  changed_field     String   @db.VarChar(150)
-  old_value         String?
-  new_value         String?
-  changed_at        DateTime @default(now()) @db.Timestamptz(6)
-}
-
 
 model Mandante {
-  id              String   @id @default(uuid()) @db.Uuid
-  name            String   @unique @db.VarChar(180)
-  code            String?  @unique @db.VarChar(80)
-  status          String   @default("Activo") @db.VarChar(80)
-  owner_name      String?  @db.VarChar(180)
-  commercial_name String?  @db.VarChar(180)
-  email           String?  @db.VarChar(180)
-  phone           String?  @db.VarChar(80)
-  tag             String?  @db.VarChar(100)
-  comment         String?
-  created_at      DateTime @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+  id                String    @id @default(cuid())
+  name              String    @unique
+  owner_name        String?
+  email             String?
+  phone             String?
+  campaign          String?
+  active_contract   String?
+  end_contract_date DateTime?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+  last_activity_at  DateTime?
 
   groups          CompanyGroup[]
   companies       Company[]
+  managementLines ManagementLine[]
+  managements     Management[]
+  lmRecords       LmRecord[]       @relation("MandanteLmRecords")
+  tpRecords       TpRecord[]       @relation("MandanteTpRecords")
+
+  @@map("mandantes")
 }
 
 model CompanyGroup {
-  id              String   @id @default(uuid()) @db.Uuid
-  mandante_id     String   @db.Uuid
-  name            String   @db.VarChar(255)
-  kind            String   @default("LM") @db.VarChar(30)
-  owner_name      String?  @db.VarChar(180)
-  campaign_name   String?  @db.VarChar(180)
-  secondary_email String?  @db.VarChar(180)
-  power_group     String?
-  related_groups  String?
-  tag             String?  @db.VarChar(100)
-  comments        String?
-  created_at      DateTime @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+  id                     String         @id @default(cuid())
+  mandante_id            String
+  group_type             ManagementType
+  name                   String
+  owner_name             String?
+  secondary_email        String?
+  campaign               String?
+  power_group_company    String?
+  associated_groups      String?
+  no_email_participation Boolean?       @default(false)
+  tag                    String?
+  created_at             DateTime       @default(now())
+  updated_at             DateTime       @updatedAt
+  last_activity_at       DateTime?
 
-  mandante        Mandante @relation(fields: [mandante_id], references: [id])
-  companies       CompanyGroupCompany[]
+  mandante        Mandante         @relation(fields: [mandante_id], references: [id], onDelete: Cascade)
+  companies       Company[]
   managementLines ManagementLine[]
+  managements     Management[]
 
-  @@unique([mandante_id, name, kind])
+  @@unique([mandante_id, group_type, name])
+  @@index([mandante_id])
+  @@index([group_type])
+  @@map("company_groups")
 }
 
-model CompanyGroupCompany {
-  id               String   @id @default(uuid()) @db.Uuid
-  group_id         String   @db.Uuid
-  company_id       String   @db.Uuid
-  owner_name       String?  @db.VarChar(180)
-  default_entity   String?  @db.VarChar(120)
-  real_finanfix_amount Decimal? @default(0) @db.Decimal(18,2)
-  created_at       DateTime @default(now()) @db.Timestamptz(6)
-  updated_at       DateTime @default(now()) @db.Timestamptz(6)
+model Company {
+  id                     String    @id @default(cuid())
+  mandante_id            String
+  group_id               String?
+  razon_social           String
+  rut                    String    @unique
+  owner_name             String?
+  email                  String?
+  collaborator_1         String?
+  collaborator_2         String?
+  estimated_amount       Decimal?  @db.Decimal(18, 2)
+  currency               String?
+  exchange_rate          Decimal?  @db.Decimal(18, 6)
+  active_contract_status String?
+  contract_end_date      DateTime?
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @updatedAt
+  last_activity_at       DateTime?
 
-  group            CompanyGroup @relation(fields: [group_id], references: [id])
-  company          Company      @relation(fields: [company_id], references: [id])
+  mandante    Mandante         @relation(fields: [mandante_id], references: [id], onDelete: Cascade)
+  group       CompanyGroup?    @relation(fields: [group_id], references: [id], onDelete: SetNull)
+  lines       ManagementLine[]
+  managements Management[]
+  lmRecords   LmRecord[]       @relation("CompanyLmRecords")
+  tpRecords   TpRecord[]       @relation("CompanyTpRecords")
 
-  @@unique([group_id, company_id])
+  @@index([mandante_id])
+  @@index([group_id])
+  @@index([razon_social])
+  @@map("companies")
 }
 
 model ManagementLine {
-  id              String   @id @default(uuid()) @db.Uuid
-  mandante_id     String?  @db.Uuid
-  group_id        String?  @db.Uuid
-  company_id      String   @db.Uuid
-  kind            String   @db.VarChar(20)
-  name            String?  @db.VarChar(180)
-  status          String?  @db.VarChar(120)
-  comments        String?
-  created_at      DateTime @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+  id                      String         @id @default(cuid())
+  mandante_id             String
+  group_id                String?
+  company_id              String
+  line_type               ManagementType
+  name                    String?
+  owner_name              String?
+  portal_access           String?
+  mes_produccion_2026     String?
+  comment                 String?
+  estado_contrato_cliente String?
+  fecha_termino_contrato  DateTime?
+  consulta_cen            String?
+  contenido_cen           String?
+  respuesta_cen           String?
+  created_at              DateTime       @default(now())
+  updated_at              DateTime       @updatedAt
+  last_activity_at        DateTime?
 
-  company         Company      @relation(fields: [company_id], references: [id])
-  group           CompanyGroup? @relation(fields: [group_id], references: [id])
-  afps            ManagementLineAfp[]
+  mandante    Mandante            @relation(fields: [mandante_id], references: [id], onDelete: Cascade)
+  group       CompanyGroup?       @relation(fields: [group_id], references: [id], onDelete: SetNull)
+  company     Company             @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  afps        ManagementLineAfp[]
+  managements Management[]
+  lmRecords   LmRecord[]          @relation("LineLmRecords")
+  tpRecords   TpRecord[]          @relation("LineTpRecords")
+
+  @@index([mandante_id])
+  @@index([group_id])
+  @@index([company_id])
+  @@index([line_type])
+  @@map("management_lines")
 }
 
 model ManagementLineAfp {
-  id              String   @id @default(uuid()) @db.Uuid
-  line_id         String   @db.Uuid
-  afp_name        String   @db.VarChar(120)
-  status          String?  @db.VarChar(120)
-  created_at      DateTime @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+  id             String   @id @default(cuid())
+  line_id        String
+  afp_name       String
+  owner_name     String?
+  current_status String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
 
-  line            ManagementLine @relation(fields: [line_id], references: [id])
+  line        ManagementLine @relation(fields: [line_id], references: [id], onDelete: Cascade)
+  managements Management[]
+  lmRecords   LmRecord[]     @relation("LineAfpLmRecords")
+  tpRecords   TpRecord[]     @relation("LineAfpTpRecords")
 
   @@unique([line_id, afp_name])
+  @@index([line_id])
+  @@map("management_line_afps")
+}
+
+model Management {
+  id              String         @id @default(cuid())
+  mandante_id     String
+  group_id        String?
+  company_id      String
+  line_id         String
+  line_afp_id     String?
+  management_type ManagementType
+
+  owner_name                  String?
+  estado_contrato_cliente     String?
+  fecha_termino_contrato      DateTime?
+  motivo_tipo_exceso          String?
+  mes_produccion_2026         String?
+  entidad                     String?
+  envio_afp                   String?
+  estado_gestion              String?
+  fecha_presentacion_afp      DateTime?
+  fecha_ingreso_afp           DateTime?
+  fecha_pago_afp              DateTime?
+  numero_solicitud            String?
+  grupo_empresa               String?
+  razon_social                String?
+  rut                         String?
+  monto_devolucion            Decimal?  @db.Decimal(18, 2)
+  monto_pagado                Decimal?  @db.Decimal(18, 2)
+  monto_cliente               Decimal?  @db.Decimal(18, 2)
+  fee                         Decimal?  @db.Decimal(18, 2)
+  monto_finanfix_solutions    Decimal?  @db.Decimal(18, 2)
+  banco                       String?
+  tipo_cuenta                 String?
+  numero_cuenta               String?
+  confirmacion_cc             Boolean?  @default(false)
+  confirmacion_poder          Boolean?  @default(false)
+  acceso_portal               String?
+  facturado_finanfix          String?
+  facturado_cliente           String?
+  fecha_factura_finanfix      DateTime?
+  fecha_pago_factura_finanfix DateTime?
+  numero_factura              String?
+  numero_oc                   String?
+  fecha_rechazo               DateTime?
+  motivo_rechazo              String?
+  consulta_cen                String?
+  contenido_cen               String?
+  respuesta_cen               String?
+  estado_trabajador           String?
+  comment                     String?
+  created_at                  DateTime  @default(now())
+  updated_at                  DateTime  @updatedAt
+  last_activity_at            DateTime?
+
+  mandante Mandante           @relation(fields: [mandante_id], references: [id], onDelete: Cascade)
+  group    CompanyGroup?      @relation(fields: [group_id], references: [id], onDelete: SetNull)
+  company  Company            @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  line     ManagementLine     @relation(fields: [line_id], references: [id], onDelete: Cascade)
+  lineAfp  ManagementLineAfp? @relation(fields: [line_afp_id], references: [id], onDelete: SetNull)
+
+  documents  Document[]
+  notes      Note[]
+  activities Activity[]
+  lmRecord   LmRecord?
+  tpRecord   TpRecord?
+
+  @@index([mandante_id])
+  @@index([group_id])
+  @@index([company_id])
+  @@index([line_id])
+  @@index([line_afp_id])
+  @@index([management_type])
+  @@index([estado_gestion])
+  @@index([entidad])
+  @@index([razon_social])
+  @@index([rut])
+  @@map("managements")
+}
+
+model LmRecord {
+  id            String  @id @default(cuid())
+  management_id String? @unique
+  mandante_id   String?
+  company_id    String?
+  line_id       String?
+  line_afp_id   String?
+
+  lm_group_id        String?
+  search_group       String?
+  rut                String
+  entity             String?
+  management_status  String?
+  refund_amount      Decimal? @db.Decimal(18, 2)
+  confirmation_cc    Boolean? @default(false)
+  confirmation_power Boolean? @default(false)
+  actual_paid_amount Decimal? @db.Decimal(18, 2)
+  excess_type_reason String?
+  worker_status      String?
+  request_number     String?
+  business_name      String?
+  bank_name          String?
+  account_number     String?
+  account_type       String?
+  comment            String?
+  mandante           String?
+  portal_access      String?
+
+  estado_contrato_cliente     String?
+  fecha_termino_contrato      DateTime?
+  motivo_tipo_exceso          String?
+  mes_produccion_2026         String?
+  envio_afp                   String?
+  fecha_presentacion_afp      DateTime?
+  fecha_ingreso_afp           DateTime?
+  fecha_pago_afp              DateTime?
+  monto_cliente               Decimal?  @db.Decimal(18, 2)
+  fee                         Decimal?  @db.Decimal(18, 2)
+  monto_finanfix_solutions    Decimal?  @db.Decimal(18, 2)
+  facturado_finanfix          String?
+  facturado_cliente           String?
+  fecha_factura_finanfix      DateTime?
+  fecha_pago_factura_finanfix DateTime?
+  numero_factura              String?
+  numero_oc                   String?
+  fecha_rechazo               DateTime?
+  motivo_rechazo              String?
+  consulta_cen                String?
+  contenido_cen               String?
+  respuesta_cen               String?
+
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+  last_activity_at DateTime?
+
+  management   Management?        @relation(fields: [management_id], references: [id], onDelete: SetNull)
+  mandante_rel Mandante?          @relation("MandanteLmRecords", fields: [mandante_id], references: [id], onDelete: SetNull)
+  company_rel  Company?           @relation("CompanyLmRecords", fields: [company_id], references: [id], onDelete: SetNull)
+  line_rel     ManagementLine?    @relation("LineLmRecords", fields: [line_id], references: [id], onDelete: SetNull)
+  line_afp_rel ManagementLineAfp? @relation("LineAfpLmRecords", fields: [line_afp_id], references: [id], onDelete: SetNull)
+
+  @@index([management_id])
+  @@index([mandante_id])
+  @@index([company_id])
+  @@index([line_id])
+  @@index([line_afp_id])
+  @@index([rut])
+  @@index([business_name])
+  @@index([entity])
+  @@map("lm_records")
+}
+
+model TpRecord {
+  id            String  @id @default(cuid())
+  management_id String? @unique
+  mandante_id   String?
+  company_id    String?
+  line_id       String?
+  line_afp_id   String?
+
+  tp_group_id        String?
+  search_group       String?
+  rut                String?
+  entity             String?
+  management_status  String?
+  actual_paid_amount Decimal? @db.Decimal(18, 2)
+  refund_amount      Decimal? @db.Decimal(18, 2)
+  worker_status      String?
+  request_number     String?
+  business_name      String?
+  bank_name          String?
+  account_number     String?
+  account_type       String?
+  comment            String?
+  mandante           String?
+  portal_access      String?
+
+  estado_contrato_cliente String?
+  fecha_termino_contrato  DateTime?
+  mes_produccion_2026     String?
+  acceso_portal           String?
+  consulta_cen            String?
+  contenido_cen           String?
+  respuesta_cen           String?
+
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+  last_activity_at DateTime?
+
+  management   Management?        @relation(fields: [management_id], references: [id], onDelete: SetNull)
+  mandante_rel Mandante?          @relation("MandanteTpRecords", fields: [mandante_id], references: [id], onDelete: SetNull)
+  company_rel  Company?           @relation("CompanyTpRecords", fields: [company_id], references: [id], onDelete: SetNull)
+  line_rel     ManagementLine?    @relation("LineTpRecords", fields: [line_id], references: [id], onDelete: SetNull)
+  line_afp_rel ManagementLineAfp? @relation("LineAfpTpRecords", fields: [line_afp_id], references: [id], onDelete: SetNull)
+
+  @@index([management_id])
+  @@index([mandante_id])
+  @@index([company_id])
+  @@index([line_id])
+  @@index([line_afp_id])
+  @@map("tp_records")
+}
+
+model Document {
+  id                String           @id @default(cuid())
+  related_module    String
+  related_record_id String
+  management_id     String?
+  category          DocumentCategory @default(OTRO)
+  file_name         String
+  file_url          String
+  file_size         Int?
+  mime_type         String?
+  uploaded_by_id    String?
+  created_at        DateTime         @default(now())
+  updated_at        DateTime         @updatedAt
+
+  uploadedBy User?       @relation("UploadedByUser", fields: [uploaded_by_id], references: [id], onDelete: SetNull)
+  management Management? @relation(fields: [management_id], references: [id], onDelete: SetNull)
+
+  @@index([related_module, related_record_id])
+  @@index([management_id])
+  @@index([category])
+  @@map("documents")
+}
+
+model Note {
+  id                String   @id @default(cuid())
+  related_module    String
+  related_record_id String
+  management_id     String?
+  content           String
+  created_by_id     String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  createdBy  User?       @relation(fields: [created_by_id], references: [id], onDelete: SetNull)
+  management Management? @relation(fields: [management_id], references: [id], onDelete: SetNull)
+
+  @@index([related_module, related_record_id])
+  @@index([management_id])
+  @@map("notes")
+}
+
+model Activity {
+  id                String    @id @default(cuid())
+  related_module    String
+  related_record_id String
+  management_id     String?
+  activity_type     String?
+  status            String?
+  description       String?
+  due_date          DateTime?
+  assigned_to_id    String?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  assignedTo User?       @relation(fields: [assigned_to_id], references: [id], onDelete: SetNull)
+  management Management? @relation(fields: [management_id], references: [id], onDelete: SetNull)
+
+  @@index([related_module, related_record_id])
+  @@index([management_id])
+  @@map("activities")
 }

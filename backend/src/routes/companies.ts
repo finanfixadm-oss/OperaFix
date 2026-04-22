@@ -1,14 +1,19 @@
 import { Router } from "express";
 import { prisma } from "../config/prisma.js";
 
-export const companiesRouter = Router();
+const companiesRouter = Router();
 
 companiesRouter.get("/", async (_req, res, next) => {
   try {
-    const companies = await prisma.company.findMany({
-      orderBy: { created_at: "desc" }
+    const items = await prisma.company.findMany({
+      include: {
+        mandante: true,
+        group: true,
+      },
+      orderBy: { razon_social: "asc" },
     });
-    res.json(companies);
+
+    res.json(items);
   } catch (error) {
     next(error);
   }
@@ -16,18 +21,28 @@ companiesRouter.get("/", async (_req, res, next) => {
 
 companiesRouter.post("/", async (req, res, next) => {
   try {
-    const company = await prisma.company.create({
+    const item = await prisma.company.create({
       data: {
+        razon_social: req.body.razon_social,
         rut: req.body.rut,
-        business_name: req.body.business_name,
-        mandante: req.body.mandante,
-        address: req.body.address,
-        email: req.body.email,
-        estimated_amount: req.body.estimated_amount
-      }
+        mandante_id: req.body.mandante_id,
+        group_id: req.body.group_id || null,
+        owner_name: req.body.owner_name || null,
+        email: req.body.email || null,
+        collaborator_1: req.body.collaborator_1 || null,
+        collaborator_2: req.body.collaborator_2 || null,
+        active_contract_status: req.body.active_contract_status || null,
+      },
+      include: {
+        mandante: true,
+        group: true,
+      },
     });
-    res.status(201).json(company);
+
+    res.status(201).json(item);
   } catch (error) {
     next(error);
   }
 });
+
+export default companiesRouter;
