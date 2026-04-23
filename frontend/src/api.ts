@@ -7,7 +7,10 @@ type FetchOptions = RequestInit & {
 };
 
 function buildUrl(path: string, query?: FetchOptions["query"]) {
-  const url = new URL(`${API_BASE}${path.startsWith("/") ? path : `/${path}`}`);
+  const cleanBase = API_BASE.replace(/\/$/, "");
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  const url = new URL(`${cleanBase}${cleanPath}`);
+
   if (query) {
     Object.entries(query).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== "") {
@@ -15,10 +18,14 @@ function buildUrl(path: string, query?: FetchOptions["query"]) {
       }
     });
   }
+
   return url.toString();
 }
 
-export async function fetchJson<T>(path: string, options: FetchOptions = {}): Promise<T> {
+export async function fetchJson<T>(
+  path: string,
+  options: FetchOptions = {}
+): Promise<T> {
   const { query, headers, ...rest } = options;
 
   const response = await fetch(buildUrl(path, query), {
