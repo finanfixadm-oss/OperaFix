@@ -27,7 +27,7 @@ app.use(
 
 app.use(express.json());
 app.use("/storage", express.static(path.resolve(process.cwd(), "storage")));
-
+app.use("/managements", managementsRouter);
 app.get("/", (_req, res) => {
   res.json({ status: "OK DESDE SERVER" });
 });

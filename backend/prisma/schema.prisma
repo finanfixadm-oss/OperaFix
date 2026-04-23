@@ -440,3 +440,21 @@ model Activity {
   @@index([management_id])
   @@map("activities")
 }
+model Management {
+  id                String   @id @default(uuid())
+  line_afp_id       String
+
+  razon_social      String?
+  rut               String?
+  direccion         String?
+
+  estado_gestion    String?
+  estado_trabajador String?
+
+  monto_devolucion  Float?
+  monto_real_pagado Float?
+
+  created_at        DateTime @default(now())
+
+  line_afp          ManagementLineAfp @relation(fields: [line_afp_id], references: [id])
+}
