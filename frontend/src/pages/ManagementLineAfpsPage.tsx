@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import ModuleFilterPanel from "../components/ModuleFilterPanel";
-import { fetchJson } from "../api";
-import type { FilterFieldDefinition, FilterRule, ManagementLine } from "../types";
+import ZohoModal from "../components/ZohoModal";
+import { fetchJson, postJson } from "../api";
+import type { FilterFieldDefinition, FilterRule, ManagementLineAfp } from "../types";
 
 function getValueByPath(obj: unknown, path: string) {
   return path.split(".").reduce<any>((acc, key) => acc?.[key], obj);
@@ -26,56 +27,91 @@ function matchRule(value: unknown, rule: FilterRule) {
     case "ends_with":
       return normalized.endsWith(query);
     case "includes_all":
-      return query
-        .split(",")
-        .map((x) => x.trim())
-        .filter(Boolean)
-        .every((part) => normalized.includes(part));
+      return query.split(",").map((x) => x.trim()).filter(Boolean).every((part) => normalized.includes(part));
     case "includes_any":
-      return query
-        .split(",")
-        .map((x) => x.trim())
-        .filter(Boolean)
-        .some((part) => normalized.includes(part));
+      return query.split(",").map((x) => x.trim()).filter(Boolean).some((part) => normalized.includes(part));
     default:
       return true;
   }
 }
 
-export default function ManagementLinesPage() {
+export default function ManagementLineAfpsPage() {
+  const { lineId = "" } = useParams();
   const navigate = useNavigate();
-  const [rows, setRows] = useState<ManagementLine[]>([]);
+
+  const [rows, setRows] = useState<ManagementLineAfp[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeRules, setActiveRules] = useState<FilterRule[]>([]);
   const [quickSearch, setQuickSearch] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    fetchJson<ManagementLine[]>("/management-lines")
+  const [form, setForm] = useState({
+    afp_name: "",
+    owner_name: "",
+    current_status: "",
+  });
+
+  async function loadRows() {
+    setLoading(true);
+    fetchJson<ManagementLineAfp[]>("/management-line-afps", {
+      query: { line_id: lineId },
+    })
       .then(setRows)
       .finally(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(() => {
+    loadRows();
+  }, [lineId]);
+
+  async function createAfp() {
+    if (!form.afp_name.trim()) {
+      alert("Debes ingresar el nombre de la AFP.");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      await postJson<ManagementLineAfp>("/management-line-afps", {
+        line_id: lineId,
+        afp_name: form.afp_name,
+        owner_name: form.owner_name,
+        current_status: form.current_status,
+      });
+
+      setModalOpen(false);
+      setForm({
+        afp_name: "",
+        owner_name: "",
+        current_status: "",
+      });
+
+      await loadRows();
+    } catch (error) {
+      console.error(error);
+      alert("No se pudo crear la AFP.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const fields: FilterFieldDefinition[] = [
+    { field: "afp_name", label: "AFP", type: "text" },
+    { field: "owner_name", label: "Propietario", type: "text" },
+    { field: "current_status", label: "Estado actual", type: "text" },
     {
-      field: "line_type",
-      label: "Tipo de línea",
+      field: "line.line_type",
+      label: "Tipo línea",
       type: "select",
       options: [
         { label: "LM", value: "LM" },
         { label: "TP", value: "TP" },
       ],
     },
-    { field: "name", label: "Nombre línea", type: "text" },
-    { field: "owner_name", label: "Propietario", type: "text" },
-    { field: "portal_access", label: "Acceso portal", type: "text" },
-    { field: "mes_produccion_2026", label: "Mes producción 2026", type: "text" },
-    { field: "estado_contrato_cliente", label: "Estado contrato cliente", type: "text" },
-    { field: "consulta_cen", label: "Consulta CEN", type: "text" },
-    { field: "contenido_cen", label: "Contenido CEN", type: "text" },
-    { field: "respuesta_cen", label: "Respuesta CEN", type: "text" },
-    { field: "mandante.name", label: "Mandante", type: "text" },
-    { field: "group.name", label: "Grupo", type: "text" },
-    { field: "company.razon_social", label: "Razón social", type: "text" },
+    { field: "line.company.razon_social", label: "Razón social", type: "text" },
+    { field: "line.mandante.name", label: "Mandante", type: "text" },
   ];
 
   const filteredRows = useMemo(() => {
@@ -84,14 +120,7 @@ export default function ManagementLinesPage() {
     if (quickSearch.trim()) {
       const q = quickSearch.toLowerCase();
       data = data.filter((row) =>
-        [
-          row.name,
-          row.owner_name,
-          row.portal_access,
-          row.company?.razon_social,
-          row.group?.name,
-          row.mandante?.name,
-        ]
+        [row.afp_name, row.owner_name, row.current_status, row.line?.company?.razon_social]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(q))
       );
@@ -110,19 +139,23 @@ export default function ManagementLinesPage() {
     <div className="zoho-module-page">
       <div className="zoho-module-header">
         <div>
-          <h1>Líneas LM / TP</h1>
-          <p>Empresa → Línea → AFP → Gestión</p>
+          <h1>AFP por línea</h1>
+          <p>Línea seleccionada → AFP → Gestión</p>
         </div>
+
         <div className="zoho-module-actions">
-          <button className="zoho-btn zoho-btn-primary">Nueva línea</button>
-          <button className="zoho-btn">Importar</button>
-          <button className="zoho-btn">Exportar</button>
+          <button className="zoho-btn zoho-btn-primary" onClick={() => setModalOpen(true)}>
+            Nueva AFP
+          </button>
+          <button className="zoho-btn" onClick={() => navigate("/management-lines")}>
+            Volver a líneas
+          </button>
         </div>
       </div>
 
       <div className="zoho-module-layout">
         <ModuleFilterPanel
-          title="Filtrar Líneas"
+          title="Filtrar AFP"
           fields={fields}
           onApply={(rules, search) => {
             setActiveRules(rules);
@@ -141,33 +174,27 @@ export default function ManagementLinesPage() {
             <table className="zoho-table">
               <thead>
                 <tr>
-                  <th>Tipo</th>
-                  <th>Nombre línea</th>
-                  <th>Mandante</th>
-                  <th>Grupo</th>
-                  <th>Razón social</th>
+                  <th>AFP</th>
                   <th>Propietario</th>
-                  <th>Acceso portal</th>
-                  <th>Mes producción</th>
-                  <th>Estado contrato</th>
+                  <th>Estado</th>
+                  <th>Tipo línea</th>
+                  <th>Razón social</th>
+                  <th>Mandante</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRows.map((row) => (
                   <tr
                     key={row.id}
-                    onClick={() => navigate(`/management-lines/${row.id}/afps`)}
+                    onClick={() => navigate(`/managements?line_afp_id=${row.id}`)}
                     style={{ cursor: "pointer" }}
                   >
-                    <td>{row.line_type}</td>
-                    <td>{row.name || "—"}</td>
-                    <td>{row.mandante?.name || "—"}</td>
-                    <td>{row.group?.name || "—"}</td>
-                    <td>{row.company?.razon_social || "—"}</td>
+                    <td>{row.afp_name}</td>
                     <td>{row.owner_name || "—"}</td>
-                    <td>{row.portal_access || "—"}</td>
-                    <td>{row.mes_produccion_2026 || "—"}</td>
-                    <td>{row.estado_contrato_cliente || "—"}</td>
+                    <td>{row.current_status || "—"}</td>
+                    <td>{row.line?.line_type || "—"}</td>
+                    <td>{row.line?.company?.razon_social || "—"}</td>
+                    <td>{row.line?.mandante?.name || "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -175,6 +202,55 @@ export default function ManagementLinesPage() {
           )}
         </section>
       </div>
+
+      <ZohoModal
+        title="Crear AFP dentro de línea"
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+      >
+        <div className="zoho-form-grid">
+          <div className="zoho-form-field">
+            <label>AFP</label>
+            <input
+              className="zoho-input"
+              value={form.afp_name}
+              onChange={(e) => setForm((prev) => ({ ...prev, afp_name: e.target.value }))}
+              placeholder="AFP Capital, AFP Modelo, AFP Provida..."
+            />
+          </div>
+
+          <div className="zoho-form-field">
+            <label>Propietario</label>
+            <input
+              className="zoho-input"
+              value={form.owner_name}
+              onChange={(e) => setForm((prev) => ({ ...prev, owner_name: e.target.value }))}
+              placeholder="Luis Mendoza"
+            />
+          </div>
+
+          <div className="zoho-form-field">
+            <label>Estado actual</label>
+            <input
+              className="zoho-input"
+              value={form.current_status}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, current_status: e.target.value }))
+              }
+              placeholder="Pendiente, En gestión, Cerrado..."
+            />
+          </div>
+        </div>
+
+        <div className="zoho-form-actions">
+          <button className="zoho-btn" onClick={() => setModalOpen(false)}>
+            Cancelar
+          </button>
+          <button className="zoho-btn zoho-btn-primary" onClick={createAfp} disabled={saving}>
+            {saving ? "Guardando..." : "Guardar AFP"}
+          </button>
+        </div>
+      </ZohoModal>
     </div>
   );
 }

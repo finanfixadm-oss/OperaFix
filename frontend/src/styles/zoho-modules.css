@@ -211,3 +211,84 @@
   padding: 24px;
   color: #5d6b82;
 }
+.zoho-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 18, 32, 0.42);
+  z-index: 999;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 70px 20px 20px;
+}
+
+.zoho-modal {
+  background: #fff;
+  width: min(860px, 100%);
+  border-radius: 10px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+  border: 1px solid #dfe5ef;
+  overflow: hidden;
+}
+
+.zoho-modal-header {
+  height: 58px;
+  padding: 0 18px;
+  border-bottom: 1px solid #eef2f7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.zoho-modal-header h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.zoho-modal-close {
+  border: none;
+  background: transparent;
+  font-size: 30px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.zoho-modal-body {
+  padding: 18px;
+}
+
+.zoho-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.zoho-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.zoho-form-field label {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.zoho-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.zoho-checkbox-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.zoho-textarea {
+  min-height: 90px;
+  resize: vertical;
+  padding: 10px;
+}

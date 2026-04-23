@@ -1,0 +1,26 @@
+import type { PropsWithChildren } from "react";
+
+type Props = PropsWithChildren<{
+  title: string;
+  isOpen: boolean;
+  onClose: () => void;
+}>;
+
+export default function ZohoModal({ title, isOpen, onClose, children }: Props) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="zoho-modal-backdrop">
+      <div className="zoho-modal">
+        <div className="zoho-modal-header">
+          <h2>{title}</h2>
+          <button className="zoho-modal-close" onClick={onClose}>
+            ×
+          </button>
+        </div>
+
+        <div className="zoho-modal-body">{children}</div>
+      </div>
+    </div>
+  );
+}
