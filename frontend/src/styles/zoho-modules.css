@@ -292,3 +292,17 @@
   resize: vertical;
   padding: 10px;
 }
+
+.zoho-form-section {
+  border: 1px solid #e4e9f2;
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 16px;
+  background: #fbfdff;
+}
+
+.zoho-form-section h3 {
+  margin: 0 0 12px;
+  font-size: 17px;
+  color: #1d4f8f;
+}
