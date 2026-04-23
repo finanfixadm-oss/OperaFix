@@ -1,201 +1,131 @@
-export interface LmRecord {
-  id: string;
-  rut: string;
-  search_group?: string | null;
-  business_name?: string | null;
-  entity?: string | null;
-  management_status?: string | null;
-  refund_amount?: string | number | null;
-  confirmation_cc?: boolean | null;
-  confirmation_power?: boolean | null;
-  portal_access?: string | null;
-  mandante?: string | null;
-  comment?: string | null;
-  request_number?: string | null;
-  worker_status?: string | null;
-  excess_type_reason?: string | null;
-  bank_name?: string | null;
-  account_number?: string | null;
-  account_type?: string | null;
-  actual_paid_amount?: string | number | null;
-  actual_finanfix_amount?: string | number | null;
-  client_contract_status?: string | null;
-  created_at?: string;
-  updated_at?: string;
-  last_activity_at?: string | null;
-}
+export type FilterOperator =
+  | "equals"
+  | "not_equals"
+  | "contains"
+  | "not_contains"
+  | "starts_with"
+  | "ends_with"
+  | "includes_all"
+  | "includes_any";
 
-export interface LmRecordFilterOptions {
-  entities: string[];
-  statuses: string[];
-  mandantes: string[];
-}
+export type FilterFieldType = "text" | "select" | "boolean" | "date" | "number";
 
-export interface PaginatedLmRecords {
-  items: LmRecord[];
-  meta: {
-    total: number;
-    page: number;
-    pageSize: number;
-    totalPages: number;
-  };
-  filterOptions: LmRecordFilterOptions;
-}
+export type FilterRule = {
+  field: string;
+  label: string;
+  type: FilterFieldType;
+  enabled: boolean;
+  operator: FilterOperator;
+  value: string;
+};
 
-export interface CrmNote {
-  id: string;
-  content: string;
-  created_at: string;
-}
+export type FilterFieldDefinition = {
+  field: string;
+  label: string;
+  type: FilterFieldType;
+  options?: Array<{ label: string; value: string }>;
+};
 
-export interface CrmActivity {
-  id: string;
-  activity_type: string;
-  description: string;
-  created_at: string;
-}
-
-export interface CrmDocument {
-  id: string;
-  title: string;
-  original_filename: string;
-  stored_filename: string;
-  storage_path: string;
-  mime_type?: string | null;
-  created_at: string;
-}
-
-export interface LmRecordDetailResponse {
-  record: LmRecord;
-  notes: CrmNote[];
-  activities: CrmActivity[];
-  documents: CrmDocument[];
-}
-
-export interface Company {
-  id: string;
-  rut: string;
-  business_name: string;
-  mandante?: string | null;
-  address?: string | null;
-  email?: string | null;
-  estimated_amount?: string | number | null;
-  created_at?: string;
-}
-
-export interface Collaborator {
-  id: string;
-  full_name: string;
-  position?: string | null;
-  email?: string | null;
-  phone?: string | null;
-  linkedin_url?: string | null;
-  company?: Company | null;
-  created_at?: string;
-}
-
-export interface LmGroup {
+export type Mandante = {
   id: string;
   name: string;
-  mandante?: string | null;
+  owner_name?: string | null;
+  email?: string | null;
+};
+
+export type CompanyGroup = {
+  id: string;
+  name: string;
+  group_type: "LM" | "TP";
+  owner_name?: string | null;
   secondary_email?: string | null;
-  groups_related?: string | null;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface TpGroup {
-  id: string;
-  name: string;
-  mandante?: string | null;
-  email?: string | null;
-  groups_related?: string | null;
-  created_at?: string;
-}
-
-export interface TpRecord {
-  id: string;
-  mandante?: string | null;
-  portal_access?: string | null;
-  production_months?: string | null;
-  comment?: string | null;
-  client_contract_status?: string | null;
-  cen_content?: string | null;
-  cen_query?: string | null;
-  created_at?: string;
-}
-
-export interface KpiOverview {
-  totalRecords: number;
-  paidRecords: number;
-  pendingPower: number;
-  pendingCC: number;
-  totalRefund: number;
-  totalFinanfix: number;
-}
-
-export interface AnalyticsBucket {
-  entity?: string | null;
-  management_status?: string | null;
-  mandante?: string | null;
-  _count: { _all: number };
-  _sum?: {
-    refund_amount?: number | null;
-    actual_finanfix_amount?: number | null;
-  };
-}
-
-export interface AnalyticsDashboard {
-  byEntity: AnalyticsBucket[];
-  byStatus: AnalyticsBucket[];
-  byMandante: AnalyticsBucket[];
-  recentRecords: Array<{
-    id: string;
-    rut: string;
-    business_name?: string | null;
-    entity?: string | null;
-    management_status?: string | null;
-    updated_at?: string;
-    actual_finanfix_amount?: string | number | null;
-  }>;
-}
-
-
-export interface Mandante {
-  id: string;
-  name: string;
-  code?: string | null;
-  status?: string | null;
-  owner_name?: string | null;
-  commercial_name?: string | null;
-  email?: string | null;
-  phone?: string | null;
+  campaign?: string | null;
+  power_group_company?: string | null;
+  associated_groups?: string | null;
+  no_email_participation?: boolean | null;
   tag?: string | null;
-  comment?: string | null;
-  _count?: { groups: number; companies: number };
-}
+  mandante?: Mandante | null;
+};
 
-export interface CompanyGroupCompanyLink {
+export type Company = {
   id: string;
+  razon_social: string;
+  rut: string;
   owner_name?: string | null;
-  default_entity?: string | null;
-  real_finanfix_amount?: string | number | null;
-  company: Company;
-}
+  email?: string | null;
+  collaborator_1?: string | null;
+  collaborator_2?: string | null;
+  active_contract_status?: string | null;
+  mandante?: Mandante | null;
+  group?: CompanyGroup | null;
+};
 
-export interface CompanyGroup {
+export type ManagementLine = {
+  id: string;
+  line_type: "LM" | "TP";
+  name?: string | null;
+  owner_name?: string | null;
+  portal_access?: string | null;
+  mes_produccion_2026?: string | null;
+  comment?: string | null;
+  estado_contrato_cliente?: string | null;
+  fecha_termino_contrato?: string | null;
+  consulta_cen?: string | null;
+  contenido_cen?: string | null;
+  respuesta_cen?: string | null;
+  created_at: string;
+  mandante?: Mandante | null;
+  group?: CompanyGroup | null;
+  company?: Company | null;
+};
+
+export type ManagementLineAfp = {
+  id: string;
+  afp_name: string;
+  owner_name?: string | null;
+  current_status?: string | null;
+  created_at: string;
+  line?: ManagementLine | null;
+};
+
+export type ManagementDocument = {
+  id: string;
+  management_id?: string | null;
+  related_module: string;
+  related_record_id: string;
+  category: string;
+  file_name: string;
+  file_url: string;
+  file_size?: number | null;
+  mime_type?: string | null;
+  uploaded_by_id?: string | null;
+  created_at: string;
+};
+
+export type Management = {
   id: string;
   mandante_id: string;
-  name: string;
-  kind: string;
-  owner_name?: string | null;
-  campaign_name?: string | null;
-  secondary_email?: string | null;
-  power_group?: string | null;
-  related_groups?: string | null;
-  tag?: string | null;
-  comments?: string | null;
-  mandante?: Mandante;
-  companies?: CompanyGroupCompanyLink[];
-  _count?: { companies: number; managementLines: number };
-}
+  company_id: string;
+  line_id: string;
+  line_afp_id?: string | null;
+  management_type: "LM" | "TP";
+  razon_social?: string | null;
+  rut?: string | null;
+  entidad?: string | null;
+  estado_gestion?: string | null;
+  numero_solicitud?: string | null;
+  monto_devolucion?: number | null;
+  monto_pagado?: number | null;
+  banco?: string | null;
+  numero_cuenta?: string | null;
+  tipo_cuenta?: string | null;
+  confirmacion_cc?: boolean | null;
+  confirmacion_poder?: boolean | null;
+  comment?: string | null;
+  created_at: string;
+  mandante?: Mandante | null;
+  company?: Company | null;
+  line?: ManagementLine | null;
+  lineAfp?: ManagementLineAfp | null;
+  documents?: ManagementDocument[];
+};

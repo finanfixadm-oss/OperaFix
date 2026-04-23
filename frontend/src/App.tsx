@@ -1,41 +1,111 @@
-import { Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
-import HomePage from "./pages/HomePage";
-import CompaniesPage from "./pages/CompaniesPage";
-import MandantesPage from "./pages/MandantesPage";
-import CompanyGroupsPage from "./pages/CompanyGroupsPage";
-import HierarchyPage from "./pages/HierarchyPage";
-import CollaboratorsPage from "./pages/CollaboratorsPage";
-import DocumentsPage from "./pages/DocumentsPage";
-import LmGroupsPage from "./pages/LmGroupsPage";
-import LmRecordsPage from "./pages/LmRecordsPage";
-import TpGroupsPage from "./pages/TpGroupsPage";
-import TpRecordsPage from "./pages/TpRecordsPage";
-import AnalysisPage from "./pages/AnalysisPage";
-import ReportsPage from "./pages/ReportsPage";
-import RequestsPage from "./pages/RequestsPage";
-import LmRecordDetailPage from "./pages/LmRecordDetailPage";
+import ModulePlaceholderPage from "./pages/ModulePlaceholderPage";
+import ManagementLinesPage from "./pages/ManagementLinesPage";
+import ManagementLineAfpsPage from "./pages/ManagementLineAfpsPage";
+import ManagementsPage from "./pages/ManagementsPage";
+import ManagementDocumentsPage from "./pages/ManagementDocumentsPage";
+import "./styles/zoho-modules.css";
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Layout />}>
-        <Route index element={<HomePage />} />
-        <Route path="/mandantes" element={<MandantesPage />} />
-        <Route path="/jerarquia" element={<HierarchyPage />} />
-        <Route path="/company-groups" element={<CompanyGroupsPage />} />
-        <Route path="/empresas" element={<CompaniesPage />} />
-        <Route path="/colaboradores" element={<CollaboratorsPage />} />
-        <Route path="/documentos" element={<DocumentsPage />} />
-        <Route path="/grupos-lm" element={<LmGroupsPage />} />
-        <Route path="/registros-empresas" element={<LmRecordsPage />} />
-        <Route path="/lm-records/:id" element={<LmRecordDetailPage />} />
-        <Route path="/grupos-tp" element={<TpGroupsPage />} />
-        <Route path="/gestiones-tp" element={<TpRecordsPage />} />
-        <Route path="/analisis" element={<AnalysisPage />} />
-        <Route path="/informes" element={<ReportsPage />} />
-        <Route path="/mis-solicitudes" element={<RequestsPage />} />
-      </Route>
-    </Routes>
+    <BrowserRouter>
+      <Layout>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <ModulePlaceholderPage
+                title="OperaFix CRM"
+                subtitle="Migración frontend en curso"
+              />
+            }
+          />
+
+          <Route
+            path="/mandantes"
+            element={
+              <ModulePlaceholderPage
+                title="Mandantes"
+                subtitle="Vista temporal mientras se rehace el módulo"
+              />
+            }
+          />
+
+          <Route
+            path="/company-groups"
+            element={
+              <ModulePlaceholderPage
+                title="Grupos de empresas"
+                subtitle="Vista temporal mientras se rehace el módulo"
+              />
+            }
+          />
+
+          <Route
+            path="/companies"
+            element={
+              <ModulePlaceholderPage
+                title="Empresas"
+                subtitle="Vista temporal mientras se rehace el módulo"
+              />
+            }
+          />
+
+          <Route
+            path="/documents"
+            element={
+              <ModulePlaceholderPage
+                title="Documentos"
+                subtitle="Vista temporal mientras se rehace el módulo"
+              />
+            }
+          />
+
+          <Route
+            path="/analysis"
+            element={
+              <ModulePlaceholderPage
+                title="Análisis"
+                subtitle="Vista temporal mientras se rehace el módulo"
+              />
+            }
+          />
+
+          <Route
+            path="/reports"
+            element={
+              <ModulePlaceholderPage
+                title="Informes"
+                subtitle="Vista temporal mientras se rehace el módulo"
+              />
+            }
+          />
+
+          <Route
+            path="/jerarquia"
+            element={
+              <ModulePlaceholderPage
+                title="Jerarquía"
+                subtitle="Vista temporal mientras se rehace el módulo"
+              />
+            }
+          />
+
+          <Route path="/management-lines" element={<ManagementLinesPage />} />
+          <Route
+            path="/management-lines/:lineId/afps"
+            element={<ManagementLineAfpsPage />}
+          />
+          <Route path="/managements" element={<ManagementsPage />} />
+          <Route
+            path="/managements/:managementId/documents"
+            element={<ManagementDocumentsPage />}
+          />
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Layout>
+    </BrowserRouter>
   );
 }

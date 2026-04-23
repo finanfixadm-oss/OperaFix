@@ -1,6 +1,8 @@
 {
   "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "target": "ES2020",
+    "useDefineForClassFields": true,
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
@@ -8,9 +10,28 @@
     "allowImportingTsExtensions": false,
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
-    "strict": true
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": [
+    "src/pages/AnalysisPage.tsx",
+    "src/pages/CollaboratorsPage.tsx",
+    "src/pages/CompaniesPage.tsx",
+    "src/pages/CompanyGroupsPage.tsx",
+    "src/pages/HierarchyPage.tsx",
+    "src/pages/HomePage.tsx",
+    "src/pages/LmGroupsPage.tsx",
+    "src/pages/LmRecordDetailPage.tsx",
+    "src/pages/LmRecordsPage.tsx",
+    "src/pages/LoginPage.tsx",
+    "src/pages/MandantesPage.tsx",
+    "src/pages/ReportsPage.tsx",
+    "src/pages/TpGroupsPage.tsx",
+    "src/pages/TpRecordsPage.tsx"
+  ]
 }
