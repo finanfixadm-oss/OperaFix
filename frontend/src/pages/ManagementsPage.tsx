@@ -1,14 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import ModuleFilterPanel from "../components/ModuleFilterPanel";
 import ZohoModal from "../components/ZohoModal";
-import { fetchJson, postJson } from "../api";
-import type {
-  FilterFieldDefinition,
-  FilterRule,
-  Management,
-  ManagementLineAfp,
-} from "../types";
+import { fetchJson, publicBaseUrl, uploadForm } from "../api";
+import type { FilterFieldDefinition, FilterRule, ManagementDocument } from "../types";
+
+const categories = [
+  "Poder",
+  "Comprobante pago",
+  "Detalle de pago",
+  "Comprobante rechazo",
+  "Archivo AFP",
+  "Carta explicativa",
+  "Factura",
+  "OC",
+  "Archivo respuesta CEN",
+  "Otro",
+];
 
 function getValueByPath(obj: unknown, path: string) {
   return path.split(".").reduce<any>((acc, key) => acc?.[key], obj);
@@ -40,68 +48,23 @@ function matchRule(value: unknown, rule: FilterRule) {
   }
 }
 
-function formatMoney(value?: number | null) {
-  return new Intl.NumberFormat("es-CL", {
-    style: "currency",
-    currency: "CLP",
-    maximumFractionDigits: 0,
-  }).format(Number(value || 0));
-}
+export default function ManagementDocumentsPage() {
+  const { managementId = "" } = useParams();
 
-const emptyForm = {
-  management_type: "LM",
-  owner_name: "",
-  razon_social: "",
-  rut: "",
-  entidad: "",
-  estado_gestion: "",
-  numero_solicitud: "",
-  envio_afp: "",
-  estado_contrato_cliente: "",
-  estado_trabajador: "",
-  motivo_tipo_exceso: "",
-  motivo_rechazo: "",
-  mes_produccion_2026: "",
-  grupo_empresa: "",
-  acceso_portal: "",
-  banco: "",
-  tipo_cuenta: "",
-  numero_cuenta: "",
-  confirmacion_cc: "false",
-  confirmacion_poder: "false",
-  consulta_cen: "",
-  contenido_cen: "",
-  respuesta_cen: "",
-  monto_devolucion: "",
-  monto_pagado: "",
-  monto_cliente: "",
-  fee: "",
-  monto_finanfix_solutions: "",
-  facturado_finanfix: "",
-  facturado_cliente: "",
-  numero_factura: "",
-  numero_oc: "",
-  comment: "",
-};
-
-export default function ManagementsPage() {
-  const [params] = useSearchParams();
-  const navigate = useNavigate();
-  const lineAfpId = params.get("line_afp_id") || "";
-
-  const [rows, setRows] = useState<Management[]>([]);
-  const [afp, setAfp] = useState<ManagementLineAfp | null>(null);
+  const [rows, setRows] = useState<ManagementDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeRules, setActiveRules] = useState<FilterRule[]>([]);
   const [quickSearch, setQuickSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+
+  const [category, setCategory] = useState("Poder");
+  const [file, setFile] = useState<File | null>(null);
 
   async function loadRows() {
     setLoading(true);
-    fetchJson<Management[]>("/managements", {
-      query: { line_afp_id: lineAfpId || undefined },
+    fetchJson<ManagementDocument[]>("/management-documents", {
+      query: { management_id: managementId },
     })
       .then(setRows)
       .finally(() => setLoading(false));
@@ -109,68 +72,46 @@ export default function ManagementsPage() {
 
   useEffect(() => {
     loadRows();
+  }, [managementId]);
 
-    if (lineAfpId) {
-      fetchJson<ManagementLineAfp>(`/management-line-afps/${lineAfpId}`)
-        .then(setAfp)
-        .catch(() => setAfp(null));
-    }
-  }, [lineAfpId]);
-
-  function updateForm(field: keyof typeof emptyForm, value: string) {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  }
-
-  async function createManagement() {
-    if (!lineAfpId || !afp?.line) {
-      alert("No se encontró la AFP o la línea asociada.");
+  async function uploadDocument() {
+    if (!managementId) {
+      alert("No se encontró la gestión.");
       return;
     }
 
-    if (!form.razon_social.trim() || !form.rut.trim()) {
-      alert("Razón social y RUT son obligatorios.");
+    if (!file) {
+      alert("Debes seleccionar un archivo.");
       return;
     }
 
     setSaving(true);
 
     try {
-      await postJson<Management>("/managements", {
-        mandante_id: afp.line.mandante?.id,
-        group_id: afp.line.group?.id || null,
-        company_id: afp.line.company?.id,
-        line_id: afp.line.id,
-        line_afp_id: lineAfpId,
+      const formData = new FormData();
+      formData.append("management_id", managementId);
+      formData.append("category", category);
+      formData.append("file", file);
 
-        ...form,
-        confirmacion_cc: form.confirmacion_cc === "true",
-        confirmacion_poder: form.confirmacion_poder === "true",
-      });
+      await uploadForm<ManagementDocument>("/management-documents/upload", formData);
 
       setModalOpen(false);
-      setForm(emptyForm);
+      setFile(null);
+      setCategory("Poder");
       await loadRows();
     } catch (error) {
       console.error(error);
-      alert("No se pudo crear la gestión.");
+      alert("No se pudo subir el documento.");
     } finally {
       setSaving(false);
     }
   }
 
   const fields: FilterFieldDefinition[] = [
-    { field: "management_type", label: "Tipo", type: "select", options: [{ label: "LM", value: "LM" }, { label: "TP", value: "TP" }] },
-    { field: "razon_social", label: "Razón social", type: "text" },
-    { field: "rut", label: "RUT", type: "text" },
-    { field: "entidad", label: "Entidad", type: "text" },
-    { field: "estado_gestion", label: "Estado Gestión", type: "text" },
-    { field: "numero_solicitud", label: "N° Solicitud", type: "text" },
-    { field: "banco", label: "Banco", type: "text" },
-    { field: "confirmacion_cc", label: "Confirmación CC", type: "boolean" },
-    { field: "confirmacion_poder", label: "Confirmación Poder", type: "boolean" },
-    { field: "mandante.name", label: "Mandante", type: "text" },
-    { field: "company.razon_social", label: "Empresa", type: "text" },
-    { field: "lineAfp.afp_name", label: "AFP", type: "text" },
+    { field: "category", label: "Categoría", type: "text" },
+    { field: "file_name", label: "Nombre archivo", type: "text" },
+    { field: "mime_type", label: "Tipo MIME", type: "text" },
+    { field: "related_module", label: "Módulo", type: "text" },
   ];
 
   const filteredRows = useMemo(() => {
@@ -179,7 +120,7 @@ export default function ManagementsPage() {
     if (quickSearch.trim()) {
       const q = quickSearch.toLowerCase();
       data = data.filter((row) =>
-        [row.razon_social, row.rut, row.entidad, row.estado_gestion, row.numero_solicitud, row.lineAfp?.afp_name]
+        [row.category, row.file_name, row.mime_type, row.related_module]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(q))
       );
@@ -198,21 +139,20 @@ export default function ManagementsPage() {
     <div className="zoho-module-page">
       <div className="zoho-module-header">
         <div>
-          <h1>Gestiones</h1>
-          <p>AFP → Gestión → Documentos por gestión</p>
+          <h1>Documentos por gestión</h1>
+          <p>Archivos asociados directamente a la gestión</p>
         </div>
+
         <div className="zoho-module-actions">
           <button className="zoho-btn zoho-btn-primary" onClick={() => setModalOpen(true)}>
-            Nueva gestión
+            Subir documento
           </button>
-          <button className="zoho-btn">Importar</button>
-          <button className="zoho-btn">Exportar</button>
         </div>
       </div>
 
       <div className="zoho-module-layout">
         <ModuleFilterPanel
-          title="Filtrar Gestiones"
+          title="Filtrar Documentos"
           fields={fields}
           onApply={(rules, search) => {
             setActiveRules(rules);
@@ -231,37 +171,37 @@ export default function ManagementsPage() {
             <table className="zoho-table">
               <thead>
                 <tr>
+                  <th>Categoría</th>
+                  <th>Archivo</th>
                   <th>Tipo</th>
-                  <th>Razón social</th>
-                  <th>RUT</th>
-                  <th>AFP</th>
-                  <th>Entidad</th>
-                  <th>Estado Gestión</th>
-                  <th>N° Solicitud</th>
-                  <th>Monto devolución</th>
-                  <th>Monto pagado</th>
-                  <th>Banco</th>
+                  <th>Tamaño</th>
+                  <th>Fecha</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredRows.map((row) => (
-                  <tr
-                    key={row.id}
-                    onClick={() => navigate(`/managements/${row.id}/documents`)}
-                    style={{ cursor: "pointer" }}
-                  >
-                    <td>{row.management_type}</td>
-                    <td>{row.razon_social || "—"}</td>
-                    <td>{row.rut || "—"}</td>
-                    <td>{row.lineAfp?.afp_name || "—"}</td>
-                    <td>{row.entidad || "—"}</td>
-                    <td>{row.estado_gestion || "—"}</td>
-                    <td>{row.numero_solicitud || "—"}</td>
-                    <td>{formatMoney(row.monto_devolucion)}</td>
-                    <td>{formatMoney(row.monto_pagado)}</td>
-                    <td>{row.banco || "—"}</td>
+                {filteredRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={5}>Sin documentos cargados.</td>
                   </tr>
-                ))}
+                ) : (
+                  filteredRows.map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.category}</td>
+                      <td>
+                        <a
+                          href={`${publicBaseUrl}${row.file_url}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {row.file_name}
+                        </a>
+                      </td>
+                      <td>{row.mime_type || "—"}</td>
+                      <td>{row.file_size ? `${Math.round(row.file_size / 1024)} KB` : "—"}</td>
+                      <td>{new Date(row.created_at).toLocaleString("es-CL")}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           )}
@@ -269,182 +209,45 @@ export default function ManagementsPage() {
       </div>
 
       <ZohoModal
-        title="Crear Gestión"
+        title="Subir documento a gestión"
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
       >
-        <div className="zoho-form-section">
-          <h3>1. Ingreso de caso</h3>
-          <div className="zoho-form-grid">
-            <Field label="Tipo">
-              <select className="zoho-select" value={form.management_type} onChange={(e) => updateForm("management_type", e.target.value)}>
-                <option value="LM">LM</option>
-                <option value="TP">TP</option>
-              </select>
-            </Field>
-
-            <Field label="Mes de producción">
-              <input className="zoho-input" value={form.mes_produccion_2026} onChange={(e) => updateForm("mes_produccion_2026", e.target.value)} />
-            </Field>
-
-            <Field label="Acceso portal">
-              <input className="zoho-input" value={form.acceso_portal} onChange={(e) => updateForm("acceso_portal", e.target.value)} />
-            </Field>
-
-            <Field label="Envío AFP">
-              <input className="zoho-input" value={form.envio_afp} onChange={(e) => updateForm("envio_afp", e.target.value)} />
-            </Field>
-
-            <Field label="Estado contrato con cliente">
-              <input className="zoho-input" value={form.estado_contrato_cliente} onChange={(e) => updateForm("estado_contrato_cliente", e.target.value)} />
-            </Field>
-
-            <Field label="Estado Gestión">
-              <input className="zoho-input" value={form.estado_gestion} onChange={(e) => updateForm("estado_gestion", e.target.value)} />
-            </Field>
-
-            <Field label="N° Solicitud">
-              <input className="zoho-input" value={form.numero_solicitud} onChange={(e) => updateForm("numero_solicitud", e.target.value)} />
-            </Field>
-
-            <Field label="Motivo del rechazo/anulación">
-              <input className="zoho-input" value={form.motivo_rechazo} onChange={(e) => updateForm("motivo_rechazo", e.target.value)} />
-            </Field>
+        <div className="zoho-form-grid">
+          <div className="zoho-form-field">
+            <label>Tipo de documento</label>
+            <select
+              className="zoho-select"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              {categories.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
 
-        <div className="zoho-form-section">
-          <h3>2. Datos identificatorios y bancarios</h3>
-          <div className="zoho-form-grid">
-            <Field label="Razón Social">
-              <input className="zoho-input" value={form.razon_social} onChange={(e) => updateForm("razon_social", e.target.value)} />
-            </Field>
-
-            <Field label="RUT">
-              <input className="zoho-input" value={form.rut} onChange={(e) => updateForm("rut", e.target.value)} />
-            </Field>
-
-            <Field label="Entidad">
-              <input className="zoho-input" value={form.entidad} onChange={(e) => updateForm("entidad", e.target.value)} />
-            </Field>
-
-            <Field label="FEE">
-              <input className="zoho-input" value={form.fee} onChange={(e) => updateForm("fee", e.target.value)} />
-            </Field>
-
-            <Field label="Banco">
-              <input className="zoho-input" value={form.banco} onChange={(e) => updateForm("banco", e.target.value)} />
-            </Field>
-
-            <Field label="Tipo de Cuenta">
-              <input className="zoho-input" value={form.tipo_cuenta} onChange={(e) => updateForm("tipo_cuenta", e.target.value)} />
-            </Field>
-
-            <Field label="Número cuenta">
-              <input className="zoho-input" value={form.numero_cuenta} onChange={(e) => updateForm("numero_cuenta", e.target.value)} />
-            </Field>
-
-            <Field label="Confirmación CC">
-              <select className="zoho-select" value={form.confirmacion_cc} onChange={(e) => updateForm("confirmacion_cc", e.target.value)}>
-                <option value="false">No</option>
-                <option value="true">Sí</option>
-              </select>
-            </Field>
-
-            <Field label="Confirmación Poder">
-              <select className="zoho-select" value={form.confirmacion_poder} onChange={(e) => updateForm("confirmacion_poder", e.target.value)}>
-                <option value="false">No</option>
-                <option value="true">Sí</option>
-              </select>
-            </Field>
+          <div className="zoho-form-field">
+            <label>Archivo</label>
+            <input
+              className="zoho-input"
+              type="file"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+            />
           </div>
-        </div>
-
-        <div className="zoho-form-section">
-          <h3>3. CEN y trabajador</h3>
-          <div className="zoho-form-grid">
-            <Field label="Consulta CEN">
-              <input className="zoho-input" value={form.consulta_cen} onChange={(e) => updateForm("consulta_cen", e.target.value)} />
-            </Field>
-
-            <Field label="Contenido CEN">
-              <input className="zoho-input" value={form.contenido_cen} onChange={(e) => updateForm("contenido_cen", e.target.value)} />
-            </Field>
-
-            <Field label="Respuesta CEN">
-              <input className="zoho-input" value={form.respuesta_cen} onChange={(e) => updateForm("respuesta_cen", e.target.value)} />
-            </Field>
-
-            <Field label="Estado Trabajador">
-              <input className="zoho-input" value={form.estado_trabajador} onChange={(e) => updateForm("estado_trabajador", e.target.value)} />
-            </Field>
-
-            <Field label="Motivo (Tipo de exceso)">
-              <input className="zoho-input" value={form.motivo_tipo_exceso} onChange={(e) => updateForm("motivo_tipo_exceso", e.target.value)} />
-            </Field>
-          </div>
-        </div>
-
-        <div className="zoho-form-section">
-          <h3>4. Montos y facturación</h3>
-          <div className="zoho-form-grid">
-            <Field label="Monto Devolución">
-              <input className="zoho-input" value={form.monto_devolucion} onChange={(e) => updateForm("monto_devolucion", e.target.value)} />
-            </Field>
-
-            <Field label="Monto Real Pagado">
-              <input className="zoho-input" value={form.monto_pagado} onChange={(e) => updateForm("monto_pagado", e.target.value)} />
-            </Field>
-
-            <Field label="Monto Cliente">
-              <input className="zoho-input" value={form.monto_cliente} onChange={(e) => updateForm("monto_cliente", e.target.value)} />
-            </Field>
-
-            <Field label="Monto Finanfix">
-              <input className="zoho-input" value={form.monto_finanfix_solutions} onChange={(e) => updateForm("monto_finanfix_solutions", e.target.value)} />
-            </Field>
-
-            <Field label="Facturado cliente">
-              <input className="zoho-input" value={form.facturado_cliente} onChange={(e) => updateForm("facturado_cliente", e.target.value)} />
-            </Field>
-
-            <Field label="Facturado Finanfix">
-              <input className="zoho-input" value={form.facturado_finanfix} onChange={(e) => updateForm("facturado_finanfix", e.target.value)} />
-            </Field>
-
-            <Field label="N° Factura">
-              <input className="zoho-input" value={form.numero_factura} onChange={(e) => updateForm("numero_factura", e.target.value)} />
-            </Field>
-
-            <Field label="N° OC">
-              <input className="zoho-input" value={form.numero_oc} onChange={(e) => updateForm("numero_oc", e.target.value)} />
-            </Field>
-          </div>
-        </div>
-
-        <div className="zoho-form-section">
-          <h3>5. Comentarios</h3>
-          <textarea className="zoho-input zoho-textarea" value={form.comment} onChange={(e) => updateForm("comment", e.target.value)} />
         </div>
 
         <div className="zoho-form-actions">
           <button className="zoho-btn" onClick={() => setModalOpen(false)}>
             Cancelar
           </button>
-          <button className="zoho-btn zoho-btn-primary" onClick={createManagement} disabled={saving}>
-            {saving ? "Guardando..." : "Guardar Gestión"}
+          <button className="zoho-btn zoho-btn-primary" onClick={uploadDocument} disabled={saving}>
+            {saving ? "Subiendo..." : "Subir documento"}
           </button>
         </div>
       </ZohoModal>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="zoho-form-field">
-      <label>{label}</label>
-      {children}
     </div>
   );
 }

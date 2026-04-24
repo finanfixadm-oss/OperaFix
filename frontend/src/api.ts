@@ -2,6 +2,8 @@ const API_BASE =
   (import.meta as any).env?.VITE_API_URL?.replace(/\/$/, "") ||
   "https://operafix-production.up.railway.app/api";
 
+export const publicBaseUrl = API_BASE.replace(/\/api$/, "");
+
 type FetchOptions = RequestInit & {
   query?: Record<string, string | number | boolean | undefined | null>;
 };
@@ -51,15 +53,16 @@ export async function postJson<T>(path: string, body: unknown): Promise<T> {
   });
 }
 
-export async function putJson<T>(path: string, body: unknown): Promise<T> {
-  return fetchJson<T>(path, {
-    method: "PUT",
-    body: JSON.stringify(body),
+export async function uploadForm<T>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(buildUrl(path), {
+    method: "POST",
+    body: formData,
   });
-}
 
-export async function deleteJson<T>(path: string): Promise<T> {
-  return fetchJson<T>(path, {
-    method: "DELETE",
-  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `HTTP ${response.status}`);
+  }
+
+  return response.json() as Promise<T>;
 }
