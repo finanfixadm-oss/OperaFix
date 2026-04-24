@@ -162,11 +162,13 @@ recordsRouter.get("/", async (req, res, next) => {
 recordsRouter.get("/:id", async (req, res, next) => {
   try {
     const row = await prisma.management.findUnique({
-      where: { id: Number(req.params.id) }, // 🔥 ESTE CAMBIO
-      include: recordInclude,
+      where: { id: req.params.id }, // 🔥 STRING (correcto)
+      include: recordInclude,       // 🔥 ESTA LÍNEA YA NO FALLA
     });
 
-    if (!row) return res.status(404).json({ message: "Registro no encontrado" });
+    if (!row) {
+      return res.status(404).json({ message: "Registro no encontrado" });
+    }
 
     res.json(row);
   } catch (error) {
@@ -207,11 +209,11 @@ recordsRouter.post("/", async (req, res, next) => {
 
 recordsRouter.put("/:id", async (req, res, next) => {
   try {
-    const previous = await prisma.management.findUnique({ where: { id: Number(req.params.id) } });
+    const previous = await prisma.management.findUnique({ where: { id: req.params.id } });
     if (!previous) return res.status(404).json({ message: "Registro no encontrado" });
 
     const row = await prisma.management.update({
-      where: { id: Number(req.params.id) },
+      where: { id: req.params.id },
       data: managementData(req.body) as any,
       include: recordInclude,
     });
