@@ -187,11 +187,6 @@ export default function RecordsPage() {
   async function createRecord() {
     const line = selectedAfp?.line;
 
-    if (!selectedAfp?.id || !line?.id || !line?.company?.id || !line?.mandante?.id) {
-      alert("Debes seleccionar una AFP / línea válida.");
-      return;
-    }
-
     if (!form.razon_social.trim()) {
       alert("Debes ingresar Razón Social.");
       return;
@@ -207,11 +202,11 @@ export default function RecordsPage() {
     setSaving(true);
     try {
       await postJson<RecordItem>("/records", {
-        mandante_id: line.mandante.id,
-        group_id: line.group?.id || null,
-        company_id: line.company.id,
-        line_id: line.id,
-        line_afp_id: selectedAfp.id,
+        ...(line?.mandante?.id ? { mandante_id: line.mandante.id } : {}),
+        ...(line?.group?.id ? { group_id: line.group.id } : {}),
+        ...(line?.company?.id ? { company_id: line.company.id } : {}),
+        ...(line?.id ? { line_id: line.id } : {}),
+        ...(selectedAfp?.id ? { line_afp_id: selectedAfp.id } : {}),
         ...formPayload,
         confirmacion_cc: form.confirmacion_cc === "true",
         confirmacion_poder: form.confirmacion_poder === "true",
@@ -370,9 +365,9 @@ export default function RecordsPage() {
 
       <ZohoModal title="Crear Registro de empresa" isOpen={modalOpen} onClose={() => setModalOpen(false)}>
         <FormSection title="0. Asociación de línea">
-          <Field label="AFP / Línea asociada">
+          <Field label="AFP / Línea asociada (opcional)">
             <select className="zoho-select" value={form.line_afp_id} onChange={(e) => updateForm("line_afp_id", e.target.value)}>
-              <option value="">Seleccionar AFP / Línea</option>
+              <option value="">Crear automáticamente según Razón Social / RUT / Entidad</option>
               {allAfps.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.afp_name} · {item.line?.company?.razon_social || "Sin empresa"} · {item.line?.mandante?.name || "Sin mandante"}

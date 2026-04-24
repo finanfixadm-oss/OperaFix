@@ -75,6 +75,9 @@ export default function RecordDetailPage() {
   const [uploadCategory, setUploadCategory] = useState("Poder");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadSaving, setUploadSaving] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editForm, setEditForm] = useState<Record<string, string>>({});
 
   async function loadRecord() {
     if (!recordId) return;
@@ -135,6 +138,52 @@ export default function RecordDetailPage() {
     }
   }
 
+  function openEdit() {
+    if (!record) return;
+    const fields = [
+      "razon_social", "rut", "entidad", "estado_gestion", "numero_solicitud", "envio_afp",
+      "estado_contrato_cliente", "estado_trabajador", "motivo_tipo_exceso", "motivo_rechazo",
+      "mes_produccion_2026", "grupo_empresa", "acceso_portal", "banco", "tipo_cuenta", "numero_cuenta",
+      "consulta_cen", "contenido_cen", "respuesta_cen", "monto_devolucion", "monto_pagado",
+      "monto_cliente", "fee", "monto_finanfix_solutions", "facturado_finanfix", "facturado_cliente",
+      "numero_factura", "numero_oc", "comment"
+    ];
+    const next: Record<string, string> = {};
+    fields.forEach((field) => {
+      const value = (record as any)[field];
+      next[field] = value === undefined || value === null ? "" : String(value);
+    });
+    next.confirmacion_cc = record.confirmacion_cc ? "true" : "false";
+    next.confirmacion_poder = record.confirmacion_poder ? "true" : "false";
+    setEditForm(next);
+    setEditOpen(true);
+  }
+
+  function updateEdit(field: string, value: string) {
+    setEditForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function saveEdit() {
+    setEditSaving(true);
+    try {
+      await fetchJson<RecordItem>(`/records/${recordId}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          ...editForm,
+          confirmacion_cc: editForm.confirmacion_cc === "true",
+          confirmacion_poder: editForm.confirmacion_poder === "true",
+        }),
+      });
+      setEditOpen(false);
+      await loadRecord();
+    } catch (error) {
+      console.error(error);
+      alert("No se pudo guardar la edición.");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   const documentsByCategory = useMemo(() => {
     return (record?.documents || []).reduce<Record<string, DocumentItem[]>>((acc, doc) => {
       const category = normalizeCategory(doc.category);
@@ -161,7 +210,7 @@ export default function RecordDetailPage() {
 
         <div className="record-hero-actions">
           <button className="zoho-btn zoho-btn-primary">Enviar correo electrónico</button>
-          <button className="zoho-btn">Editar</button>
+          <button className="zoho-btn" onClick={openEdit}>Editar</button>
           <button className="zoho-btn">...</button>
           <button className="zoho-btn" onClick={() => navigate("/records")}>Volver</button>
         </div>
@@ -287,6 +336,50 @@ export default function RecordDetailPage() {
         </DetailSection>
       </div>
 
+
+      <ZohoModal title="Editar registro" isOpen={editOpen} onClose={() => setEditOpen(false)}>
+        <div className="zoho-form-section">
+          <h3>Datos empresa</h3>
+          <div className="zoho-form-grid">
+            <EditField label="Razón Social" value={editForm.razon_social} onChange={(v) => updateEdit("razon_social", v)} />
+            <EditField label="RUT" value={editForm.rut} onChange={(v) => updateEdit("rut", v)} />
+            <EditField label="Buscar Grupo" value={editForm.grupo_empresa} onChange={(v) => updateEdit("grupo_empresa", v)} />
+            <EditField label="Comentario" value={editForm.comment} onChange={(v) => updateEdit("comment", v)} />
+          </div>
+        </div>
+        <div className="zoho-form-section">
+          <h3>Información de gestión</h3>
+          <div className="zoho-form-grid">
+            <EditField label="Entidad" value={editForm.entidad} onChange={(v) => updateEdit("entidad", v)} />
+            <EditField label="Estado Gestión" value={editForm.estado_gestion} onChange={(v) => updateEdit("estado_gestion", v)} />
+            <EditField label="N° Solicitud" value={editForm.numero_solicitud} onChange={(v) => updateEdit("numero_solicitud", v)} />
+            <EditField label="Mes producción" value={editForm.mes_produccion_2026} onChange={(v) => updateEdit("mes_produccion_2026", v)} />
+            <EditField label="Motivo tipo exceso" value={editForm.motivo_tipo_exceso} onChange={(v) => updateEdit("motivo_tipo_exceso", v)} />
+            <EditField label="Envío AFP" value={editForm.envio_afp} onChange={(v) => updateEdit("envio_afp", v)} />
+            <EditField label="Consulta CEN" value={editForm.consulta_cen} onChange={(v) => updateEdit("consulta_cen", v)} />
+            <EditField label="Respuesta CEN" value={editForm.respuesta_cen} onChange={(v) => updateEdit("respuesta_cen", v)} />
+          </div>
+        </div>
+        <div className="zoho-form-section">
+          <h3>Datos bancarios, montos y facturación</h3>
+          <div className="zoho-form-grid">
+            <EditField label="Banco" value={editForm.banco} onChange={(v) => updateEdit("banco", v)} />
+            <EditField label="Tipo cuenta" value={editForm.tipo_cuenta} onChange={(v) => updateEdit("tipo_cuenta", v)} />
+            <EditField label="Número cuenta" value={editForm.numero_cuenta} onChange={(v) => updateEdit("numero_cuenta", v)} />
+            <EditField label="Monto devolución" value={editForm.monto_devolucion} onChange={(v) => updateEdit("monto_devolucion", v)} />
+            <EditField label="Monto real pagado" value={editForm.monto_pagado} onChange={(v) => updateEdit("monto_pagado", v)} />
+            <EditField label="Monto cliente" value={editForm.monto_cliente} onChange={(v) => updateEdit("monto_cliente", v)} />
+            <EditField label="Monto Finanfix" value={editForm.monto_finanfix_solutions} onChange={(v) => updateEdit("monto_finanfix_solutions", v)} />
+            <EditField label="N° Factura" value={editForm.numero_factura} onChange={(v) => updateEdit("numero_factura", v)} />
+            <EditField label="N° OC" value={editForm.numero_oc} onChange={(v) => updateEdit("numero_oc", v)} />
+          </div>
+        </div>
+        <div className="zoho-form-actions">
+          <button className="zoho-btn" onClick={() => setEditOpen(false)}>Cancelar</button>
+          <button className="zoho-btn zoho-btn-primary" onClick={saveEdit} disabled={editSaving}>{editSaving ? "Guardando..." : "Guardar cambios"}</button>
+        </div>
+      </ZohoModal>
+
       <ZohoModal title="Adjuntar documento" isOpen={uploadOpen} onClose={() => setUploadOpen(false)}>
         <div className="zoho-form-grid">
           <div className="zoho-form-field">
@@ -332,4 +425,8 @@ function DocumentMatrix({ documentsByCategory, onAttach }: { documentsByCategory
       })}
     </div>
   );
+}
+
+function EditField({ label, value, onChange }: { label: string; value?: string; onChange: (value: string) => void }) {
+  return <div className="zoho-form-field"><label>{label}</label><input className="zoho-input" value={value || ""} onChange={(e) => onChange(e.target.value)} /></div>;
 }

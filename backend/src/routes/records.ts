@@ -114,23 +114,132 @@ const recordInclude = {
   company: true,
   line: true,
   lineAfp: true,
-  documents: true,
+  documents: { orderBy: { created_at: "desc" as const } },
   notes: { orderBy: { created_at: "desc" as const } },
   activities: { orderBy: { created_at: "desc" as const } },
 };
 
+async function ensureRecordContext(body: any) {
+  const managementType = body.management_type === "TP" ? "TP" : "LM";
+  const requestedAfpId = nullableString(body.line_afp_id);
+
+  if (requestedAfpId) {
+    const lineAfp = await prisma.managementLineAfp.findUnique({
+      where: { id: requestedAfpId },
+      include: { line: true },
+    });
+
+    if (lineAfp?.line) {
+      return {
+        mandante_id: lineAfp.line.mandante_id,
+        group_id: lineAfp.line.group_id || null,
+        company_id: lineAfp.line.company_id,
+        line_id: lineAfp.line.id,
+        line_afp_id: lineAfp.id,
+      };
+    }
+  }
+
+  const mandanteName = nullableString(body.mandante_name) || "Optimiza Consulting";
+  const razonSocial = nullableString(body.razon_social) || "Empresa sin razón social";
+  const rut = nullableString(body.rut) || `TEMP-${Date.now()}`;
+  const afpName = nullableString(body.entidad) || "AFP Capital";
+  const groupName = nullableString(body.grupo_empresa) || "Grupo general";
+
+  const mandante = await prisma.mandante.upsert({
+    where: { name: mandanteName },
+    update: {},
+    create: { name: mandanteName },
+  });
+
+  const group = await prisma.companyGroup.upsert({
+    where: {
+      mandante_id_group_type_name: {
+        mandante_id: mandante.id,
+        group_type: managementType as any,
+        name: groupName,
+      },
+    },
+    update: {},
+    create: {
+      mandante_id: mandante.id,
+      group_type: managementType as any,
+      name: groupName,
+    },
+  });
+
+  const company = await prisma.company.upsert({
+    where: { rut },
+    update: {
+      razon_social: razonSocial,
+      mandante_id: mandante.id,
+      group_id: group.id,
+    },
+    create: {
+      mandante_id: mandante.id,
+      group_id: group.id,
+      razon_social: razonSocial,
+      rut,
+    },
+  });
+
+  let line = await prisma.managementLine.findFirst({
+    where: {
+      mandante_id: mandante.id,
+      group_id: group.id,
+      company_id: company.id,
+      line_type: managementType as any,
+    },
+  });
+
+  if (!line) {
+    line = await prisma.managementLine.create({
+      data: {
+        mandante_id: mandante.id,
+        group_id: group.id,
+        company_id: company.id,
+        line_type: managementType as any,
+        name: `${razonSocial} - ${managementType}`,
+      },
+    });
+  }
+
+  const lineAfp = await prisma.managementLineAfp.upsert({
+    where: {
+      line_id_afp_name: {
+        line_id: line.id,
+        afp_name: afpName,
+      },
+    },
+    update: {},
+    create: {
+      line_id: line.id,
+      afp_name: afpName,
+      current_status: nullableString(body.estado_gestion) || "Pendiente Gestión",
+    },
+  });
+
+  return {
+    mandante_id: mandante.id,
+    group_id: group.id,
+    company_id: company.id,
+    line_id: line.id,
+    line_afp_id: lineAfp.id,
+  };
+}
+
 recordsRouter.get("/", async (req, res, next) => {
   try {
-    const mandante = typeof req.query.mandante === "string"
-  ? req.query.mandante
-  : undefined;
+    const mandanteId = typeof req.query.mandante_id === "string" ? req.query.mandante_id : undefined;
+    const mandante = typeof req.query.mandante === "string" ? req.query.mandante : undefined;
     const lineAfpId = typeof req.query.line_afp_id === "string" ? req.query.line_afp_id : undefined;
     const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
 
     const rows = await prisma.management.findMany({
       where: {
-        mandante_id: mandante,
+        mandante_id: mandanteId,
         line_afp_id: lineAfpId,
+        mandante: mandante ? { name: { contains: mandante, mode: "insensitive" } } : undefined,
         OR: search
           ? [
               { razon_social: { contains: search, mode: "insensitive" } },
@@ -141,7 +250,7 @@ recordsRouter.get("/", async (req, res, next) => {
               { grupo_empresa: { contains: search, mode: "insensitive" } },
             ]
           : undefined,
-      },
+      } as any,
       include: {
         mandante: true,
         group: true,
@@ -162,14 +271,11 @@ recordsRouter.get("/", async (req, res, next) => {
 recordsRouter.get("/:id", async (req, res, next) => {
   try {
     const row = await prisma.management.findUnique({
-      where: { id: req.params.id }, // 🔥 STRING (correcto)
-      include: recordInclude,       // 🔥 ESTA LÍNEA YA NO FALLA
+      where: { id: req.params.id },
+      include: recordInclude,
     });
 
-    if (!row) {
-      return res.status(404).json({ message: "Registro no encontrado" });
-    }
-
+    if (!row) return res.status(404).json({ message: "Registro no encontrado" });
     res.json(row);
   } catch (error) {
     next(error);
@@ -178,15 +284,13 @@ recordsRouter.get("/:id", async (req, res, next) => {
 
 recordsRouter.post("/", async (req, res, next) => {
   try {
+    const context = await ensureRecordContext(req.body);
+
     const row = await prisma.management.create({
-      data: ({
-        mandante_id: req.body.mandante_id,
-        group_id: req.body.group_id || null,
-        company_id: req.body.company_id,
-        line_id: req.body.line_id,
-        line_afp_id: req.body.line_afp_id || null,
+      data: {
+        ...context,
         ...managementData(req.body),
-      } as any),
+      } as any,
       include: recordInclude,
     });
 
@@ -209,13 +313,8 @@ recordsRouter.post("/", async (req, res, next) => {
 
 recordsRouter.put("/:id", async (req, res, next) => {
   try {
-    const previous = await prisma.management.findUnique({
-      where: { id: req.params.id },
-    });
-
-    if (!previous) {
-      return res.status(404).json({ message: "Registro no encontrado" });
-    }
+    const previous = await prisma.management.findUnique({ where: { id: req.params.id } });
+    if (!previous) return res.status(404).json({ message: "Registro no encontrado" });
 
     const row = await prisma.management.update({
       where: { id: req.params.id },
@@ -251,6 +350,18 @@ recordsRouter.post("/:id/notes", async (req, res, next) => {
         content: String(req.body.content || ""),
       },
     });
+
+    await prisma.activity.create({
+      data: {
+        related_module: "records",
+        related_record_id: recordId,
+        management_id: recordId,
+        activity_type: "NOTA",
+        status: "Completada",
+        description: "Nota agregada al registro",
+      },
+    });
+
     res.status(201).json(note);
   } catch (error) {
     next(error);
