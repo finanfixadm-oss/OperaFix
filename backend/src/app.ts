@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import path from "node:path";
+import recordsRouter from "./routes/records.js";
 
 import companiesRouter from "./routes/companies.js";
 import documentsRouter from "./routes/documents.js";
@@ -11,6 +12,8 @@ import managementLinesRouter from "./routes/management-lines.js";
 import managementLineAfpsRouter from "./routes/management-line-afps.js";
 import managementsRouter from "./routes/managements.js";
 import managementDocumentsRouter from "./routes/management-documents.js";
+
+
 
 const app = express();
 
@@ -45,5 +48,8 @@ app.use("/api/management-lines", managementLinesRouter);
 app.use("/api/management-line-afps", managementLineAfpsRouter);
 app.use("/api/managements", managementsRouter);
 app.use("/api/management-documents", managementDocumentsRouter);
+app.use("/records", recordsRouter);
+
 
 export default app;
+

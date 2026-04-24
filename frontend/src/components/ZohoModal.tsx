@@ -1,12 +1,17 @@
 import type { PropsWithChildren } from "react";
 
-type Props = PropsWithChildren<{
+type ZohoModalProps = PropsWithChildren<{
   title: string;
   isOpen: boolean;
   onClose: () => void;
 }>;
 
-export default function ZohoModal({ title, isOpen, onClose, children }: Props) {
+export default function ZohoModal({
+  title,
+  isOpen,
+  onClose,
+  children,
+}: ZohoModalProps) {
   if (!isOpen) return null;
 
   return (
@@ -14,7 +19,7 @@ export default function ZohoModal({ title, isOpen, onClose, children }: Props) {
       <div className="zoho-modal">
         <div className="zoho-modal-header">
           <h2>{title}</h2>
-          <button className="zoho-modal-close" onClick={onClose}>
+          <button type="button" className="zoho-modal-close" onClick={onClose}>
             ×
           </button>
         </div>
