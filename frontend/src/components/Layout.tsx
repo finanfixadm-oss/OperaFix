@@ -9,10 +9,7 @@ export default function Layout({ children }: PropsWithChildren) {
           <div className="crm-brand">OperaFix</div>
           <nav className="crm-main-nav">
             <NavLink to="/records">Inicio</NavLink>
-            <NavLink to="/records">Módulos</NavLink>
-            <NavLink to="/reports">Informes</NavLink>
-            <NavLink to="/analysis">Análisis</NavLink>
-            <NavLink to="/documents">Mis solicitudes</NavLink>
+            <NavLink to="/records">Registros de empresas</NavLink>
           </nav>
         </div>
       </header>
@@ -25,12 +22,6 @@ export default function Layout({ children }: PropsWithChildren) {
 
           <nav className="crm-side-nav">
             <NavLink to="/records">Registros de empresas</NavLink>
-            <NavLink to="/mandantes">Mandantes</NavLink>
-            <NavLink to="/company-groups">Grupos de empresas</NavLink>
-            <NavLink to="/companies">Empresas</NavLink>
-            <NavLink to="/management-lines">Líneas LM / TP</NavLink>
-            <NavLink to="/documents">Documentos</NavLink>
-            <NavLink to="/jerarquia">Jerarquía</NavLink>
           </nav>
         </aside>
 
