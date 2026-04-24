@@ -28,6 +28,7 @@ export default function Layout({ children }: PropsWithChildren) {
             <NavLink to="/company-groups">Grupos de empresas</NavLink>
             <NavLink to="/companies">Empresas</NavLink>
             <NavLink to="/management-lines">Líneas LM / TP</NavLink>
+            <NavLink to="/managements">Gestiones</NavLink>
             <NavLink to="/documents">Documentos</NavLink>
             <NavLink to="/jerarquia">Jerarquía</NavLink>
           </nav>
