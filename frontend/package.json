@@ -3,11 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-"scripts": {
-  "dev": "vite --host",
-  "build": "tsc -b && vite build",
-  "start": "vite preview --host 0.0.0.0 --port $PORT"
-},
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc -b && vite build",
+    "start": "vite preview --host 0.0.0.0 --port 5173",
+    "start:railway": "vite preview --host 0.0.0.0 --port $PORT"
+  },
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
