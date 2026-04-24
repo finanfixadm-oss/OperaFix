@@ -57,7 +57,7 @@ export default function App() {
             element={
               <ModulePlaceholderPage
                 title="Documentos"
-                subtitle="Vista temporal mientras se rehace el módulo"
+                subtitle="Módulo general de documentos en preparación"
               />
             }
           />
@@ -97,7 +97,9 @@ export default function App() {
             path="/management-lines/:lineId/afps"
             element={<ManagementLineAfpsPage />}
           />
+
           <Route path="/managements" element={<ManagementsPage />} />
+
           <Route
             path="/managements/:managementId/documents"
             element={<ManagementDocumentsPage />}
