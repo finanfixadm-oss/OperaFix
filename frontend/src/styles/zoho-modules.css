@@ -419,3 +419,272 @@
   font-weight: 700;
   margin-bottom: 6px;
 }
+.zoho-view-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #dfe5ef;
+  padding-bottom: 8px;
+  overflow-x: auto;
+}
+
+.zoho-view-tabs button {
+  border: 1px solid #dfe5ef;
+  background: #fff;
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.zoho-view-tabs button.active {
+  background: #e8f3ff;
+  border-color: #2f8de4;
+  color: #1d4f8f;
+  font-weight: 700;
+}
+
+.zoho-table-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.zoho-table-range {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.zoho-link-cell {
+  color: #1d4f8f;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.record-hero-card {
+  background: #fff;
+  border: 1px solid #dfe5ef;
+  border-radius: 10px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: 170px 1fr auto;
+  gap: 18px;
+  align-items: center;
+}
+
+.record-hero-logo img {
+  max-width: 140px;
+  max-height: 70px;
+  object-fit: contain;
+}
+
+.record-hero-main h1 {
+  margin: 0;
+  font-size: 26px;
+}
+
+.record-hero-main p {
+  margin: 4px 0 0;
+  color: #1d4f8f;
+  font-weight: 700;
+}
+
+.record-hero-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.record-tabs-card {
+  background: #fff;
+  border: 1px solid #dfe5ef;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.record-tabs {
+  display: flex;
+  gap: 18px;
+  border-bottom: 1px solid #eef2f7;
+  padding: 0 14px;
+}
+
+.record-tabs button {
+  border: none;
+  background: transparent;
+  padding: 14px 0;
+  cursor: pointer;
+  font-weight: 700;
+  color: #334155;
+}
+
+.record-tabs button.active {
+  color: #1d4f8f;
+  border-bottom: 3px solid #2f8de4;
+}
+
+.record-tab-content {
+  padding: 16px;
+}
+
+.record-tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.record-small-select {
+  width: 160px;
+}
+
+.record-timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.record-timeline-item {
+  border: 1px solid #e4e9f2;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fbfdff;
+}
+
+.record-timeline-item p {
+  margin: 6px 0;
+}
+
+.record-timeline-item span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.record-email-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.record-email-tabs button {
+  border: 1px solid #dfe5ef;
+  background: #fff;
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.record-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.record-file-list a {
+  color: #1d4f8f;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.record-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.record-detail-section {
+  background: #fff;
+  border: 1px solid #b9d9ff;
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.record-detail-section.wide {
+  grid-column: 1 / -1;
+}
+
+.record-detail-section h2 {
+  background: #0a4bc4;
+  color: #fff;
+  border-radius: 999px;
+  text-align: center;
+  padding: 6px 14px;
+  font-size: 15px;
+  margin: 0 0 14px;
+}
+
+.record-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.record-detail-section.wide .record-info-grid {
+  grid-template-columns: 1fr;
+}
+
+.record-info-field {
+  padding: 7px 8px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.record-info-field span {
+  display: block;
+  color: #1d4f8f;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+
+.record-info-field strong {
+  font-size: 13px;
+  color: #0f1f3d;
+}
+
+.record-doc-matrix {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.record-doc-slot {
+  border: 1px solid #dfe5ef;
+  border-radius: 8px;
+  background: #fbfdff;
+  padding: 10px;
+}
+
+.record-doc-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.record-doc-slot a {
+  display: block;
+  color: #1d4f8f;
+  text-decoration: none;
+  font-weight: 700;
+  margin: 4px 0;
+}
+
+.record-doc-empty {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+@media (max-width: 1100px) {
+  .record-hero-card,
+  .record-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .record-doc-matrix {
+    grid-template-columns: 1fr;
+  }
+}

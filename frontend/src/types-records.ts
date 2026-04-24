@@ -1,0 +1,83 @@
+export type DocumentItem = {
+  id: string;
+  category: string;
+  file_name: string;
+  file_url: string;
+  file_size?: number | null;
+  mime_type?: string | null;
+  created_at: string;
+};
+
+export type NoteItem = {
+  id: string;
+  content: string;
+  created_at: string;
+};
+
+export type ActivityItem = {
+  id: string;
+  activity_type?: string | null;
+  status?: string | null;
+  description?: string | null;
+  created_at: string;
+};
+
+export type RecordItem = {
+  id: string;
+  management_type?: "LM" | "TP" | string | null;
+  owner_name?: string | null;
+  mandante_id?: string | null;
+  group_id?: string | null;
+  company_id?: string | null;
+  line_id?: string | null;
+  line_afp_id?: string | null;
+  razon_social?: string | null;
+  rut?: string | null;
+  entidad?: string | null;
+  estado_gestion?: string | null;
+  numero_solicitud?: string | null;
+  envio_afp?: string | null;
+  estado_contrato_cliente?: string | null;
+  fecha_termino_contrato?: string | null;
+  estado_trabajador?: string | null;
+  motivo_tipo_exceso?: string | null;
+  motivo_rechazo?: string | null;
+  fecha_rechazo?: string | null;
+  mes_produccion_2026?: string | null;
+  grupo_empresa?: string | null;
+  acceso_portal?: string | null;
+  banco?: string | null;
+  tipo_cuenta?: string | null;
+  numero_cuenta?: string | null;
+  confirmacion_cc?: boolean | null;
+  confirmacion_poder?: boolean | null;
+  consulta_cen?: string | null;
+  contenido_cen?: string | null;
+  respuesta_cen?: string | null;
+  fecha_presentacion_afp?: string | null;
+  fecha_ingreso_afp?: string | null;
+  fecha_pago_afp?: string | null;
+  monto_devolucion?: number | string | null;
+  monto_pagado?: number | string | null;
+  monto_cliente?: number | string | null;
+  fee?: number | string | null;
+  monto_finanfix_solutions?: number | string | null;
+  facturado_finanfix?: string | null;
+  facturado_cliente?: string | null;
+  fecha_factura_finanfix?: string | null;
+  fecha_pago_factura_finanfix?: string | null;
+  numero_factura?: string | null;
+  numero_oc?: string | null;
+  comment?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  last_activity_at?: string | null;
+  mandante?: { id: string; name: string } | null;
+  group?: { id: string; name: string } | null;
+  company?: { id: string; razon_social: string; rut?: string | null } | null;
+  line?: { id: string; name?: string | null; line_type?: string | null } | null;
+  lineAfp?: { id: string; afp_name: string } | null;
+  documents?: DocumentItem[];
+  notes?: NoteItem[];
+  activities?: ActivityItem[];
+};

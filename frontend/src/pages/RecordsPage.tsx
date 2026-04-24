@@ -1,52 +1,470 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ModuleFilterPanel from "../components/ModuleFilterPanel";
+import ZohoModal from "../components/ZohoModal";
+import { fetchJson, postJson } from "../api";
+import type { FilterFieldDefinition, FilterRule, ManagementLineAfp } from "../types";
+import type { RecordItem } from "../types-records";
+
+type FormState = {
+  line_afp_id: string;
+  management_type: string;
+  owner_name: string;
+  razon_social: string;
+  rut: string;
+  entidad: string;
+  estado_gestion: string;
+  numero_solicitud: string;
+  envio_afp: string;
+  estado_contrato_cliente: string;
+  fecha_termino_contrato: string;
+  estado_trabajador: string;
+  motivo_tipo_exceso: string;
+  motivo_rechazo: string;
+  fecha_rechazo: string;
+  mes_produccion_2026: string;
+  grupo_empresa: string;
+  acceso_portal: string;
+  banco: string;
+  tipo_cuenta: string;
+  numero_cuenta: string;
+  confirmacion_cc: string;
+  confirmacion_poder: string;
+  consulta_cen: string;
+  contenido_cen: string;
+  respuesta_cen: string;
+  fecha_presentacion_afp: string;
+  fecha_ingreso_afp: string;
+  fecha_pago_afp: string;
+  monto_devolucion: string;
+  monto_pagado: string;
+  monto_cliente: string;
+  fee: string;
+  monto_finanfix_solutions: string;
+  facturado_finanfix: string;
+  facturado_cliente: string;
+  fecha_factura_finanfix: string;
+  fecha_pago_factura_finanfix: string;
+  numero_factura: string;
+  numero_oc: string;
+  comment: string;
+};
+
+const emptyForm: FormState = {
+  line_afp_id: "",
+  management_type: "LM",
+  owner_name: "",
+  razon_social: "",
+  rut: "",
+  entidad: "",
+  estado_gestion: "Pendiente Gestión",
+  numero_solicitud: "",
+  envio_afp: "Pendiente",
+  estado_contrato_cliente: "",
+  fecha_termino_contrato: "",
+  estado_trabajador: "",
+  motivo_tipo_exceso: "",
+  motivo_rechazo: "",
+  fecha_rechazo: "",
+  mes_produccion_2026: "",
+  grupo_empresa: "",
+  acceso_portal: "",
+  banco: "",
+  tipo_cuenta: "",
+  numero_cuenta: "",
+  confirmacion_cc: "false",
+  confirmacion_poder: "false",
+  consulta_cen: "",
+  contenido_cen: "",
+  respuesta_cen: "",
+  fecha_presentacion_afp: "",
+  fecha_ingreso_afp: "",
+  fecha_pago_afp: "",
+  monto_devolucion: "",
+  monto_pagado: "",
+  monto_cliente: "",
+  fee: "",
+  monto_finanfix_solutions: "",
+  facturado_finanfix: "",
+  facturado_cliente: "",
+  fecha_factura_finanfix: "",
+  fecha_pago_factura_finanfix: "",
+  numero_factura: "",
+  numero_oc: "",
+  comment: "",
+};
+
+function getValueByPath(obj: unknown, path: string) {
+  return path.split(".").reduce<any>((acc, key) => acc?.[key], obj);
+}
+
+function matchRule(value: unknown, rule: FilterRule) {
+  const normalized = String(value ?? "").toLowerCase();
+  const query = String(rule.value ?? "").toLowerCase();
+
+  switch (rule.operator) {
+    case "equals":
+      return normalized === query;
+    case "not_equals":
+      return normalized !== query;
+    case "contains":
+      return normalized.includes(query);
+    case "not_contains":
+      return !normalized.includes(query);
+    case "starts_with":
+      return normalized.startsWith(query);
+    case "ends_with":
+      return normalized.endsWith(query);
+    case "includes_all":
+      return query.split(",").map((x) => x.trim()).filter(Boolean).every((part) => normalized.includes(part));
+    case "includes_any":
+      return query.split(",").map((x) => x.trim()).filter(Boolean).some((part) => normalized.includes(part));
+    default:
+      return true;
+  }
+}
+
+function formatMoney(value?: number | string | null) {
+  return new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
+}
+
+function boolLabel(value?: boolean | null) {
+  return value ? "Sí" : "No";
+}
 
 export default function RecordsPage() {
-  const [records, setRecords] = useState<any[]>([]);
   const navigate = useNavigate();
+  const [rows, setRows] = useState<RecordItem[]>([]);
+  const [allAfps, setAllAfps] = useState<ManagementLineAfp[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeRules, setActiveRules] = useState<FilterRule[]>([]);
+  const [quickSearch, setQuickSearch] = useState("");
+  const [activeView, setActiveView] = useState("todos");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<FormState>(emptyForm);
+
+  async function loadRows() {
+    setLoading(true);
+    try {
+      const data = await fetchJson<RecordItem[]>("/records");
+      setRows(data);
+    } catch (error) {
+      console.error(error);
+      alert("No se pudieron cargar los registros de empresas.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadAfps() {
+    try {
+      const data = await fetchJson<ManagementLineAfp[]>("/management-line-afps");
+      setAllAfps(data);
+    } catch (error) {
+      console.error(error);
+      setAllAfps([]);
+    }
+  }
 
   useEffect(() => {
-    fetch(import.meta.env.VITE_API_URL + "/records")
-      .then(res => res.json())
-      .then(setRecords)
-      .catch(() => setRecords([]));
+    loadRows();
+    loadAfps();
   }, []);
 
+  function updateForm(field: keyof FormState, value: string) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  const selectedAfp = useMemo(() => {
+    return allAfps.find((item) => item.id === form.line_afp_id) || null;
+  }, [allAfps, form.line_afp_id]);
+
+  async function createRecord() {
+    const line = selectedAfp?.line;
+
+    if (!selectedAfp?.id || !line?.id || !line?.company?.id || !line?.mandante?.id) {
+      alert("Debes seleccionar una AFP / línea válida.");
+      return;
+    }
+
+    if (!form.razon_social.trim()) {
+      alert("Debes ingresar Razón Social.");
+      return;
+    }
+
+    if (!form.rut.trim()) {
+      alert("Debes ingresar RUT.");
+      return;
+    }
+
+    const { line_afp_id: _ignoredLineAfpId, ...formPayload } = form;
+
+    setSaving(true);
+    try {
+      await postJson<RecordItem>("/records", {
+        mandante_id: line.mandante.id,
+        group_id: line.group?.id || null,
+        company_id: line.company.id,
+        line_id: line.id,
+        line_afp_id: selectedAfp.id,
+        ...formPayload,
+        confirmacion_cc: form.confirmacion_cc === "true",
+        confirmacion_poder: form.confirmacion_poder === "true",
+      });
+      setModalOpen(false);
+      setForm(emptyForm);
+      await loadRows();
+    } catch (error) {
+      console.error(error);
+      alert("No se pudo crear el registro de empresa.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const fields: FilterFieldDefinition[] = [
+    { field: "entidad", label: "Entidad", type: "text" },
+    { field: "grupo_empresa", label: "Buscar Grupo", type: "text" },
+    { field: "confirmacion_cc", label: "Confirmación CC", type: "boolean" },
+    { field: "rut", label: "RUT", type: "text" },
+    { field: "estado_gestion", label: "Estado Gestión", type: "text" },
+    { field: "monto_devolucion", label: "Monto Devolución", type: "number" },
+    { field: "razon_social", label: "Razón Social", type: "text" },
+    { field: "numero_solicitud", label: "N° Solicitud", type: "text" },
+    { field: "mes_produccion_2026", label: "Mes de producción", type: "text" },
+    { field: "management_type", label: "Tipo", type: "select", options: [{ label: "LM", value: "LM" }, { label: "TP", value: "TP" }] },
+    { field: "mandante.name", label: "Mandante", type: "text" },
+    { field: "lineAfp.afp_name", label: "AFP", type: "text" },
+    { field: "acceso_portal", label: "Acceso portal", type: "text" },
+    { field: "banco", label: "Banco", type: "text" },
+    { field: "tipo_cuenta", label: "Tipo de Cuenta", type: "text" },
+    { field: "numero_cuenta", label: "Número cuenta", type: "text" },
+    { field: "confirmacion_poder", label: "Confirmación Poder", type: "boolean" },
+    { field: "consulta_cen", label: "Consulta CEN", type: "text" },
+    { field: "respuesta_cen", label: "Respuesta CEN", type: "text" },
+    { field: "estado_trabajador", label: "Estado Trabajador", type: "text" },
+    { field: "facturado_cliente", label: "Facturado cliente", type: "text" },
+    { field: "facturado_finanfix", label: "Facturado Finanfix", type: "text" },
+  ];
+
+  const filteredRows = useMemo(() => {
+    let data = [...rows];
+
+    if (activeView === "optimiza") data = data.filter((row) => row.mandante?.name?.toLowerCase().includes("optimiza"));
+    if (activeView === "mundo") data = data.filter((row) => row.mandante?.name?.toLowerCase().includes("mundo"));
+    if (activeView === "mis") data = data.filter((row) => Boolean(row.owner_name));
+
+    if (quickSearch.trim()) {
+      const q = quickSearch.toLowerCase();
+      data = data.filter((row) =>
+        [
+          row.entidad,
+          row.grupo_empresa,
+          row.rut,
+          row.estado_gestion,
+          row.razon_social,
+          row.numero_solicitud,
+          row.mes_produccion_2026,
+          row.mandante?.name,
+          row.company?.razon_social,
+          row.lineAfp?.afp_name,
+        ]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(q))
+      );
+    }
+
+    if (activeRules.length) {
+      data = data.filter((row) => activeRules.every((rule) => matchRule(getValueByPath(row, rule.field), rule)));
+    }
+
+    return data;
+  }, [rows, activeRules, quickSearch, activeView]);
+
   return (
-    <div>
-      <h1>Registros de empresas</h1>
-
-      <div className="zoho-layout">
-        <div className="zoho-filters">
-          <input placeholder="Buscar..." />
-
-          <button>Filtrar</button>
+    <div className="zoho-module-page">
+      <div className="zoho-module-header">
+        <div>
+          <h1>Registros de empresas</h1>
+          <p>Lista de líneas/casos de gestión por empresa, AFP y mandante</p>
         </div>
-
-        <table className="zoho-table">
-          <thead>
-            <tr>
-              <th>Entidad</th>
-              <th>RUT</th>
-              <th>Estado</th>
-              <th>Monto</th>
-              <th>Razón social</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {records.map(r => (
-              <tr key={r.id} onClick={() => navigate(`/records/${r.id}`)}>
-                <td>{r.entity}</td>
-                <td>{r.rut}</td>
-                <td>{r.status}</td>
-                <td>{r.amount}</td>
-                <td>{r.company}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="zoho-module-actions">
+          <button className="zoho-btn">Filtrar</button>
+          <button className="zoho-btn">Ordenar</button>
+          <button className="zoho-btn zoho-btn-primary" onClick={() => setModalOpen(true)}>
+            Crear Registro de empresa
+          </button>
+        </div>
       </div>
+
+      <div className="zoho-view-tabs">
+        <button className={activeView === "optimiza" ? "active" : ""} onClick={() => setActiveView("optimiza")}>Optimiza Consulting</button>
+        <button className={activeView === "mundo" ? "active" : ""} onClick={() => setActiveView("mundo")}>Mundo Previsional</button>
+        <button className={activeView === "mis" ? "active" : ""} onClick={() => setActiveView("mis")}>Mis Registros</button>
+        <button className={activeView === "todos" ? "active" : ""} onClick={() => setActiveView("todos")}>Todos los registros</button>
+      </div>
+
+      <div className="zoho-module-layout">
+        <ModuleFilterPanel
+          title="Filtrar Registros de empresas"
+          fields={fields}
+          onApply={(rules, search) => {
+            setActiveRules(rules);
+            setQuickSearch(search);
+          }}
+        />
+
+        <section className="zoho-table-wrap">
+          <div className="zoho-table-toolbar">
+            <span>Registros totales {filteredRows.length}</span>
+            <span className="zoho-table-range">1 a {Math.min(filteredRows.length, 100)}</span>
+          </div>
+
+          {loading ? (
+            <div className="zoho-empty">Cargando registros...</div>
+          ) : (
+            <table className="zoho-table">
+              <thead>
+                <tr>
+                  <th><input type="checkbox" /></th>
+                  <th>Entidad</th>
+                  <th>Buscar Grupo</th>
+                  <th>Confirmación CC</th>
+                  <th>RUT</th>
+                  <th>Estado Gestión</th>
+                  <th>Monto Devolución</th>
+                  <th>Razón Social</th>
+                  <th>N° Solicitud</th>
+                  <th>Mes producción</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.length === 0 ? (
+                  <tr><td colSpan={10}>Sin registros de empresas.</td></tr>
+                ) : (
+                  filteredRows.map((row) => (
+                    <tr key={row.id}>
+                      <td><input type="checkbox" /></td>
+                      <td className="zoho-link-cell" onClick={() => navigate(`/records/${row.id}`)}>{row.entidad || row.lineAfp?.afp_name || "—"}</td>
+                      <td>{row.grupo_empresa || row.group?.name || "—"}</td>
+                      <td>{boolLabel(row.confirmacion_cc)}</td>
+                      <td>{row.rut || row.company?.rut || "—"}</td>
+                      <td>{row.estado_gestion || "—"}</td>
+                      <td>{formatMoney(row.monto_devolucion)}</td>
+                      <td className="zoho-link-cell" onClick={() => navigate(`/records/${row.id}`)}>{row.razon_social || row.company?.razon_social || "—"}</td>
+                      <td>{row.numero_solicitud || "—"}</td>
+                      <td>{row.mes_produccion_2026 || "—"}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+        </section>
+      </div>
+
+      <ZohoModal title="Crear Registro de empresa" isOpen={modalOpen} onClose={() => setModalOpen(false)}>
+        <FormSection title="0. Asociación de línea">
+          <Field label="AFP / Línea asociada">
+            <select className="zoho-select" value={form.line_afp_id} onChange={(e) => updateForm("line_afp_id", e.target.value)}>
+              <option value="">Seleccionar AFP / Línea</option>
+              {allAfps.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.afp_name} · {item.line?.company?.razon_social || "Sin empresa"} · {item.line?.mandante?.name || "Sin mandante"}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </FormSection>
+
+        <FormSection title="1. Ingreso de caso">
+          <Field label="Tipo"><select className="zoho-select" value={form.management_type} onChange={(e) => updateForm("management_type", e.target.value)}><option value="LM">LM</option><option value="TP">TP</option></select></Field>
+          <Field label="Mes de producción"><input className="zoho-input" value={form.mes_produccion_2026} onChange={(e) => updateForm("mes_produccion_2026", e.target.value)} /></Field>
+          <Field label="Acceso portal"><SelectYesNo value={form.acceso_portal} onChange={(v) => updateForm("acceso_portal", v)} /></Field>
+          <Field label="Envío AFP"><SelectStatus value={form.envio_afp} onChange={(v) => updateForm("envio_afp", v)} options={["Pendiente", "Enviado", "Respondido", "Rechazado"]} /></Field>
+          <Field label="Estado contrato con cliente"><SelectStatus value={form.estado_contrato_cliente} onChange={(v) => updateForm("estado_contrato_cliente", v)} options={["Vigente", "No vigente", "Pendiente"]} /></Field>
+          <Field label="Estado Gestión"><SelectStatus value={form.estado_gestion} onChange={(v) => updateForm("estado_gestion", v)} options={["Pendiente Gestión", "En preparación", "Enviada AFP", "Respondida AFP", "Pagada", "Facturada", "Cerrada", "Rechazada"]} /></Field>
+          <Field label="N° Solicitud"><input className="zoho-input" value={form.numero_solicitud} onChange={(e) => updateForm("numero_solicitud", e.target.value)} /></Field>
+          <Field label="Motivo del rechazo/anulación"><input className="zoho-input" value={form.motivo_rechazo} onChange={(e) => updateForm("motivo_rechazo", e.target.value)} /></Field>
+          <Field label="Fecha rechazo"><input className="zoho-input" type="date" value={form.fecha_rechazo} onChange={(e) => updateForm("fecha_rechazo", e.target.value)} /></Field>
+          <Field label="Buscar Grupo"><input className="zoho-input" value={form.grupo_empresa} onChange={(e) => updateForm("grupo_empresa", e.target.value)} /></Field>
+          <Field label="Propietario de Registro"><input className="zoho-input" value={form.owner_name} onChange={(e) => updateForm("owner_name", e.target.value)} /></Field>
+        </FormSection>
+
+        <FormSection title="2. Datos identificatorios y bancarios">
+          <Field label="Razón Social"><input className="zoho-input" value={form.razon_social} onChange={(e) => updateForm("razon_social", e.target.value)} /></Field>
+          <Field label="RUT"><input className="zoho-input" value={form.rut} onChange={(e) => updateForm("rut", e.target.value)} /></Field>
+          <Field label="Entidad"><input className="zoho-input" value={form.entidad} onChange={(e) => updateForm("entidad", e.target.value)} /></Field>
+          <Field label="FEE"><input className="zoho-input" type="number" value={form.fee} onChange={(e) => updateForm("fee", e.target.value)} /></Field>
+          <Field label="Banco"><input className="zoho-input" value={form.banco} onChange={(e) => updateForm("banco", e.target.value)} /></Field>
+          <Field label="Tipo de Cuenta"><input className="zoho-input" value={form.tipo_cuenta} onChange={(e) => updateForm("tipo_cuenta", e.target.value)} /></Field>
+          <Field label="Número cuenta"><input className="zoho-input" value={form.numero_cuenta} onChange={(e) => updateForm("numero_cuenta", e.target.value)} /></Field>
+          <Field label="Confirmación CC"><SelectBoolean value={form.confirmacion_cc} onChange={(v) => updateForm("confirmacion_cc", v)} /></Field>
+          <Field label="Confirmación Poder"><SelectBoolean value={form.confirmacion_poder} onChange={(v) => updateForm("confirmacion_poder", v)} /></Field>
+        </FormSection>
+
+        <FormSection title="3. CEN y trabajador">
+          <Field label="Consulta CEN"><SelectYesNo value={form.consulta_cen} onChange={(v) => updateForm("consulta_cen", v)} /></Field>
+          <Field label="Contenido CEN"><SelectYesNo value={form.contenido_cen} onChange={(v) => updateForm("contenido_cen", v)} /></Field>
+          <Field label="Respuesta CEN"><SelectYesNo value={form.respuesta_cen} onChange={(v) => updateForm("respuesta_cen", v)} /></Field>
+          <Field label="Estado Trabajador"><SelectStatus value={form.estado_trabajador} onChange={(v) => updateForm("estado_trabajador", v)} options={["Vigente", "No vigente", "Sin información"]} /></Field>
+          <Field label="Motivo (Tipo de exceso)"><SelectStatus value={form.motivo_tipo_exceso} onChange={(v) => updateForm("motivo_tipo_exceso", v)} options={["Licencia Médica LM", "Trabajo Pesado TP", "LM + TP", "Otro"]} /></Field>
+        </FormSection>
+
+        <FormSection title="4. Fechas de proceso">
+          <Field label="Fecha término contrato"><input className="zoho-input" type="date" value={form.fecha_termino_contrato} onChange={(e) => updateForm("fecha_termino_contrato", e.target.value)} /></Field>
+          <Field label="Fecha Presentación AFP"><input className="zoho-input" type="date" value={form.fecha_presentacion_afp} onChange={(e) => updateForm("fecha_presentacion_afp", e.target.value)} /></Field>
+          <Field label="Fecha ingreso AFP"><input className="zoho-input" type="date" value={form.fecha_ingreso_afp} onChange={(e) => updateForm("fecha_ingreso_afp", e.target.value)} /></Field>
+          <Field label="Fecha Pago AFP"><input className="zoho-input" type="date" value={form.fecha_pago_afp} onChange={(e) => updateForm("fecha_pago_afp", e.target.value)} /></Field>
+          <Field label="Fecha Factura Finanfix"><input className="zoho-input" type="date" value={form.fecha_factura_finanfix} onChange={(e) => updateForm("fecha_factura_finanfix", e.target.value)} /></Field>
+          <Field label="Fecha pago factura Finanfix"><input className="zoho-input" type="date" value={form.fecha_pago_factura_finanfix} onChange={(e) => updateForm("fecha_pago_factura_finanfix", e.target.value)} /></Field>
+        </FormSection>
+
+        <FormSection title="5. Montos y facturación">
+          <Field label="Monto Devolución"><input className="zoho-input" type="number" value={form.monto_devolucion} onChange={(e) => updateForm("monto_devolucion", e.target.value)} /></Field>
+          <Field label="Monto Real Pagado"><input className="zoho-input" type="number" value={form.monto_pagado} onChange={(e) => updateForm("monto_pagado", e.target.value)} /></Field>
+          <Field label="Monto Cliente"><input className="zoho-input" type="number" value={form.monto_cliente} onChange={(e) => updateForm("monto_cliente", e.target.value)} /></Field>
+          <Field label="Monto Finanfix"><input className="zoho-input" type="number" value={form.monto_finanfix_solutions} onChange={(e) => updateForm("monto_finanfix_solutions", e.target.value)} /></Field>
+          <Field label="Facturado cliente"><SelectYesNo value={form.facturado_cliente} onChange={(v) => updateForm("facturado_cliente", v)} /></Field>
+          <Field label="Facturado Finanfix"><SelectYesNo value={form.facturado_finanfix} onChange={(v) => updateForm("facturado_finanfix", v)} /></Field>
+          <Field label="N° Factura"><input className="zoho-input" value={form.numero_factura} onChange={(e) => updateForm("numero_factura", e.target.value)} /></Field>
+          <Field label="N° OC"><input className="zoho-input" value={form.numero_oc} onChange={(e) => updateForm("numero_oc", e.target.value)} /></Field>
+        </FormSection>
+
+        <FormSection title="6. Comentario">
+          <textarea className="zoho-input zoho-textarea" value={form.comment} onChange={(e) => updateForm("comment", e.target.value)} />
+        </FormSection>
+
+        <div className="zoho-form-actions">
+          <button className="zoho-btn" onClick={() => setModalOpen(false)}>Cancelar</button>
+          <button className="zoho-btn zoho-btn-primary" onClick={createRecord} disabled={saving}>{saving ? "Guardando..." : "Guardar Registro"}</button>
+        </div>
+      </ZohoModal>
     </div>
   );
+}
+
+function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return <div className="zoho-form-section"><h3>{title}</h3><div className="zoho-form-grid">{children}</div></div>;
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div className="zoho-form-field"><label>{label}</label>{children}</div>;
+}
+
+function SelectBoolean({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return <select className="zoho-select" value={value} onChange={(e) => onChange(e.target.value)}><option value="false">No</option><option value="true">Sí</option></select>;
+}
+
+function SelectYesNo({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return <select className="zoho-select" value={value} onChange={(e) => onChange(e.target.value)}><option value="">Seleccionar</option><option value="Sí">Sí</option><option value="No">No</option><option value="Pendiente">Pendiente</option></select>;
+}
+
+function SelectStatus({ value, onChange, options }: { value: string; onChange: (value: string) => void; options: string[] }) {
+  return <select className="zoho-select" value={value} onChange={(e) => onChange(e.target.value)}><option value="">Seleccionar</option>{options.map((item) => <option key={item} value={item}>{item}</option>)}</select>;
 }
