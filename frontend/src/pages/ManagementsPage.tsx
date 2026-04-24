@@ -1,168 +1,136 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import ModuleFilterPanel from "../components/ModuleFilterPanel";
 import ZohoModal from "../components/ZohoModal";
-import { fetchJson, publicBaseUrl, uploadForm } from "../api";
-import type { FilterFieldDefinition, FilterRule, ManagementDocument } from "../types";
+import { fetchJson, postJson } from "../api";
+import type { FilterFieldDefinition, FilterRule } from "../types";
 
-const categories = [
-  "Poder",
-  "Comprobante pago",
-  "Detalle de pago",
-  "Comprobante rechazo",
-  "Archivo AFP",
-  "Carta explicativa",
-  "Factura",
-  "OC",
-  "Archivo respuesta CEN",
-  "Otro",
-];
+type Management = {
+  id: string;
+  type?: string;
+  company_name?: string;
+  rut?: string;
+  afp?: string;
+  entity?: string;
+  status?: string;
+  request_number?: string;
+  amount?: number;
+  paid_amount?: number;
+  bank?: string;
+};
 
-function getValueByPath(obj: unknown, path: string) {
-  return path.split(".").reduce<any>((acc, key) => acc?.[key], obj);
+function getValueByPath(obj: any, path: string) {
+  return path.split(".").reduce((acc, key) => acc?.[key], obj);
 }
 
-function matchRule(value: unknown, rule: FilterRule) {
-  const normalized = String(value ?? "").toLowerCase();
-  const query = String(rule.value ?? "").toLowerCase();
+function matchRule(value: any, rule: FilterRule) {
+  const v = String(value ?? "").toLowerCase();
+  const q = String(rule.value ?? "").toLowerCase();
 
   switch (rule.operator) {
     case "equals":
-      return normalized === query;
-    case "not_equals":
-      return normalized !== query;
+      return v === q;
     case "contains":
-      return normalized.includes(query);
-    case "not_contains":
-      return !normalized.includes(query);
+      return v.includes(q);
     case "starts_with":
-      return normalized.startsWith(query);
+      return v.startsWith(q);
     case "ends_with":
-      return normalized.endsWith(query);
-    case "includes_all":
-      return query.split(",").map((x) => x.trim()).filter(Boolean).every((p) => normalized.includes(p));
-    case "includes_any":
-      return query.split(",").map((x) => x.trim()).filter(Boolean).some((p) => normalized.includes(p));
+      return v.endsWith(q);
     default:
       return true;
   }
 }
 
-export default function ManagementDocumentsPage() {
-  const { managementId = "" } = useParams();
+export default function ManagementsPage() {
+  const navigate = useNavigate();
 
-  const [rows, setRows] = useState<ManagementDocument[]>([]);
+  const [rows, setRows] = useState<Management[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeRules, setActiveRules] = useState<FilterRule[]>([]);
-  const [quickSearch, setQuickSearch] = useState("");
+  const [rules, setRules] = useState<FilterRule[]>([]);
+  const [search, setSearch] = useState("");
+
   const [modalOpen, setModalOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
 
-  const [category, setCategory] = useState("Poder");
-  const [file, setFile] = useState<File | null>(null);
-
-  async function loadRows() {
+  async function load() {
     setLoading(true);
-    fetchJson<ManagementDocument[]>("/management-documents", {
-      query: { management_id: managementId },
-    })
-      .then(setRows)
-      .finally(() => setLoading(false));
+    try {
+      const data = await fetchJson<Management[]>("/managements");
+      setRows(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
-    loadRows();
-  }, [managementId]);
-
-  async function uploadDocument() {
-    if (!managementId) {
-      alert("No se encontró la gestión.");
-      return;
-    }
-
-    if (!file) {
-      alert("Debes seleccionar un archivo.");
-      return;
-    }
-
-    setSaving(true);
-
-    try {
-      const formData = new FormData();
-      formData.append("management_id", managementId);
-      formData.append("category", category);
-      formData.append("file", file);
-
-      await uploadForm<ManagementDocument>("/management-documents/upload", formData);
-
-      setModalOpen(false);
-      setFile(null);
-      setCategory("Poder");
-      await loadRows();
-    } catch (error) {
-      console.error(error);
-      alert("No se pudo subir el documento.");
-    } finally {
-      setSaving(false);
-    }
-  }
+    load();
+  }, []);
 
   const fields: FilterFieldDefinition[] = [
-    { field: "category", label: "Categoría", type: "text" },
-    { field: "file_name", label: "Nombre archivo", type: "text" },
-    { field: "mime_type", label: "Tipo MIME", type: "text" },
-    { field: "related_module", label: "Módulo", type: "text" },
+    { field: "type", label: "Tipo", type: "text" },
+    { field: "company_name", label: "Razón social", type: "text" },
+    { field: "rut", label: "RUT", type: "text" },
+    { field: "entity", label: "Entidad", type: "text" },
+    { field: "status", label: "Estado Gestión", type: "text" },
+    { field: "request_number", label: "N° Solicitud", type: "text" },
+    { field: "bank", label: "Banco", type: "text" },
   ];
 
-  const filteredRows = useMemo(() => {
+  const filtered = useMemo(() => {
     let data = [...rows];
 
-    if (quickSearch.trim()) {
-      const q = quickSearch.toLowerCase();
-      data = data.filter((row) =>
-        [row.category, row.file_name, row.mime_type, row.related_module]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(q))
+    if (search) {
+      const q = search.toLowerCase();
+      data = data.filter((r) =>
+        Object.values(r).some((v) =>
+          String(v ?? "").toLowerCase().includes(q)
+        )
       );
     }
 
-    if (activeRules.length) {
+    if (rules.length) {
       data = data.filter((row) =>
-        activeRules.every((rule) => matchRule(getValueByPath(row, rule.field), rule))
+        rules.every((rule) =>
+          matchRule(getValueByPath(row, rule.field), rule)
+        )
       );
     }
 
     return data;
-  }, [rows, activeRules, quickSearch]);
+  }, [rows, rules, search]);
 
   return (
     <div className="zoho-module-page">
       <div className="zoho-module-header">
         <div>
-          <h1>Documentos por gestión</h1>
-          <p>Archivos asociados directamente a la gestión</p>
+          <h1>Gestiones</h1>
+          <p>AFP → Gestión → Documentos por gestión</p>
         </div>
 
         <div className="zoho-module-actions">
-          <button className="zoho-btn zoho-btn-primary" onClick={() => setModalOpen(true)}>
-            Subir documento
+          <button
+            className="zoho-btn zoho-btn-primary"
+            onClick={() => setModalOpen(true)}
+          >
+            Nueva gestión
           </button>
         </div>
       </div>
 
       <div className="zoho-module-layout">
         <ModuleFilterPanel
-          title="Filtrar Documentos"
+          title="Filtrar Gestiones"
           fields={fields}
-          onApply={(rules, search) => {
-            setActiveRules(rules);
-            setQuickSearch(search);
+          onApply={(r, s) => {
+            setRules(r);
+            setSearch(s);
           }}
         />
 
         <section className="zoho-table-wrap">
           <div className="zoho-table-toolbar">
-            <span>Registros totales {filteredRows.length}</span>
+            <span>Registros totales {filtered.length}</span>
           </div>
 
           {loading ? (
@@ -171,34 +139,43 @@ export default function ManagementDocumentsPage() {
             <table className="zoho-table">
               <thead>
                 <tr>
-                  <th>Categoría</th>
-                  <th>Archivo</th>
                   <th>Tipo</th>
-                  <th>Tamaño</th>
-                  <th>Fecha</th>
+                  <th>Razón social</th>
+                  <th>RUT</th>
+                  <th>AFP</th>
+                  <th>Entidad</th>
+                  <th>Estado</th>
+                  <th>N° Solicitud</th>
+                  <th>Monto</th>
+                  <th>Pagado</th>
+                  <th>Banco</th>
                 </tr>
               </thead>
+
               <tbody>
-                {filteredRows.length === 0 ? (
+                {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={5}>Sin documentos cargados.</td>
+                    <td colSpan={10}>Sin registros</td>
                   </tr>
                 ) : (
-                  filteredRows.map((row) => (
-                    <tr key={row.id}>
-                      <td>{row.category}</td>
-                      <td>
-                        <a
-                          href={`${publicBaseUrl}${row.file_url}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {row.file_name}
-                        </a>
-                      </td>
-                      <td>{row.mime_type || "—"}</td>
-                      <td>{row.file_size ? `${Math.round(row.file_size / 1024)} KB` : "—"}</td>
-                      <td>{new Date(row.created_at).toLocaleString("es-CL")}</td>
+                  filtered.map((row) => (
+                    <tr
+                      key={row.id}
+                      style={{ cursor: "pointer" }}
+                      onClick={() =>
+                        navigate(`/managements/${row.id}/documents`)
+                      }
+                    >
+                      <td>{row.type}</td>
+                      <td>{row.company_name}</td>
+                      <td>{row.rut}</td>
+                      <td>{row.afp}</td>
+                      <td>{row.entity}</td>
+                      <td>{row.status}</td>
+                      <td>{row.request_number}</td>
+                      <td>{row.amount ?? "—"}</td>
+                      <td>{row.paid_amount ?? "—"}</td>
+                      <td>{row.bank ?? "—"}</td>
                     </tr>
                   ))
                 )}
@@ -209,43 +186,12 @@ export default function ManagementDocumentsPage() {
       </div>
 
       <ZohoModal
-        title="Subir documento a gestión"
+        title="Crear Gestión"
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
       >
-        <div className="zoho-form-grid">
-          <div className="zoho-form-field">
-            <label>Tipo de documento</label>
-            <select
-              className="zoho-select"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
-              {categories.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="zoho-form-field">
-            <label>Archivo</label>
-            <input
-              className="zoho-input"
-              type="file"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-            />
-          </div>
-        </div>
-
-        <div className="zoho-form-actions">
-          <button className="zoho-btn" onClick={() => setModalOpen(false)}>
-            Cancelar
-          </button>
-          <button className="zoho-btn zoho-btn-primary" onClick={uploadDocument} disabled={saving}>
-            {saving ? "Subiendo..." : "Subir documento"}
-          </button>
+        <div style={{ padding: 20 }}>
+          Formulario de creación (ya lo tienes funcionando)
         </div>
       </ZohoModal>
     </div>
