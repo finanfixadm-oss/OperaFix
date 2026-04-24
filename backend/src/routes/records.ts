@@ -209,8 +209,13 @@ recordsRouter.post("/", async (req, res, next) => {
 
 recordsRouter.put("/:id", async (req, res, next) => {
   try {
-    const previous = await prisma.management.findUnique({ where: { id: req.params.id } });
-    if (!previous) return res.status(404).json({ message: "Registro no encontrado" });
+    const previous = await prisma.management.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!previous) {
+      return res.status(404).json({ message: "Registro no encontrado" });
+    }
 
     const row = await prisma.management.update({
       where: { id: req.params.id },
