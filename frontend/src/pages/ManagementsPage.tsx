@@ -1,158 +1,75 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import ModuleFilterPanel from "../components/ModuleFilterPanel";
+import { useNavigate, useParams } from "react-router-dom";
 import ZohoModal from "../components/ZohoModal";
-import { fetchJson, postJson } from "../api";
-import type {
-  FilterFieldDefinition,
-  FilterRule,
-  ManagementLineAfp,
-} from "../types";
+import { fetchJson, publicBaseUrl, uploadForm } from "../api";
+import type { ManagementDocument } from "../types";
 
-type Management = {
+type ManagementDetail = {
   id: string;
   management_type?: string | null;
-  owner_name?: string | null;
-
-  mandante_id?: string | null;
-  group_id?: string | null;
-  company_id?: string | null;
-  line_id?: string | null;
-  line_afp_id?: string | null;
-
   razon_social?: string | null;
   rut?: string | null;
   entidad?: string | null;
   estado_gestion?: string | null;
   numero_solicitud?: string | null;
-
   envio_afp?: string | null;
   estado_contrato_cliente?: string | null;
   estado_trabajador?: string | null;
   motivo_tipo_exceso?: string | null;
   motivo_rechazo?: string | null;
   mes_produccion_2026?: string | null;
-  grupo_empresa?: string | null;
   acceso_portal?: string | null;
-
   banco?: string | null;
   tipo_cuenta?: string | null;
   numero_cuenta?: string | null;
   confirmacion_cc?: boolean | null;
   confirmacion_poder?: boolean | null;
-
   consulta_cen?: string | null;
   contenido_cen?: string | null;
   respuesta_cen?: string | null;
-
   monto_devolucion?: number | null;
   monto_pagado?: number | null;
   monto_cliente?: number | null;
   fee?: number | null;
   monto_finanfix_solutions?: number | null;
-
   facturado_finanfix?: string | null;
   facturado_cliente?: string | null;
   numero_factura?: string | null;
   numero_oc?: string | null;
-
   comment?: string | null;
-
-  mandante?: { id: string; name: string } | null;
-  company?: { id: string; razon_social: string; rut?: string | null } | null;
-  line?: {
-    id: string;
-    line_type?: string | null;
-    mandante?: { id: string; name: string } | null;
-    group?: { id: string; name: string } | null;
-    company?: { id: string; razon_social: string; rut?: string | null } | null;
-  } | null;
-  lineAfp?: {
-    id: string;
-    afp_name: string;
-    line?: ManagementLineAfp["line"];
-  } | null;
+  mandante?: { name: string } | null;
+  company?: { razon_social: string; rut?: string | null } | null;
+  lineAfp?: { afp_name: string } | null;
 };
 
-const emptyForm = {
-  management_type: "LM",
-  owner_name: "",
-  razon_social: "",
-  rut: "",
-  entidad: "",
-  estado_gestion: "",
-  numero_solicitud: "",
+const stages = [
+  {
+    key: "presentacion",
+    title: "1. Documentos de presentación",
+    description: "Archivos usados para preparar y presentar la gestión.",
+    categories: ["Carta explicativa", "Archivo AFP", "Poder", "Archivo respuesta CEN"],
+  },
+  {
+    key: "pago",
+    title: "2. Documentos de respuesta / pago",
+    description: "Archivos recibidos cuando la entidad responde o paga.",
+    categories: ["Comprobante pago", "Detalle de pago", "Comprobante rechazo"],
+  },
+  {
+    key: "facturacion",
+    title: "3. Documentos de facturación",
+    description: "Documentos comerciales de cierre de la gestión.",
+    categories: ["Factura", "OC"],
+  },
+  {
+    key: "otros",
+    title: "4. Otros documentos",
+    description: "Otros respaldos asociados a la gestión.",
+    categories: ["Otro"],
+  },
+];
 
-  envio_afp: "",
-  estado_contrato_cliente: "",
-  estado_trabajador: "",
-  motivo_tipo_exceso: "",
-  motivo_rechazo: "",
-  mes_produccion_2026: "",
-  grupo_empresa: "",
-  acceso_portal: "",
-
-  banco: "",
-  tipo_cuenta: "",
-  numero_cuenta: "",
-  confirmacion_cc: "false",
-  confirmacion_poder: "false",
-
-  consulta_cen: "",
-  contenido_cen: "",
-  respuesta_cen: "",
-
-  monto_devolucion: "",
-  monto_pagado: "",
-  monto_cliente: "",
-  fee: "",
-  monto_finanfix_solutions: "",
-
-  facturado_finanfix: "",
-  facturado_cliente: "",
-  numero_factura: "",
-  numero_oc: "",
-
-  comment: "",
-};
-
-function getValueByPath(obj: unknown, path: string) {
-  return path.split(".").reduce<any>((acc, key) => acc?.[key], obj);
-}
-
-function matchRule(value: unknown, rule: FilterRule) {
-  const normalized = String(value ?? "").toLowerCase();
-  const query = String(rule.value ?? "").toLowerCase();
-
-  switch (rule.operator) {
-    case "equals":
-      return normalized === query;
-    case "not_equals":
-      return normalized !== query;
-    case "contains":
-      return normalized.includes(query);
-    case "not_contains":
-      return !normalized.includes(query);
-    case "starts_with":
-      return normalized.startsWith(query);
-    case "ends_with":
-      return normalized.endsWith(query);
-    case "includes_all":
-      return query
-        .split(",")
-        .map((x) => x.trim())
-        .filter(Boolean)
-        .every((part) => normalized.includes(part));
-    case "includes_any":
-      return query
-        .split(",")
-        .map((x) => x.trim())
-        .filter(Boolean)
-        .some((part) => normalized.includes(part));
-    default:
-      return true;
-  }
-}
+const allCategories = stages.flatMap((stage) => stage.categories);
 
 function formatMoney(value?: number | null) {
   return new Intl.NumberFormat("es-CL", {
@@ -162,720 +79,274 @@ function formatMoney(value?: number | null) {
   }).format(Number(value || 0));
 }
 
-export default function ManagementsPage() {
+function valueOrDash(value?: string | number | boolean | null) {
+  if (value === undefined || value === null || value === "") return "—";
+  if (typeof value === "boolean") return value ? "Sí" : "No";
+  return String(value);
+}
+
+export default function ManagementDocumentsPage() {
+  const { managementId = "" } = useParams();
   const navigate = useNavigate();
-  const [params] = useSearchParams();
-  const lineAfpId = params.get("line_afp_id") || "";
 
-  const [rows, setRows] = useState<Management[]>([]);
-  const [afp, setAfp] = useState<ManagementLineAfp | null>(null);
+  const [management, setManagement] = useState<ManagementDetail | null>(null);
+  const [documents, setDocuments] = useState<ManagementDocument[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const [activeRules, setActiveRules] = useState<FilterRule[]>([]);
-  const [quickSearch, setQuickSearch] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const [category, setCategory] = useState("Carta explicativa");
+  const [file, setFile] = useState<File | null>(null);
 
-  async function loadRows() {
+  async function loadData() {
     setLoading(true);
 
     try {
-      const data = await fetchJson<Management[]>("/managements", {
-        query: { line_afp_id: lineAfpId || undefined },
-      });
-      setRows(data);
+      const [managementData, documentData] = await Promise.all([
+        fetchJson<ManagementDetail>(`/managements/${managementId}`),
+        fetchJson<ManagementDocument[]>("/management-documents", {
+          query: { management_id: managementId },
+        }),
+      ]);
+
+      setManagement(managementData);
+      setDocuments(documentData);
     } catch (error) {
       console.error(error);
-      alert("No se pudieron cargar las gestiones.");
+      alert("No se pudo cargar la ficha de gestión.");
     } finally {
       setLoading(false);
     }
   }
 
-  async function loadAfp() {
-    if (!lineAfpId) {
-      setAfp(null);
-      return;
-    }
-
-    try {
-      const data = await fetchJson<ManagementLineAfp>(
-        `/management-line-afps/${lineAfpId}`
-      );
-      setAfp(data);
-    } catch (error) {
-      console.error(error);
-      setAfp(null);
-    }
-  }
-
   useEffect(() => {
-    loadRows();
-    loadAfp();
-  }, [lineAfpId]);
+    if (managementId) loadData();
+  }, [managementId]);
 
-  function updateForm(field: keyof typeof emptyForm, value: string) {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  }
-
-  async function createManagement() {
-    const lineFromAfp = afp?.line;
-
-    const mandanteId =
-      lineFromAfp?.mandante?.id ||
-      rows[0]?.mandante_id ||
-      rows[0]?.line?.mandante?.id ||
-      "";
-
-    const groupId =
-      lineFromAfp?.group?.id ||
-      rows[0]?.group_id ||
-      rows[0]?.line?.group?.id ||
-      null;
-
-    const companyId =
-      lineFromAfp?.company?.id ||
-      rows[0]?.company_id ||
-      rows[0]?.company?.id ||
-      rows[0]?.line?.company?.id ||
-      "";
-
-    const lineId =
-      lineFromAfp?.id ||
-      rows[0]?.line_id ||
-      rows[0]?.line?.id ||
-      "";
-
-    if (!form.razon_social.trim()) {
-      alert("Debes ingresar Razón Social.");
+  async function uploadDocument() {
+    if (!managementId) {
+      alert("No se encontró la gestión.");
       return;
     }
 
-    if (!form.rut.trim()) {
-      alert("Debes ingresar RUT.");
-      return;
-    }
-
-    if (!mandanteId || !companyId || !lineId) {
-      alert(
-        "Falta contexto de Mandante / Empresa / Línea. Entra desde una línea o una AFP para crear la gestión relacionada."
-      );
+    if (!file) {
+      alert("Debes seleccionar un archivo.");
       return;
     }
 
     setSaving(true);
 
     try {
-      await postJson<Management>("/managements", {
-        mandante_id: mandanteId,
-        group_id: groupId,
-        company_id: companyId,
-        line_id: lineId,
-        line_afp_id: lineAfpId || null,
+      const formData = new FormData();
+      formData.append("management_id", managementId);
+      formData.append("category", category);
+      formData.append("file", file);
 
-        ...form,
-
-        confirmacion_cc: form.confirmacion_cc === "true",
-        confirmacion_poder: form.confirmacion_poder === "true",
-      });
+      await uploadForm<ManagementDocument>("/management-documents/upload", formData);
 
       setModalOpen(false);
-      setForm(emptyForm);
-      await loadRows();
+      setFile(null);
+      setCategory("Carta explicativa");
+      await loadData();
     } catch (error) {
       console.error(error);
-      alert("No se pudo crear la gestión.");
+      alert("No se pudo subir el documento.");
     } finally {
       setSaving(false);
     }
   }
 
-  const fields: FilterFieldDefinition[] = [
-    {
-      field: "management_type",
-      label: "Tipo",
-      type: "select",
-      options: [
-        { label: "LM", value: "LM" },
-        { label: "TP", value: "TP" },
-      ],
-    },
-    { field: "mes_produccion_2026", label: "Mes de producción", type: "text" },
-    { field: "acceso_portal", label: "Acceso portal", type: "text" },
-    { field: "mandante.name", label: "Mandante", type: "text" },
-    { field: "envio_afp", label: "Envío AFP", type: "text" },
-    {
-      field: "estado_contrato_cliente",
-      label: "Estado contrato con cliente",
-      type: "text",
-    },
-    { field: "comment", label: "Comentario", type: "text" },
-    { field: "entidad", label: "Entidad", type: "text" },
-    { field: "estado_gestion", label: "Estado Gestión", type: "text" },
-    { field: "motivo_rechazo", label: "Motivo rechazo/anulación", type: "text" },
-    { field: "numero_solicitud", label: "N° Solicitud", type: "text" },
-    { field: "grupo_empresa", label: "Buscar Grupo", type: "text" },
-    { field: "owner_name", label: "Propietario de Registro", type: "text" },
-    { field: "respuesta_cen", label: "Respuesta CEN", type: "text" },
-    { field: "consulta_cen", label: "Consulta CEN", type: "text" },
-    { field: "contenido_cen", label: "Contenido CEN", type: "text" },
-    { field: "estado_trabajador", label: "Estado Trabajador", type: "text" },
-    { field: "motivo_tipo_exceso", label: "Motivo Tipo de exceso", type: "text" },
+  const documentsByCategory = useMemo(() => {
+    return documents.reduce<Record<string, ManagementDocument[]>>((acc, doc) => {
+      const key = doc.category || "Otro";
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(doc);
+      return acc;
+    }, {});
+  }, [documents]);
 
-    { field: "razon_social", label: "Razón Social", type: "text" },
-    { field: "rut", label: "RUT", type: "text" },
-    { field: "company.razon_social", label: "Empresa", type: "text" },
-    { field: "fee", label: "FEE", type: "number" },
-    { field: "banco", label: "Banco", type: "text" },
-    { field: "tipo_cuenta", label: "Tipo de Cuenta", type: "text" },
-    { field: "numero_cuenta", label: "Número cuenta", type: "text" },
-    { field: "confirmacion_cc", label: "Confirmación CC", type: "boolean" },
-    { field: "confirmacion_poder", label: "Confirmación Poder", type: "boolean" },
-
-    { field: "monto_devolucion", label: "Monto Devolución", type: "number" },
-    { field: "monto_cliente", label: "Monto cliente", type: "number" },
-    {
-      field: "monto_finanfix_solutions",
-      label: "Monto Finanfix",
-      type: "number",
-    },
-    { field: "monto_pagado", label: "Monto Real Pagado", type: "number" },
-    { field: "facturado_cliente", label: "Facturado cliente", type: "text" },
-    { field: "facturado_finanfix", label: "Facturado Finanfix", type: "text" },
-    { field: "numero_factura", label: "N° Factura", type: "text" },
-    { field: "numero_oc", label: "N° OC", type: "text" },
-    { field: "lineAfp.afp_name", label: "AFP", type: "text" },
-  ];
-
-  const filteredRows = useMemo(() => {
-    let data = [...rows];
-
-    if (quickSearch.trim()) {
-      const q = quickSearch.toLowerCase();
-
-      data = data.filter((row) =>
-        [
-          row.management_type,
-          row.razon_social,
-          row.rut,
-          row.entidad,
-          row.estado_gestion,
-          row.numero_solicitud,
-          row.envio_afp,
-          row.estado_contrato_cliente,
-          row.estado_trabajador,
-          row.motivo_tipo_exceso,
-          row.motivo_rechazo,
-          row.mes_produccion_2026,
-          row.grupo_empresa,
-          row.acceso_portal,
-          row.banco,
-          row.tipo_cuenta,
-          row.numero_cuenta,
-          row.consulta_cen,
-          row.contenido_cen,
-          row.respuesta_cen,
-          row.facturado_finanfix,
-          row.facturado_cliente,
-          row.numero_factura,
-          row.numero_oc,
-          row.comment,
-          row.lineAfp?.afp_name,
-          row.mandante?.name,
-          row.company?.razon_social,
-        ]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(q))
-      );
-    }
-
-    if (activeRules.length) {
-      data = data.filter((row) =>
-        activeRules.every((rule) =>
-          matchRule(getValueByPath(row, rule.field), rule)
-        )
-      );
-    }
-
-    return data;
-  }, [rows, activeRules, quickSearch]);
+  if (loading) {
+    return <div className="zoho-empty">Cargando ficha...</div>;
+  }
 
   return (
     <div className="zoho-module-page">
       <div className="zoho-module-header">
         <div>
-          <h1>Gestiones</h1>
-          <p>AFP → Gestión → Documentos por gestión</p>
+          <h1>Ficha de Gestión</h1>
+          <p>
+            {management?.razon_social || "Sin razón social"} ·{" "}
+            {management?.rut || "Sin RUT"} · {management?.lineAfp?.afp_name || "Sin AFP"}
+          </p>
         </div>
 
         <div className="zoho-module-actions">
-          <button
-            className="zoho-btn zoho-btn-primary"
-            onClick={() => setModalOpen(true)}
-          >
-            Nueva gestión
+          <button className="zoho-btn" onClick={() => navigate("/managements")}>
+            Volver a gestiones
           </button>
-          <button className="zoho-btn">Importar</button>
-          <button className="zoho-btn">Exportar</button>
+          <button className="zoho-btn zoho-btn-primary" onClick={() => setModalOpen(true)}>
+            Adjuntar documento
+          </button>
         </div>
       </div>
 
-      <div className="zoho-module-layout">
-        <ModuleFilterPanel
-          title="Filtrar Gestiones"
-          fields={fields}
-          onApply={(rules, search) => {
-            setActiveRules(rules);
-            setQuickSearch(search);
-          }}
-        />
+      <section className="zoho-detail-card">
+        <div className="zoho-detail-title">
+          <h2>Información principal</h2>
+          <span className="zoho-status-pill">
+            {management?.estado_gestion || "Sin estado"}
+          </span>
+        </div>
 
-        <section className="zoho-table-wrap">
-          <div className="zoho-table-toolbar">
-            <span>Registros totales {filteredRows.length}</span>
-          </div>
+        <div className="zoho-detail-grid">
+          <Info label="Tipo" value={management?.management_type} />
+          <Info label="Mandante" value={management?.mandante?.name} />
+          <Info label="Razón Social" value={management?.razon_social} />
+          <Info label="RUT" value={management?.rut} />
+          <Info label="AFP" value={management?.lineAfp?.afp_name} />
+          <Info label="Entidad" value={management?.entidad} />
+          <Info label="N° Solicitud" value={management?.numero_solicitud} />
+          <Info label="Envío AFP" value={management?.envio_afp} />
+          <Info label="Estado contrato cliente" value={management?.estado_contrato_cliente} />
+          <Info label="Estado trabajador" value={management?.estado_trabajador} />
+          <Info label="Acceso portal" value={management?.acceso_portal} />
+          <Info label="Mes producción" value={management?.mes_produccion_2026} />
+        </div>
+      </section>
 
-          {loading ? (
-            <div className="zoho-empty">Cargando...</div>
-          ) : (
-            <table className="zoho-table">
-              <thead>
-                <tr>
-                  <th>Tipo</th>
-                  <th>Razón Social</th>
-                  <th>RUT</th>
-                  <th>AFP</th>
-                  <th>Entidad</th>
-                  <th>Estado Gestión</th>
-                  <th>N° Solicitud</th>
-                  <th>Monto Devolución</th>
-                  <th>Monto Real Pagado</th>
-                  <th>Banco</th>
-                </tr>
-              </thead>
+      <section className="zoho-detail-card">
+        <div className="zoho-detail-title">
+          <h2>Datos bancarios y CEN</h2>
+        </div>
 
-              <tbody>
-                {filteredRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={10}>Sin gestiones creadas.</td>
-                  </tr>
-                ) : (
-                  filteredRows.map((row) => (
-                    <tr
-                      key={row.id}
-                      style={{ cursor: "pointer" }}
-                      onClick={() =>
-                        navigate(`/managements/${row.id}/documents`)
-                      }
-                    >
-                      <td>{row.management_type || "—"}</td>
-                      <td>{row.razon_social || "—"}</td>
-                      <td>{row.rut || "—"}</td>
-                      <td>{row.lineAfp?.afp_name || "—"}</td>
-                      <td>{row.entidad || "—"}</td>
-                      <td>{row.estado_gestion || "—"}</td>
-                      <td>{row.numero_solicitud || "—"}</td>
-                      <td>{formatMoney(row.monto_devolucion)}</td>
-                      <td>{formatMoney(row.monto_pagado)}</td>
-                      <td>{row.banco || "—"}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          )}
-        </section>
-      </div>
+        <div className="zoho-detail-grid">
+          <Info label="Banco" value={management?.banco} />
+          <Info label="Tipo cuenta" value={management?.tipo_cuenta} />
+          <Info label="Número cuenta" value={management?.numero_cuenta} />
+          <Info label="Confirmación CC" value={management?.confirmacion_cc} />
+          <Info label="Confirmación Poder" value={management?.confirmacion_poder} />
+          <Info label="Consulta CEN" value={management?.consulta_cen} />
+          <Info label="Contenido CEN" value={management?.contenido_cen} />
+          <Info label="Respuesta CEN" value={management?.respuesta_cen} />
+          <Info label="Motivo exceso" value={management?.motivo_tipo_exceso} />
+          <Info label="Motivo rechazo/anulación" value={management?.motivo_rechazo} />
+        </div>
+      </section>
+
+      <section className="zoho-detail-card">
+        <div className="zoho-detail-title">
+          <h2>Montos y facturación</h2>
+        </div>
+
+        <div className="zoho-detail-grid">
+          <Info label="FEE" value={management?.fee} />
+          <Info label="Monto devolución" value={formatMoney(management?.monto_devolucion)} />
+          <Info label="Monto real pagado" value={formatMoney(management?.monto_pagado)} />
+          <Info label="Monto cliente" value={formatMoney(management?.monto_cliente)} />
+          <Info label="Monto Finanfix" value={formatMoney(management?.monto_finanfix_solutions)} />
+          <Info label="Facturado cliente" value={management?.facturado_cliente} />
+          <Info label="Facturado Finanfix" value={management?.facturado_finanfix} />
+          <Info label="N° Factura" value={management?.numero_factura} />
+          <Info label="N° OC" value={management?.numero_oc} />
+        </div>
+      </section>
+
+      <section className="zoho-detail-card">
+        <div className="zoho-detail-title">
+          <h2>Documentación por etapa</h2>
+          <span>{documents.length} documento(s)</span>
+        </div>
+
+        <div className="zoho-doc-stage-list">
+          {stages.map((stage) => (
+            <div key={stage.key} className="zoho-doc-stage">
+              <div className="zoho-doc-stage-header">
+                <div>
+                  <h3>{stage.title}</h3>
+                  <p>{stage.description}</p>
+                </div>
+              </div>
+
+              <div className="zoho-doc-grid">
+                {stage.categories.map((cat) => {
+                  const docs = documentsByCategory[cat] || [];
+
+                  return (
+                    <div key={cat} className="zoho-doc-slot">
+                      <div className="zoho-doc-slot-title">
+                        <strong>{cat}</strong>
+                        <button
+                          className="zoho-small-btn"
+                          onClick={() => {
+                            setCategory(cat);
+                            setModalOpen(true);
+                          }}
+                        >
+                          Adjuntar
+                        </button>
+                      </div>
+
+                      {docs.length === 0 ? (
+                        <div className="zoho-doc-empty">Sin archivo</div>
+                      ) : (
+                        docs.map((doc) => (
+                          <a
+                            key={doc.id}
+                            className="zoho-doc-link"
+                            href={`${publicBaseUrl}${doc.file_url}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {doc.file_name}
+                          </a>
+                        ))
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <ZohoModal
-        title="Crear Gestión"
+        title="Adjuntar documento a gestión"
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
       >
-        <div className="zoho-form-section">
-          <h3>1. Ingreso de caso</h3>
-
-          <div className="zoho-form-grid">
-            <Field label="Tipo">
-              <select
-                className="zoho-select"
-                value={form.management_type}
-                onChange={(e) => updateForm("management_type", e.target.value)}
-              >
-                <option value="LM">LM</option>
-                <option value="TP">TP</option>
-              </select>
-            </Field>
-
-            <Field label="Mes de producción">
-              <input
-                className="zoho-input"
-                value={form.mes_produccion_2026}
-                onChange={(e) =>
-                  updateForm("mes_produccion_2026", e.target.value)
-                }
-              />
-            </Field>
-
-            <Field label="Acceso portal">
-              <select
-                className="zoho-select"
-                value={form.acceso_portal}
-                onChange={(e) => updateForm("acceso_portal", e.target.value)}
-              >
-                <option value="">Seleccionar</option>
-                <option value="Sí">Sí</option>
-                <option value="No">No</option>
-                <option value="Pendiente">Pendiente</option>
-              </select>
-            </Field>
-
-            <Field label="Envío AFP">
-              <select
-                className="zoho-select"
-                value={form.envio_afp}
-                onChange={(e) => updateForm("envio_afp", e.target.value)}
-              >
-                <option value="">Seleccionar</option>
-                <option value="Pendiente">Pendiente</option>
-                <option value="Enviado">Enviado</option>
-                <option value="Respondido">Respondido</option>
-                <option value="Rechazado">Rechazado</option>
-              </select>
-            </Field>
-
-            <Field label="Estado contrato con cliente">
-              <select
-                className="zoho-select"
-                value={form.estado_contrato_cliente}
-                onChange={(e) =>
-                  updateForm("estado_contrato_cliente", e.target.value)
-                }
-              >
-                <option value="">Seleccionar</option>
-                <option value="Vigente">Vigente</option>
-                <option value="No vigente">No vigente</option>
-                <option value="Pendiente">Pendiente</option>
-              </select>
-            </Field>
-
-            <Field label="Estado Gestión">
-              <select
-                className="zoho-select"
-                value={form.estado_gestion}
-                onChange={(e) => updateForm("estado_gestion", e.target.value)}
-              >
-                <option value="">Seleccionar</option>
-                <option value="Pendiente Gestión">Pendiente Gestión</option>
-                <option value="En preparación">En preparación</option>
-                <option value="Enviada AFP">Enviada AFP</option>
-                <option value="Respondida AFP">Respondida AFP</option>
-                <option value="Pagada">Pagada</option>
-                <option value="Facturada">Facturada</option>
-                <option value="Cerrada">Cerrada</option>
-                <option value="Rechazada">Rechazada</option>
-              </select>
-            </Field>
-
-            <Field label="N° Solicitud">
-              <input
-                className="zoho-input"
-                value={form.numero_solicitud}
-                onChange={(e) => updateForm("numero_solicitud", e.target.value)}
-              />
-            </Field>
-
-            <Field label="Motivo del rechazo/anulación">
-              <input
-                className="zoho-input"
-                value={form.motivo_rechazo}
-                onChange={(e) => updateForm("motivo_rechazo", e.target.value)}
-              />
-            </Field>
-
-            <Field label="Propietario de Registro">
-              <input
-                className="zoho-input"
-                value={form.owner_name}
-                onChange={(e) => updateForm("owner_name", e.target.value)}
-              />
-            </Field>
+        <div className="zoho-form-grid">
+          <div className="zoho-form-field">
+            <label>Tipo de documento</label>
+            <select
+              className="zoho-select"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              {allCategories.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
 
-        <div className="zoho-form-section">
-          <h3>2. Datos identificatorios y bancarios</h3>
-
-          <div className="zoho-form-grid">
-            <Field label="Razón Social">
-              <input
-                className="zoho-input"
-                value={form.razon_social}
-                onChange={(e) => updateForm("razon_social", e.target.value)}
-              />
-            </Field>
-
-            <Field label="RUT">
-              <input
-                className="zoho-input"
-                value={form.rut}
-                onChange={(e) => updateForm("rut", e.target.value)}
-              />
-            </Field>
-
-            <Field label="Entidad">
-              <input
-                className="zoho-input"
-                value={form.entidad}
-                onChange={(e) => updateForm("entidad", e.target.value)}
-              />
-            </Field>
-
-            <Field label="FEE">
-              <input
-                className="zoho-input"
-                value={form.fee}
-                onChange={(e) => updateForm("fee", e.target.value)}
-              />
-            </Field>
-
-            <Field label="Banco">
-              <input
-                className="zoho-input"
-                value={form.banco}
-                onChange={(e) => updateForm("banco", e.target.value)}
-              />
-            </Field>
-
-            <Field label="Tipo de Cuenta">
-              <input
-                className="zoho-input"
-                value={form.tipo_cuenta}
-                onChange={(e) => updateForm("tipo_cuenta", e.target.value)}
-              />
-            </Field>
-
-            <Field label="Número cuenta">
-              <input
-                className="zoho-input"
-                value={form.numero_cuenta}
-                onChange={(e) => updateForm("numero_cuenta", e.target.value)}
-              />
-            </Field>
-
-            <Field label="Confirmación CC">
-              <select
-                className="zoho-select"
-                value={form.confirmacion_cc}
-                onChange={(e) => updateForm("confirmacion_cc", e.target.value)}
-              >
-                <option value="false">No</option>
-                <option value="true">Sí</option>
-              </select>
-            </Field>
-
-            <Field label="Confirmación Poder">
-              <select
-                className="zoho-select"
-                value={form.confirmacion_poder}
-                onChange={(e) =>
-                  updateForm("confirmacion_poder", e.target.value)
-                }
-              >
-                <option value="false">No</option>
-                <option value="true">Sí</option>
-              </select>
-            </Field>
+          <div className="zoho-form-field">
+            <label>Archivo</label>
+            <input
+              className="zoho-input"
+              type="file"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+            />
           </div>
-        </div>
-
-        <div className="zoho-form-section">
-          <h3>3. CEN y trabajador</h3>
-
-          <div className="zoho-form-grid">
-            <Field label="Consulta CEN">
-              <select
-                className="zoho-select"
-                value={form.consulta_cen}
-                onChange={(e) => updateForm("consulta_cen", e.target.value)}
-              >
-                <option value="">Seleccionar</option>
-                <option value="Sí">Sí</option>
-                <option value="No">No</option>
-                <option value="Pendiente">Pendiente</option>
-              </select>
-            </Field>
-
-            <Field label="Contenido CEN">
-              <select
-                className="zoho-select"
-                value={form.contenido_cen}
-                onChange={(e) => updateForm("contenido_cen", e.target.value)}
-              >
-                <option value="">Seleccionar</option>
-                <option value="Sí">Sí</option>
-                <option value="No">No</option>
-                <option value="Pendiente">Pendiente</option>
-              </select>
-            </Field>
-
-            <Field label="Respuesta CEN">
-              <select
-                className="zoho-select"
-                value={form.respuesta_cen}
-                onChange={(e) => updateForm("respuesta_cen", e.target.value)}
-              >
-                <option value="">Seleccionar</option>
-                <option value="Sí">Sí</option>
-                <option value="No">No</option>
-                <option value="Pendiente">Pendiente</option>
-              </select>
-            </Field>
-
-            <Field label="Estado Trabajador">
-              <select
-                className="zoho-select"
-                value={form.estado_trabajador}
-                onChange={(e) => updateForm("estado_trabajador", e.target.value)}
-              >
-                <option value="">Seleccionar</option>
-                <option value="Vigente">Vigente</option>
-                <option value="No vigente">No vigente</option>
-                <option value="Sin información">Sin información</option>
-              </select>
-            </Field>
-
-            <Field label="Motivo (Tipo de exceso)">
-              <select
-                className="zoho-select"
-                value={form.motivo_tipo_exceso}
-                onChange={(e) =>
-                  updateForm("motivo_tipo_exceso", e.target.value)
-                }
-              >
-                <option value="">Seleccionar</option>
-                <option value="LM">LM</option>
-                <option value="TP">TP</option>
-                <option value="LM + TP">LM + TP</option>
-                <option value="Otro">Otro</option>
-              </select>
-            </Field>
-          </div>
-        </div>
-
-        <div className="zoho-form-section">
-          <h3>4. Montos y facturación</h3>
-
-          <div className="zoho-form-grid">
-            <Field label="Monto Devolución">
-              <input
-                className="zoho-input"
-                type="number"
-                value={form.monto_devolucion}
-                onChange={(e) => updateForm("monto_devolucion", e.target.value)}
-              />
-            </Field>
-
-            <Field label="Monto Real Pagado">
-              <input
-                className="zoho-input"
-                type="number"
-                value={form.monto_pagado}
-                onChange={(e) => updateForm("monto_pagado", e.target.value)}
-              />
-            </Field>
-
-            <Field label="Monto Cliente">
-              <input
-                className="zoho-input"
-                type="number"
-                value={form.monto_cliente}
-                onChange={(e) => updateForm("monto_cliente", e.target.value)}
-              />
-            </Field>
-
-            <Field label="Monto Finanfix">
-              <input
-                className="zoho-input"
-                type="number"
-                value={form.monto_finanfix_solutions}
-                onChange={(e) =>
-                  updateForm("monto_finanfix_solutions", e.target.value)
-                }
-              />
-            </Field>
-
-            <Field label="Facturado cliente">
-              <select
-                className="zoho-select"
-                value={form.facturado_cliente}
-                onChange={(e) =>
-                  updateForm("facturado_cliente", e.target.value)
-                }
-              >
-                <option value="">Seleccionar</option>
-                <option value="Sí">Sí</option>
-                <option value="No">No</option>
-                <option value="Pendiente">Pendiente</option>
-              </select>
-            </Field>
-
-            <Field label="Facturado Finanfix">
-              <select
-                className="zoho-select"
-                value={form.facturado_finanfix}
-                onChange={(e) =>
-                  updateForm("facturado_finanfix", e.target.value)
-                }
-              >
-                <option value="">Seleccionar</option>
-                <option value="Sí">Sí</option>
-                <option value="No">No</option>
-                <option value="Pendiente">Pendiente</option>
-              </select>
-            </Field>
-
-            <Field label="N° Factura">
-              <input
-                className="zoho-input"
-                value={form.numero_factura}
-                onChange={(e) => updateForm("numero_factura", e.target.value)}
-              />
-            </Field>
-
-            <Field label="N° OC">
-              <input
-                className="zoho-input"
-                value={form.numero_oc}
-                onChange={(e) => updateForm("numero_oc", e.target.value)}
-              />
-            </Field>
-          </div>
-        </div>
-
-        <div className="zoho-form-section">
-          <h3>5. Comentario</h3>
-
-          <textarea
-            className="zoho-input zoho-textarea"
-            value={form.comment}
-            onChange={(e) => updateForm("comment", e.target.value)}
-          />
         </div>
 
         <div className="zoho-form-actions">
           <button className="zoho-btn" onClick={() => setModalOpen(false)}>
             Cancelar
           </button>
-
-          <button
-            className="zoho-btn zoho-btn-primary"
-            onClick={createManagement}
-            disabled={saving}
-          >
-            {saving ? "Guardando..." : "Guardar Gestión"}
+          <button className="zoho-btn zoho-btn-primary" onClick={uploadDocument} disabled={saving}>
+            {saving ? "Subiendo..." : "Subir documento"}
           </button>
         </div>
       </ZohoModal>
@@ -883,17 +354,11 @@ export default function ManagementsPage() {
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Info({ label, value }: { label: string; value?: string | number | boolean | null }) {
   return (
-    <div className="zoho-form-field">
-      <label>{label}</label>
-      {children}
+    <div className="zoho-info-field">
+      <span>{label}</span>
+      <strong>{valueOrDash(value)}</strong>
     </div>
   );
 }
