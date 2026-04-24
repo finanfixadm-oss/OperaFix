@@ -108,7 +108,9 @@ function date(value?: string | null) {
 }
 
 function normalizeCategory(category?: string | null) {
-  return String(category || "").replaceAll("_", " ").toLowerCase();
+  // El /_/g busca todas las instancias de "_" y las cambia por " "
+  return String(category || "").replace(/_/g, " ").toLowerCase();
+
 }
 
 export default function CompanyRecordDetailPage() {
