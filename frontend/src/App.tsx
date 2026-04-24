@@ -57,7 +57,7 @@ export default function App() {
             element={
               <ModulePlaceholderPage
                 title="Documentos"
-                subtitle="Módulo general de documentos en preparación"
+                subtitle="Buscador general de documentos en preparación"
               />
             }
           />
@@ -93,6 +93,7 @@ export default function App() {
           />
 
           <Route path="/management-lines" element={<ManagementLinesPage />} />
+
           <Route
             path="/management-lines/:lineId/afps"
             element={<ManagementLineAfpsPage />}
