@@ -2,7 +2,10 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import RecordsPage from "./pages/RecordsPage";
 import RecordDetailPage from "./pages/RecordDetailPage";
+import CompanyRecordsPage from "./pages/CompanyRecordsPage";
+import CompanyRecordDetailPage from "./pages/CompanyRecordDetailPage";
 import "./styles/zoho-modules.css";
+
 
 export default function App() {
   return (
@@ -12,6 +15,8 @@ export default function App() {
           <Route path="/" element={<Navigate to="/records" replace />} />
           <Route path="/records" element={<RecordsPage />} />
           <Route path="/records/:id" element={<RecordDetailPage />} />
+          <Route path="/company-records" element={<CompanyRecordsPage />} />
+          <Route path="/company-records/:id" element={<CompanyRecordDetailPage />} />
 
           {/* Compatibilidad: rutas antiguas redirigen al módulo vigente */}
           <Route path="/managements" element={<Navigate to="/records" replace />} />

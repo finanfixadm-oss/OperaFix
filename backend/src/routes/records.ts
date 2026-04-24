@@ -121,13 +121,15 @@ const recordInclude = {
 
 recordsRouter.get("/", async (req, res, next) => {
   try {
-    const mandanteId = typeof req.query.mandante_id === "string" ? req.query.mandante_id : undefined;
+    const mandante = typeof req.query.mandante === "string"
+  ? req.query.mandante
+  : undefined;
     const lineAfpId = typeof req.query.line_afp_id === "string" ? req.query.line_afp_id : undefined;
     const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
 
     const rows = await prisma.management.findMany({
       where: {
-        mandante_id: mandanteId,
+        mandante_id: mandante,
         line_afp_id: lineAfpId,
         OR: search
           ? [
@@ -160,11 +162,12 @@ recordsRouter.get("/", async (req, res, next) => {
 recordsRouter.get("/:id", async (req, res, next) => {
   try {
     const row = await prisma.management.findUnique({
-      where: { id: req.params.id },
+      where: { id: Number(req.params.id) }, // 🔥 ESTE CAMBIO
       include: recordInclude,
     });
 
     if (!row) return res.status(404).json({ message: "Registro no encontrado" });
+
     res.json(row);
   } catch (error) {
     next(error);
@@ -204,11 +207,11 @@ recordsRouter.post("/", async (req, res, next) => {
 
 recordsRouter.put("/:id", async (req, res, next) => {
   try {
-    const previous = await prisma.management.findUnique({ where: { id: req.params.id } });
+    const previous = await prisma.management.findUnique({ where: { id: Number(req.params.id) } });
     if (!previous) return res.status(404).json({ message: "Registro no encontrado" });
 
     const row = await prisma.management.update({
-      where: { id: req.params.id },
+      where: { id: Number(req.params.id) },
       data: managementData(req.body) as any,
       include: recordInclude,
     });
