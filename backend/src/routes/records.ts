@@ -80,15 +80,11 @@ function managementData(body: any) {
     grupo_empresa: nullableString(body.grupo_empresa),
     razon_social: nullableString(body.razon_social),
     rut: nullableString(body.rut),
-    direccion: nullableString(body.direccion),
-    poder: nullableString(body.poder),
     monto_devolucion: nullableNumber(body.monto_devolucion),
     monto_pagado: nullableNumber(body.monto_pagado),
     monto_cliente: nullableNumber(body.monto_cliente),
-    monto_real_cliente: nullableNumber(body.monto_real_cliente),
     fee: nullableNumber(body.fee),
     monto_finanfix_solutions: nullableNumber(body.monto_finanfix_solutions),
-    monto_real_finanfix_solutions: nullableNumber(body.monto_real_finanfix_solutions),
     banco: nullableString(body.banco),
     tipo_cuenta: nullableString(body.tipo_cuenta),
     numero_cuenta: nullableString(body.numero_cuenta),
@@ -99,7 +95,6 @@ function managementData(body: any) {
     facturado_cliente: nullableString(body.facturado_cliente),
     fecha_factura_finanfix: nullableDate(body.fecha_factura_finanfix),
     fecha_pago_factura_finanfix: nullableDate(body.fecha_pago_factura_finanfix),
-    fecha_notificacion_cliente: nullableDate(body.fecha_notificacion_cliente),
     numero_factura: nullableString(body.numero_factura),
     numero_oc: nullableString(body.numero_oc),
     fecha_rechazo: nullableDate(body.fecha_rechazo),
@@ -145,22 +140,17 @@ async function ensureRecordContext(body: any) {
     }
   }
 
-  const mandanteId = nullableString(body.mandante_id);
-  const mandanteName = nullableString(body.mandante_name) || "Mandante general";
+  const mandanteName = nullableString(body.mandante_name) || "Optimiza Consulting";
   const razonSocial = nullableString(body.razon_social) || "Empresa sin razón social";
   const rut = nullableString(body.rut) || `TEMP-${Date.now()}`;
   const afpName = nullableString(body.entidad) || "AFP Capital";
   const groupName = nullableString(body.grupo_empresa) || "Grupo general";
 
-  const mandante = mandanteId
-    ? await prisma.mandante.findUnique({ where: { id: mandanteId } })
-    : await prisma.mandante.upsert({
-        where: { name: mandanteName },
-        update: {},
-        create: { name: mandanteName },
-      });
-
-  if (!mandante) throw new Error("Mandante seleccionado no existe");
+  const mandante = await prisma.mandante.upsert({
+    where: { name: mandanteName },
+    update: {},
+    create: { name: mandanteName },
+  });
 
   const group = await prisma.companyGroup.upsert({
     where: {
@@ -180,8 +170,17 @@ async function ensureRecordContext(body: any) {
 
   const company = await prisma.company.upsert({
     where: { rut },
-    update: { razon_social: razonSocial, mandante_id: mandante.id, group_id: group.id },
-    create: { mandante_id: mandante.id, group_id: group.id, razon_social: razonSocial, rut },
+    update: {
+      razon_social: razonSocial,
+      mandante_id: mandante.id,
+      group_id: group.id,
+    },
+    create: {
+      mandante_id: mandante.id,
+      group_id: group.id,
+      razon_social: razonSocial,
+      rut,
+    },
   });
 
   let line = await prisma.managementLine.findFirst({
@@ -206,8 +205,13 @@ async function ensureRecordContext(body: any) {
   }
 
   const lineAfp = await prisma.managementLineAfp.upsert({
-    where: { line_id_afp_name: { line_id: line.id, afp_name: afpName } },
-    update: { current_status: nullableString(body.estado_gestion) || undefined },
+    where: {
+      line_id_afp_name: {
+        line_id: line.id,
+        afp_name: afpName,
+      },
+    },
+    update: {},
     create: {
       line_id: line.id,
       afp_name: afpName,
@@ -244,7 +248,6 @@ recordsRouter.get("/", async (req, res, next) => {
               { estado_gestion: { contains: search, mode: "insensitive" } },
               { numero_solicitud: { contains: search, mode: "insensitive" } },
               { grupo_empresa: { contains: search, mode: "insensitive" } },
-              { mandante: { name: { contains: search, mode: "insensitive" } } },
             ]
           : undefined,
       } as any,
@@ -284,7 +287,10 @@ recordsRouter.post("/", async (req, res, next) => {
     const context = await ensureRecordContext(req.body);
 
     const row = await prisma.management.create({
-      data: { ...context, ...managementData(req.body) } as any,
+      data: {
+        ...context,
+        ...managementData(req.body),
+      } as any,
       include: recordInclude,
     });
 

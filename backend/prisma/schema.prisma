@@ -203,15 +203,11 @@ model Management {
   grupo_empresa               String?
   razon_social                String?
   rut                         String?
-  direccion                   String?
-  poder                       String?
   monto_devolucion            Decimal?  @db.Decimal(18, 2)
   monto_pagado                Decimal?  @db.Decimal(18, 2)
   monto_cliente               Decimal?  @db.Decimal(18, 2)
-  monto_real_cliente          Decimal?  @db.Decimal(18, 2)
   fee                         Decimal?  @db.Decimal(18, 2)
   monto_finanfix_solutions    Decimal?  @db.Decimal(18, 2)
-  monto_real_finanfix_solutions Decimal? @db.Decimal(18, 2)
   banco                       String?
   tipo_cuenta                 String?
   numero_cuenta               String?
@@ -222,7 +218,6 @@ model Management {
   facturado_cliente           String?
   fecha_factura_finanfix      DateTime?
   fecha_pago_factura_finanfix DateTime?
-  fecha_notificacion_cliente  DateTime?
   numero_factura              String?
   numero_oc                   String?
   fecha_rechazo               DateTime?
@@ -298,15 +293,12 @@ model LmRecord {
   fecha_ingreso_afp           DateTime?
   fecha_pago_afp              DateTime?
   monto_cliente               Decimal?  @db.Decimal(18, 2)
-  monto_real_cliente          Decimal?  @db.Decimal(18, 2)
   fee                         Decimal?  @db.Decimal(18, 2)
   monto_finanfix_solutions    Decimal?  @db.Decimal(18, 2)
-  monto_real_finanfix_solutions Decimal? @db.Decimal(18, 2)
   facturado_finanfix          String?
   facturado_cliente           String?
   fecha_factura_finanfix      DateTime?
   fecha_pago_factura_finanfix DateTime?
-  fecha_notificacion_cliente  DateTime?
   numero_factura              String?
   numero_oc                   String?
   fecha_rechazo               DateTime?
