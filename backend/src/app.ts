@@ -13,7 +13,6 @@ import managementsRouter from "./routes/managements.js";
 import managementDocumentsRouter from "./routes/management-documents.js";
 import recordsRouter from "./routes/records.js";
 
-
 const app = express();
 
 app.use(
@@ -27,9 +26,10 @@ app.use(
   })
 );
 
-app.use(express.json());
+app.use(express.json({ limit: "25mb" }));
+app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 app.use("/storage", express.static(path.resolve(process.cwd(), "storage")));
-app.use("/managements", managementsRouter);
+
 app.get("/", (_req, res) => {
   res.json({ status: "OK DESDE SERVER" });
 });
@@ -48,5 +48,9 @@ app.use("/api/management-line-afps", managementLineAfpsRouter);
 app.use("/api/managements", managementsRouter);
 app.use("/api/management-documents", managementDocumentsRouter);
 app.use("/api/records", recordsRouter);
+
+// Compatibilidad temporal para pantallas antiguas que puedan llamar sin /api.
+app.use("/managements", managementsRouter);
+app.use("/records", recordsRouter);
 
 export default app;

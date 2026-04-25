@@ -117,8 +117,7 @@ const fieldParsers: Record<string, (value: unknown) => unknown> = {
 function managementCreateData(body: any) {
   const data: Record<string, unknown> = {};
   for (const [key, parser] of Object.entries(fieldParsers)) {
-    if (key === "management_type") data[key] = parser(body[key]);
-    else data[key] = parser(body[key]);
+    data[key] = parser(body[key]);
   }
   data.last_activity_at = new Date();
   return data;
@@ -271,24 +270,29 @@ async function ensureRecordContext(body: any) {
 recordsRouter.get("/", async (req, res, next) => {
   try {
     const mandanteId = typeof req.query.mandante_id === "string" ? req.query.mandante_id : undefined;
-    const mandante = typeof req.query.mandante === "string" ? req.query.mandante : undefined;
+    const mandante = typeof req.query.mandante === "string" ? req.query.mandante.trim() : undefined;
     const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
 
+    const where: any = {};
+
+    if (mandanteId) where.mandante_id = mandanteId;
+    if (mandante && !["todos", "todos los registros", "all"].includes(mandante.toLowerCase())) {
+      where.mandante = { name: { contains: mandante, mode: "insensitive" } };
+    }
+    if (search) {
+      where.OR = [
+        { razon_social: { contains: search, mode: "insensitive" } },
+        { rut: { contains: search, mode: "insensitive" } },
+        { entidad: { contains: search, mode: "insensitive" } },
+        { estado_gestion: { contains: search, mode: "insensitive" } },
+        { numero_solicitud: { contains: search, mode: "insensitive" } },
+        { grupo_empresa: { contains: search, mode: "insensitive" } },
+        { mandante: { name: { contains: search, mode: "insensitive" } } },
+      ];
+    }
+
     const rows = await prisma.management.findMany({
-      where: {
-        mandante_id: mandanteId,
-        mandante: mandante ? { name: { contains: mandante, mode: "insensitive" } } : undefined,
-        OR: search
-          ? [
-              { razon_social: { contains: search, mode: "insensitive" } },
-              { rut: { contains: search, mode: "insensitive" } },
-              { entidad: { contains: search, mode: "insensitive" } },
-              { estado_gestion: { contains: search, mode: "insensitive" } },
-              { numero_solicitud: { contains: search, mode: "insensitive" } },
-              { grupo_empresa: { contains: search, mode: "insensitive" } },
-            ]
-          : undefined,
-      } as any,
+      where,
       include: {
         mandante: true,
         group: true,
