@@ -8,10 +8,25 @@ function toNullableString(value: unknown) {
   return String(value);
 }
 
+function toNullableDate(value: unknown) {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 mandantesRouter.get("/", async (_req, res, next) => {
   try {
     const rows = await prisma.mandante.findMany({
       orderBy: { name: "asc" },
+      include: {
+        _count: {
+          select: {
+            groups: true,
+            companies: true,
+            managements: true,
+          },
+        },
+      },
     });
 
     res.json(rows);
@@ -31,12 +46,16 @@ mandantesRouter.post("/", async (req, res, next) => {
         owner_name: toNullableString(req.body.owner_name),
         email: toNullableString(req.body.email),
         phone: toNullableString(req.body.phone),
+        active_contract: toNullableString(req.body.active_contract),
+        end_contract_date: toNullableDate(req.body.end_contract_date),
       },
       create: {
         name,
         owner_name: toNullableString(req.body.owner_name),
         email: toNullableString(req.body.email),
         phone: toNullableString(req.body.phone),
+        active_contract: toNullableString(req.body.active_contract),
+        end_contract_date: toNullableDate(req.body.end_contract_date),
       },
     });
 
