@@ -269,16 +269,23 @@ async function ensureRecordContext(body: any) {
 
 recordsRouter.get("/", async (req, res, next) => {
   try {
-    const mandanteId = typeof req.query.mandante_id === "string" ? req.query.mandante_id : undefined;
-    const mandante = typeof req.query.mandante === "string" ? req.query.mandante.trim() : undefined;
-    const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+    const mandanteId =
+      typeof req.query.mandante_id === "string"
+        ? req.query.mandante_id
+        : undefined;
+
+    const search =
+      typeof req.query.search === "string"
+        ? req.query.search.trim()
+        : "";
 
     const where: any = {};
 
-    if (mandanteId) where.mandante_id = mandanteId;
-    if (mandante && !["todos", "todos los registros", "all"].includes(mandante.toLowerCase())) {
-      where.mandante = { name: { contains: mandante, mode: "insensitive" } };
+    // 🔥 SOLO agregamos si existe (clave)
+    if (mandanteId) {
+      where.mandante_id = mandanteId;
     }
+
     if (search) {
       where.OR = [
         { razon_social: { contains: search, mode: "insensitive" } },
@@ -287,7 +294,6 @@ recordsRouter.get("/", async (req, res, next) => {
         { estado_gestion: { contains: search, mode: "insensitive" } },
         { numero_solicitud: { contains: search, mode: "insensitive" } },
         { grupo_empresa: { contains: search, mode: "insensitive" } },
-        { mandante: { name: { contains: search, mode: "insensitive" } } },
       ];
     }
 
@@ -306,9 +312,11 @@ recordsRouter.get("/", async (req, res, next) => {
 
     res.json(rows);
   } catch (error) {
-    next(error);
+    console.error("🔥 ERROR RECORDS:", error);
+    res.status(500).json({ message: "Error obteniendo registros" });
   }
 });
+
 
 recordsRouter.get("/:id", async (req, res, next) => {
   try {
