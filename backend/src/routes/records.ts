@@ -140,17 +140,22 @@ async function ensureRecordContext(body: any) {
     }
   }
 
-  const mandanteName = nullableString(body.mandante_name) || "Optimiza Consulting";
+  const mandanteId = nullableString(body.mandante_id);
+  const mandanteName = nullableString(body.mandante_name) || "Mandante general";
   const razonSocial = nullableString(body.razon_social) || "Empresa sin razón social";
   const rut = nullableString(body.rut) || `TEMP-${Date.now()}`;
-  const afpName = nullableString(body.entidad) || "AFP Capital";
+  const afpName = nullableString(body.entidad) || "Sin AFP";
   const groupName = nullableString(body.grupo_empresa) || "Grupo general";
 
-  const mandante = await prisma.mandante.upsert({
-    where: { name: mandanteName },
-    update: {},
-    create: { name: mandanteName },
-  });
+  const mandante = mandanteId
+    ? await prisma.mandante.findUnique({ where: { id: mandanteId } })
+    : await prisma.mandante.upsert({
+        where: { name: mandanteName },
+        update: {},
+        create: { name: mandanteName },
+      });
+
+  if (!mandante) throw new Error("Mandante seleccionado no existe");
 
   const group = await prisma.companyGroup.upsert({
     where: {
@@ -205,13 +210,8 @@ async function ensureRecordContext(body: any) {
   }
 
   const lineAfp = await prisma.managementLineAfp.upsert({
-    where: {
-      line_id_afp_name: {
-        line_id: line.id,
-        afp_name: afpName,
-      },
-    },
-    update: {},
+    where: { line_id_afp_name: { line_id: line.id, afp_name: afpName } },
+    update: { current_status: nullableString(body.estado_gestion) || "Pendiente Gestión" },
     create: {
       line_id: line.id,
       afp_name: afpName,
@@ -285,12 +285,8 @@ recordsRouter.get("/:id", async (req, res, next) => {
 recordsRouter.post("/", async (req, res, next) => {
   try {
     const context = await ensureRecordContext(req.body);
-
     const row = await prisma.management.create({
-      data: {
-        ...context,
-        ...managementData(req.body),
-      } as any,
+      data: { ...context, ...managementData(req.body) } as any,
       include: recordInclude,
     });
 
@@ -329,7 +325,7 @@ recordsRouter.put("/:id", async (req, res, next) => {
         management_id: row.id,
         activity_type: "EDICIÓN",
         status: "Completada",
-        description: "Registro actualizado desde ficha de detalle",
+        description: req.body.__changed_label ? `Campo actualizado: ${req.body.__changed_label}` : "Registro actualizado desde ficha de detalle",
       },
     });
 
@@ -371,7 +367,6 @@ recordsRouter.post("/:id/notes", async (req, res, next) => {
 recordsRouter.post("/:id/documents/upload", upload.single("file"), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ message: "Archivo requerido" });
-
     const recordId = String(req.params.id);
     const fileUrl = `/storage/management-documents/${req.file.filename}`;
     const doc = await prisma.document.create({

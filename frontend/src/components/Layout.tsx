@@ -10,6 +10,7 @@ export default function Layout({ children }: PropsWithChildren) {
           <nav className="crm-main-nav">
             <NavLink to="/records">Inicio</NavLink>
             <NavLink to="/records">Registros de empresas</NavLink>
+            <NavLink to="/mandantes">Mandantes</NavLink>
           </nav>
         </div>
       </header>
@@ -22,6 +23,7 @@ export default function Layout({ children }: PropsWithChildren) {
 
           <nav className="crm-side-nav">
             <NavLink to="/records">Registros de empresas</NavLink>
+            <NavLink to="/mandantes">Mandantes</NavLink>
           </nav>
         </aside>
 

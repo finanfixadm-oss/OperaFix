@@ -688,3 +688,42 @@
     grid-template-columns: 1fr;
   }
 }
+
+.record-info-field.editable {
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.record-info-field.editable:hover {
+  background: #f2f8ff;
+  border-color: #b9d9ff;
+}
+
+.edit-pencil {
+  color: #0a84ff;
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.record-info-field.editing {
+  background: #fbfdff;
+  border: 1px solid #b9d9ff;
+  border-radius: 8px;
+}
+
+.inline-edit-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.inline-edit-row .zoho-input,
+.inline-edit-row .zoho-select {
+  min-height: 34px;
+  padding: 6px 8px;
+}
+
+.document-slot .zoho-small-btn {
+  margin-top: 8px;
+}
