@@ -19,6 +19,10 @@ const upload = multer({
   }),
 });
 
+function hasOwn(body: any, key: string) {
+  return Object.prototype.hasOwnProperty.call(body || {}, key);
+}
+
 function nullableString(value: unknown) {
   if (value === undefined || value === null || value === "") return null;
   return String(value);
@@ -62,50 +66,78 @@ function mapDocumentCategory(value: unknown) {
   return map[raw] || "OTRO";
 }
 
-function managementData(body: any) {
-  return {
-    management_type: body.management_type === "TP" ? "TP" : "LM",
-    owner_name: nullableString(body.owner_name),
-    estado_contrato_cliente: nullableString(body.estado_contrato_cliente),
-    fecha_termino_contrato: nullableDate(body.fecha_termino_contrato),
-    motivo_tipo_exceso: nullableString(body.motivo_tipo_exceso),
-    mes_produccion_2026: nullableString(body.mes_produccion_2026),
-    entidad: nullableString(body.entidad),
-    envio_afp: nullableString(body.envio_afp),
-    estado_gestion: nullableString(body.estado_gestion),
-    fecha_presentacion_afp: nullableDate(body.fecha_presentacion_afp),
-    fecha_ingreso_afp: nullableDate(body.fecha_ingreso_afp),
-    fecha_pago_afp: nullableDate(body.fecha_pago_afp),
-    numero_solicitud: nullableString(body.numero_solicitud),
-    grupo_empresa: nullableString(body.grupo_empresa),
-    razon_social: nullableString(body.razon_social),
-    rut: nullableString(body.rut),
-    monto_devolucion: nullableNumber(body.monto_devolucion),
-    monto_pagado: nullableNumber(body.monto_pagado),
-    monto_cliente: nullableNumber(body.monto_cliente),
-    fee: nullableNumber(body.fee),
-    monto_finanfix_solutions: nullableNumber(body.monto_finanfix_solutions),
-    banco: nullableString(body.banco),
-    tipo_cuenta: nullableString(body.tipo_cuenta),
-    numero_cuenta: nullableString(body.numero_cuenta),
-    confirmacion_cc: toBoolean(body.confirmacion_cc),
-    confirmacion_poder: toBoolean(body.confirmacion_poder),
-    acceso_portal: nullableString(body.acceso_portal),
-    facturado_finanfix: nullableString(body.facturado_finanfix),
-    facturado_cliente: nullableString(body.facturado_cliente),
-    fecha_factura_finanfix: nullableDate(body.fecha_factura_finanfix),
-    fecha_pago_factura_finanfix: nullableDate(body.fecha_pago_factura_finanfix),
-    numero_factura: nullableString(body.numero_factura),
-    numero_oc: nullableString(body.numero_oc),
-    fecha_rechazo: nullableDate(body.fecha_rechazo),
-    motivo_rechazo: nullableString(body.motivo_rechazo),
-    consulta_cen: nullableString(body.consulta_cen),
-    contenido_cen: nullableString(body.contenido_cen),
-    respuesta_cen: nullableString(body.respuesta_cen),
-    estado_trabajador: nullableString(body.estado_trabajador),
-    comment: nullableString(body.comment),
-    last_activity_at: new Date(),
-  };
+const fieldParsers: Record<string, (value: unknown) => unknown> = {
+  management_type: (v) => (v === "TP" ? "TP" : "LM"),
+  owner_name: nullableString,
+  estado_contrato_cliente: nullableString,
+  fecha_termino_contrato: nullableDate,
+  motivo_tipo_exceso: nullableString,
+  mes_produccion_2026: nullableString,
+  mes_ingreso_solicitud: nullableString,
+  entidad: nullableString,
+  envio_afp: nullableString,
+  estado_gestion: nullableString,
+  fecha_presentacion_afp: nullableDate,
+  fecha_ingreso_afp: nullableDate,
+  fecha_pago_afp: nullableDate,
+  numero_solicitud: nullableString,
+  grupo_empresa: nullableString,
+  razon_social: nullableString,
+  rut: nullableString,
+  direccion: nullableString,
+  monto_devolucion: nullableNumber,
+  monto_pagado: nullableNumber,
+  monto_cliente: nullableNumber,
+  monto_finanfix_solutions: nullableNumber,
+  monto_real_cliente: nullableNumber,
+  monto_real_finanfix_solutions: nullableNumber,
+  fee: nullableNumber,
+  banco: nullableString,
+  tipo_cuenta: nullableString,
+  numero_cuenta: nullableString,
+  confirmacion_cc: toBoolean,
+  confirmacion_poder: toBoolean,
+  acceso_portal: nullableString,
+  facturado_finanfix: nullableString,
+  facturado_cliente: nullableString,
+  fecha_factura_finanfix: nullableDate,
+  fecha_pago_factura_finanfix: nullableDate,
+  fecha_notificacion_cliente: nullableDate,
+  numero_factura: nullableString,
+  numero_oc: nullableString,
+  fecha_rechazo: nullableDate,
+  motivo_rechazo: nullableString,
+  consulta_cen: nullableString,
+  contenido_cen: nullableString,
+  respuesta_cen: nullableString,
+  estado_trabajador: nullableString,
+  comment: nullableString,
+};
+
+function managementCreateData(body: any) {
+  const data: Record<string, unknown> = {};
+  for (const [key, parser] of Object.entries(fieldParsers)) {
+    if (key === "management_type") data[key] = parser(body[key]);
+    else data[key] = parser(body[key]);
+  }
+  data.last_activity_at = new Date();
+  return data;
+}
+
+function managementPatchData(body: any) {
+  const data: Record<string, unknown> = {};
+  for (const [key, parser] of Object.entries(fieldParsers)) {
+    if (hasOwn(body, key)) data[key] = parser(body[key]);
+  }
+
+  if (hasOwn(body, "mandante_id")) data.mandante_id = nullableString(body.mandante_id);
+  if (hasOwn(body, "group_id")) data.group_id = nullableString(body.group_id);
+  if (hasOwn(body, "company_id")) data.company_id = nullableString(body.company_id);
+  if (hasOwn(body, "line_id")) data.line_id = nullableString(body.line_id);
+  if (hasOwn(body, "line_afp_id")) data.line_afp_id = nullableString(body.line_afp_id);
+
+  data.last_activity_at = new Date();
+  return data;
 }
 
 const recordInclude = {
@@ -140,22 +172,25 @@ async function ensureRecordContext(body: any) {
     }
   }
 
-  const mandanteId = nullableString(body.mandante_id);
-  const mandanteName = nullableString(body.mandante_name) || "Mandante general";
+  let mandante = null;
+  const requestedMandanteId = nullableString(body.mandante_id);
+  if (requestedMandanteId) {
+    mandante = await prisma.mandante.findUnique({ where: { id: requestedMandanteId } });
+  }
+
+  if (!mandante) {
+    const mandanteName = nullableString(body.mandante_name) || "Sin mandante";
+    mandante = await prisma.mandante.upsert({
+      where: { name: mandanteName },
+      update: {},
+      create: { name: mandanteName },
+    });
+  }
+
   const razonSocial = nullableString(body.razon_social) || "Empresa sin razón social";
   const rut = nullableString(body.rut) || `TEMP-${Date.now()}`;
-  const afpName = nullableString(body.entidad) || "Sin AFP";
+  const afpName = nullableString(body.entidad) || "AFP Capital";
   const groupName = nullableString(body.grupo_empresa) || "Grupo general";
-
-  const mandante = mandanteId
-    ? await prisma.mandante.findUnique({ where: { id: mandanteId } })
-    : await prisma.mandante.upsert({
-        where: { name: mandanteName },
-        update: {},
-        create: { name: mandanteName },
-      });
-
-  if (!mandante) throw new Error("Mandante seleccionado no existe");
 
   const group = await prisma.companyGroup.upsert({
     where: {
@@ -210,8 +245,13 @@ async function ensureRecordContext(body: any) {
   }
 
   const lineAfp = await prisma.managementLineAfp.upsert({
-    where: { line_id_afp_name: { line_id: line.id, afp_name: afpName } },
-    update: { current_status: nullableString(body.estado_gestion) || "Pendiente Gestión" },
+    where: {
+      line_id_afp_name: {
+        line_id: line.id,
+        afp_name: afpName,
+      },
+    },
+    update: {},
     create: {
       line_id: line.id,
       afp_name: afpName,
@@ -232,13 +272,11 @@ recordsRouter.get("/", async (req, res, next) => {
   try {
     const mandanteId = typeof req.query.mandante_id === "string" ? req.query.mandante_id : undefined;
     const mandante = typeof req.query.mandante === "string" ? req.query.mandante : undefined;
-    const lineAfpId = typeof req.query.line_afp_id === "string" ? req.query.line_afp_id : undefined;
     const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
 
     const rows = await prisma.management.findMany({
       where: {
         mandante_id: mandanteId,
-        line_afp_id: lineAfpId,
         mandante: mandante ? { name: { contains: mandante, mode: "insensitive" } } : undefined,
         OR: search
           ? [
@@ -285,8 +323,12 @@ recordsRouter.get("/:id", async (req, res, next) => {
 recordsRouter.post("/", async (req, res, next) => {
   try {
     const context = await ensureRecordContext(req.body);
+
     const row = await prisma.management.create({
-      data: { ...context, ...managementData(req.body) } as any,
+      data: {
+        ...context,
+        ...managementCreateData(req.body),
+      } as any,
       include: recordInclude,
     });
 
@@ -312,9 +354,14 @@ recordsRouter.put("/:id", async (req, res, next) => {
     const previous = await prisma.management.findUnique({ where: { id: req.params.id } });
     if (!previous) return res.status(404).json({ message: "Registro no encontrado" });
 
+    const patch = managementPatchData(req.body);
+    const changedDescriptions = Object.entries(req.body || {})
+      .filter(([key]) => key in fieldParsers || ["mandante_id", "group_id", "company_id", "line_id", "line_afp_id"].includes(key))
+      .map(([key, newValue]) => `${key}: "${String((previous as any)[key] ?? "")}" → "${String(newValue ?? "")}"`);
+
     const row = await prisma.management.update({
       where: { id: req.params.id },
-      data: managementData(req.body) as any,
+      data: patch as any,
       include: recordInclude,
     });
 
@@ -325,7 +372,9 @@ recordsRouter.put("/:id", async (req, res, next) => {
         management_id: row.id,
         activity_type: "EDICIÓN",
         status: "Completada",
-        description: req.body.__changed_label ? `Campo actualizado: ${req.body.__changed_label}` : "Registro actualizado desde ficha de detalle",
+        description: changedDescriptions.length
+          ? `Campos modificados: ${changedDescriptions.join("; ")}`
+          : "Registro actualizado desde ficha de detalle",
       },
     });
 
@@ -367,6 +416,7 @@ recordsRouter.post("/:id/notes", async (req, res, next) => {
 recordsRouter.post("/:id/documents/upload", upload.single("file"), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ message: "Archivo requerido" });
+
     const recordId = String(req.params.id);
     const fileUrl = `/storage/management-documents/${req.file.filename}`;
     const doc = await prisma.document.create({

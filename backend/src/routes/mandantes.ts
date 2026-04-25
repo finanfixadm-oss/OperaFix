@@ -8,6 +8,25 @@ function nullableString(value: unknown) {
   return String(value);
 }
 
+function nullableDate(value: unknown) {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function mandanteData(body: any) {
+  return {
+    name: String(body.name || body.nombre || "").trim(),
+    owner_name: nullableString(body.owner_name),
+    email: nullableString(body.email),
+    phone: nullableString(body.phone),
+    campaign: nullableString(body.campaign),
+    active_contract: nullableString(body.active_contract),
+    end_contract_date: nullableDate(body.end_contract_date),
+    last_activity_at: new Date(),
+  };
+}
+
 mandantesRouter.get("/", async (req, res, next) => {
   try {
     const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
@@ -19,6 +38,9 @@ mandantesRouter.get("/", async (req, res, next) => {
               { name: { contains: search, mode: "insensitive" } },
               { owner_name: { contains: search, mode: "insensitive" } },
               { email: { contains: search, mode: "insensitive" } },
+              { phone: { contains: search, mode: "insensitive" } },
+              { campaign: { contains: search, mode: "insensitive" } },
+              { active_contract: { contains: search, mode: "insensitive" } },
             ],
           }
         : undefined,
@@ -42,28 +64,14 @@ mandantesRouter.get("/", async (req, res, next) => {
 
 mandantesRouter.post("/", async (req, res, next) => {
   try {
-    const name = String(req.body.name || "").trim();
-    if (!name) return res.status(400).json({ message: "Nombre de mandante requerido" });
+    const data = mandanteData(req.body);
 
-    const row = await prisma.mandante.upsert({
-      where: { name },
-      update: {
-        owner_name: nullableString(req.body.owner_name),
-        email: nullableString(req.body.email),
-        phone: nullableString(req.body.phone),
-        campaign: nullableString(req.body.campaign),
-        active_contract: nullableString(req.body.active_contract),
-        last_activity_at: new Date(),
-      },
-      create: {
-        name,
-        owner_name: nullableString(req.body.owner_name),
-        email: nullableString(req.body.email),
-        phone: nullableString(req.body.phone),
-        campaign: nullableString(req.body.campaign),
-        active_contract: nullableString(req.body.active_contract),
-        last_activity_at: new Date(),
-      },
+    if (!data.name) {
+      return res.status(400).json({ message: "Nombre de mandante requerido" });
+    }
+
+    const row = await prisma.mandante.create({
+      data,
       include: {
         _count: {
           select: {
@@ -83,20 +91,15 @@ mandantesRouter.post("/", async (req, res, next) => {
 
 mandantesRouter.put("/:id", async (req, res, next) => {
   try {
-    const name = String(req.body.name || "").trim();
-    if (!name) return res.status(400).json({ message: "Nombre de mandante requerido" });
+    const data = mandanteData(req.body);
+
+    if (!data.name) {
+      return res.status(400).json({ message: "Nombre de mandante requerido" });
+    }
 
     const row = await prisma.mandante.update({
       where: { id: req.params.id },
-      data: {
-        name,
-        owner_name: nullableString(req.body.owner_name),
-        email: nullableString(req.body.email),
-        phone: nullableString(req.body.phone),
-        campaign: nullableString(req.body.campaign),
-        active_contract: nullableString(req.body.active_contract),
-        last_activity_at: new Date(),
-      },
+      data,
       include: {
         _count: {
           select: {
@@ -109,6 +112,18 @@ mandantesRouter.put("/:id", async (req, res, next) => {
     });
 
     res.json(row);
+  } catch (error) {
+    next(error);
+  }
+});
+
+mandantesRouter.delete("/:id", async (req, res, next) => {
+  try {
+    await prisma.mandante.delete({
+      where: { id: req.params.id },
+    });
+
+    res.json({ ok: true });
   } catch (error) {
     next(error);
   }

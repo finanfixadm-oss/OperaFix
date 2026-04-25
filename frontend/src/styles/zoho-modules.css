@@ -689,41 +689,273 @@
   }
 }
 
+
+/* Ajustes Registros de empresas / Mandantes */
+.mandantes-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+}
+
+.zoho-help-text {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.zoho-view-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #dfe5ef;
+  padding-bottom: 10px;
+}
+
+.zoho-view-tabs button {
+  border: 1px solid #cfd7e6;
+  background: #fff;
+  border-radius: 6px;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.zoho-view-tabs button.active {
+  border-color: #2f8de4;
+  color: #0c4da2;
+  background: #eef6ff;
+  font-weight: 700;
+}
+
+.zoho-link-cell {
+  color: #0b55b7;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.zoho-table-range {
+  float: right;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.zoho-textarea {
+  min-height: 90px;
+  padding-top: 10px;
+}
+
+.record-detail-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.record-header-card,
+.record-tab-card,
+.record-detail-section {
+  background: #fff;
+  border: 1px solid #b9d7ff;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.record-header-card {
+  display: grid;
+  grid-template-columns: auto 180px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.record-logo {
+  color: #0a42b8;
+  font-size: 26px;
+  line-height: 1;
+  padding: 10px 0;
+}
+
+.record-logo span {
+  display: block;
+  color: #3467a9;
+  font-size: 12px;
+}
+
+.record-header-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.record-title-lines {
+  grid-column: 2 / 4;
+  color: #0f1f3d;
+}
+
+.record-title-lines span {
+  color: #0b4aa5;
+}
+
+.record-tabs {
+  display: flex;
+  gap: 18px;
+  background: #fff;
+  border-bottom: 1px solid #dfe5ef;
+  padding: 0 14px;
+}
+
+.record-tabs button {
+  border: none;
+  background: transparent;
+  padding: 14px 0 12px;
+  cursor: pointer;
+  font-weight: 700;
+  color: #0f1f3d;
+}
+
+.record-tabs button.active {
+  color: #0b55d9;
+  border-bottom: 3px solid #2f8de4;
+}
+
+.record-small-select {
+  max-width: 160px;
+  margin-bottom: 8px;
+}
+
+.record-note-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.record-mail-folders {
+  display: flex;
+  gap: 20px;
+  font-weight: 700;
+  color: #0b4aa5;
+}
+
+.record-timeline-item {
+  border-left: 3px solid #2f8de4;
+  background: #f7fbff;
+  padding: 10px 12px;
+  margin: 8px 0;
+}
+
+.record-sections-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.record-detail-section.wide {
+  grid-column: 1 / -1;
+}
+
+.record-detail-section h2 {
+  margin: 0 0 12px;
+  background: #074dd0;
+  color: #fff;
+  border-radius: 999px;
+  text-align: center;
+  padding: 7px 10px;
+  font-size: 15px;
+}
+
+.record-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 10px 18px;
+}
+
+.record-info-field {
+  border-bottom: 1px solid #e5eaf3;
+  padding: 9px 8px;
+  min-height: 52px;
+}
+
+.record-info-field span {
+  display: block;
+  color: #04449e;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+.record-info-field strong {
+  color: #0f1f3d;
+  font-size: 14px;
+}
+
 .record-info-field.editable {
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .record-info-field.editable:hover {
-  background: #f2f8ff;
-  border-color: #b9d9ff;
+  background: #f0f7ff;
+  border-radius: 6px;
 }
 
-.edit-pencil {
-  color: #0a84ff;
-  font-size: 12px;
-  margin-left: 4px;
+.record-pencil {
+  border: none;
+  background: transparent;
+  color: #0b7cff;
+  cursor: pointer;
+  font-weight: 700;
 }
 
-.record-info-field.editing {
-  background: #fbfdff;
-  border: 1px solid #b9d9ff;
-  border-radius: 8px;
-}
-
-.inline-edit-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+.record-doc-links {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
+}
+
+.record-doc-matrix {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.record-doc-slot {
+  border: 1px solid #dfe5ef;
+  background: #fbfdff;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.record-doc-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
   align-items: center;
+  margin-bottom: 8px;
 }
 
-.inline-edit-row .zoho-input,
-.inline-edit-row .zoho-select {
-  min-height: 34px;
-  padding: 6px 8px;
+.record-doc-empty {
+  color: #64748b;
 }
 
-.document-slot .zoho-small-btn {
-  margin-top: 8px;
+.zoho-small-btn {
+  border: 1px solid #2f8de4;
+  background: #fff;
+  color: #2f8de4;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+@media (max-width: 1100px) {
+  .crm-body,
+  .zoho-module-layout,
+  .mandantes-layout,
+  .record-sections-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .record-info-grid,
+  .record-doc-matrix,
+  .zoho-form-grid {
+    grid-template-columns: 1fr;
+  }
 }
