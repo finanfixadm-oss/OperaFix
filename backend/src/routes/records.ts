@@ -140,17 +140,24 @@ async function ensureRecordContext(body: any) {
     }
   }
 
+  const mandanteId = nullableString(body.mandante_id);
   const mandanteName = nullableString(body.mandante_name) || "Optimiza Consulting";
   const razonSocial = nullableString(body.razon_social) || "Empresa sin razón social";
   const rut = nullableString(body.rut) || `TEMP-${Date.now()}`;
   const afpName = nullableString(body.entidad) || "AFP Capital";
   const groupName = nullableString(body.grupo_empresa) || "Grupo general";
 
-  const mandante = await prisma.mandante.upsert({
-    where: { name: mandanteName },
-    update: {},
-    create: { name: mandanteName },
-  });
+  const mandante = mandanteId
+    ? await prisma.mandante.findUnique({ where: { id: mandanteId } })
+    : await prisma.mandante.upsert({
+        where: { name: mandanteName },
+        update: {},
+        create: { name: mandanteName },
+      });
+
+  if (!mandante) {
+    throw new Error("Mandante seleccionado no existe");
+  }
 
   const group = await prisma.companyGroup.upsert({
     where: {

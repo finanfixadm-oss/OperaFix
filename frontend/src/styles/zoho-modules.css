@@ -688,3 +688,14 @@
     grid-template-columns: 1fr;
   }
 }
+
+.zoho-quick-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 6px 0 14px;
+}
+
+.zoho-filter-panel label {
+  cursor: pointer;
+}

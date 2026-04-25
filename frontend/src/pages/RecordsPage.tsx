@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ModuleFilterPanel from "../components/ModuleFilterPanel";
 import ZohoModal from "../components/ZohoModal";
-import { fetchJson, postJson, uploadForm, publicBaseUrl } from "../api";
+import { fetchJson, postJson } from "../api";
 import type { FilterFieldDefinition, FilterRule, ManagementLineAfp } from "../types";
 import type { RecordItem } from "../types-records";
 
