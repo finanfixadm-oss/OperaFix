@@ -299,51 +299,60 @@ async function findLegacyRecordById(id: string) {
 }
 
 function legacyPatchCandidates(body: any) {
-  return {
-    mandante: body.mandante_name || body.mandante,
-    mandante_id: nullableString(body.mandante_id),
-    search_group: nullableString(body.grupo_empresa),
-    business_name: nullableString(body.razon_social),
-    rut: nullableString(body.rut),
-    entity: nullableString(body.entidad),
-    management_status: nullableString(body.estado_gestion),
-    refund_amount: nullableNumber(body.monto_devolucion),
-    actual_paid_amount: nullableNumber(body.monto_pagado),
-    client_amount: nullableNumber(body.monto_cliente),
-    finanfix_amount: nullableNumber(body.monto_finanfix_solutions),
-    actual_client_amount: nullableNumber(body.monto_real_cliente),
-    actual_finanfix_amount: nullableNumber(body.monto_real_finanfix_solutions),
-    fee: nullableNumber(body.fee),
-    request_number: nullableString(body.numero_solicitud),
-    confirmation_cc: toBoolean(body.confirmacion_cc),
-    confirmation_power: toBoolean(body.confirmacion_poder),
-    bank_name: nullableString(body.banco),
-    account_type: nullableString(body.tipo_cuenta),
-    account_number: nullableString(body.numero_cuenta),
-    portal_access: nullableString(body.acceso_portal),
-    excess_type_reason: nullableString(body.motivo_tipo_exceso),
-    production_months: nullableString(body.mes_produccion_2026),
-    client_contract_status: nullableString(body.estado_contrato_cliente),
-    contract_end_date: nullableDate(body.fecha_termino_contrato),
-    rejection_date: nullableDate(body.fecha_rechazo),
-    rejection_reason: nullableString(body.motivo_rechazo),
-    afp_shipment: nullableString(body.envio_afp),
-    afp_entry_date: nullableDate(body.fecha_ingreso_afp),
-    afp_submission_date: nullableDate(body.fecha_presentacion_afp),
-    afp_payment_date: nullableDate(body.fecha_pago_afp),
-    finanfix_invoice_date: nullableDate(body.fecha_factura_finanfix),
-    finanfix_invoice_payment_date: nullableDate(body.fecha_pago_factura_finanfix),
-    client_notification_date: nullableDate(body.fecha_notificacion_cliente),
-    invoice_number: nullableString(body.numero_factura),
-    oc_number: nullableString(body.numero_oc),
-    cen_query: nullableString(body.consulta_cen),
-    cen_content: nullableString(body.contenido_cen),
-    cen_response: nullableString(body.respuesta_cen),
-    worker_status: nullableString(body.estado_trabajador),
-    comment: nullableString(body.comment),
-    updated_at: new Date(),
-    last_activity_at: new Date(),
+  // v14: Solo actualiza campos que vienen explícitamente en el request.
+  // Antes se enviaban nulls para campos ausentes y Railway podía rechazar el UPDATE
+  // por restricciones NOT NULL en tablas legacy.
+  const data: Record<string, unknown> = {};
+  const put = (bodyKey: string, column: string, parser: (value: unknown) => unknown = nullableString) => {
+    if (hasOwn(body, bodyKey)) data[column] = parser(body[bodyKey]);
   };
+
+  if (hasOwn(body, "mandante_name")) data.mandante = nullableString(body.mandante_name);
+  if (hasOwn(body, "mandante")) data.mandante = nullableString(body.mandante);
+  put("mandante_id", "mandante_id");
+  put("grupo_empresa", "search_group");
+  put("razon_social", "business_name");
+  put("rut", "rut");
+  put("entidad", "entity");
+  put("estado_gestion", "management_status");
+  put("monto_devolucion", "refund_amount", nullableNumber);
+  put("monto_pagado", "actual_paid_amount", nullableNumber);
+  put("monto_cliente", "client_amount", nullableNumber);
+  put("monto_finanfix_solutions", "finanfix_amount", nullableNumber);
+  put("monto_real_cliente", "actual_client_amount", nullableNumber);
+  put("monto_real_finanfix_solutions", "actual_finanfix_amount", nullableNumber);
+  put("fee", "fee", nullableNumber);
+  put("numero_solicitud", "request_number");
+  if (hasOwn(body, "confirmacion_cc")) data.confirmation_cc = toBoolean(body.confirmacion_cc);
+  if (hasOwn(body, "confirmacion_poder")) data.confirmation_power = toBoolean(body.confirmacion_poder);
+  put("banco", "bank_name");
+  put("tipo_cuenta", "account_type");
+  put("numero_cuenta", "account_number");
+  put("acceso_portal", "portal_access");
+  put("motivo_tipo_exceso", "excess_type_reason");
+  put("mes_produccion_2026", "production_months");
+  put("estado_contrato_cliente", "client_contract_status");
+  put("fecha_termino_contrato", "contract_end_date", nullableDate);
+  put("fecha_rechazo", "rejection_date", nullableDate);
+  put("motivo_rechazo", "rejection_reason");
+  put("envio_afp", "afp_shipment");
+  put("fecha_ingreso_afp", "afp_entry_date", nullableDate);
+  put("fecha_presentacion_afp", "afp_submission_date", nullableDate);
+  put("fecha_pago_afp", "afp_payment_date", nullableDate);
+  put("fecha_factura_finanfix", "finanfix_invoice_date", nullableDate);
+  put("fecha_pago_factura_finanfix", "finanfix_invoice_payment_date", nullableDate);
+  put("fecha_notificacion_cliente", "client_notification_date", nullableDate);
+  put("numero_factura", "invoice_number");
+  put("numero_oc", "oc_number");
+  put("consulta_cen", "cen_query");
+  put("contenido_cen", "cen_content");
+  put("respuesta_cen", "cen_response");
+  put("estado_trabajador", "worker_status");
+  put("comment", "comment");
+
+  data.updated_at = new Date();
+  data.last_activity_at = new Date();
+  return data;
 }
 
 async function updateLegacyRecord(id: string, body: any) {
@@ -357,7 +366,12 @@ async function updateLegacyRecord(id: string, body: any) {
     const exists = await prisma.$queryRawUnsafe<any[]>(`select * from ${tableName} where ${conditions.join(" or ")} limit 1`, id);
     if (!exists?.[0]) continue;
 
-    const candidateData = legacyPatchCandidates(body);
+    const enrichedBody = { ...body };
+    if (hasOwn(body, "mandante_id") && !hasOwn(body, "mandante_name") && !hasOwn(body, "mandante")) {
+      enrichedBody.mandante_name = await resolveMandanteName(body);
+    }
+
+    const candidateData = legacyPatchCandidates(enrichedBody);
     const entries = Object.entries(candidateData).filter(([column, value]) =>
       columns.has(column) && hasOwn(candidateData, column) && value !== undefined
     );
@@ -837,6 +851,21 @@ recordsRouter.put("/:id", async (req, res) => {
 
       if (previous) {
         const patch = managementPatchData(body);
+
+        // v14: Si cambia el mandante, reconstruimos también grupo/empresa/línea/AFP.
+        // Así evitamos dejar relaciones obligatorias en null y se mantiene la lógica tipo Zoho.
+        if (hasOwn(body, "mandante_id") || hasOwn(body, "mandante_name") || hasOwn(body, "mandante")) {
+          const context = await ensureRecordContext({
+            ...previous,
+            ...body,
+          });
+          patch.mandante_id = context.mandante_id;
+          patch.group_id = context.group_id;
+          patch.company_id = context.company_id;
+          patch.line_id = context.line_id;
+          patch.line_afp_id = context.line_afp_id;
+        }
+
         const changedDescriptions = Object.entries(body || {})
           .filter(([key]) => key in fieldParsers || ["mandante_id", "group_id", "company_id", "line_id", "line_afp_id"].includes(key))
           .map(([key, newValue]) => `${key}: "${String((previous as any)[key] ?? "")}" → "${String(newValue ?? "")}"`);
