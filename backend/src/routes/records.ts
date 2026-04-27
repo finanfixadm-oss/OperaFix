@@ -205,6 +205,115 @@ async function getExistingColumns(tableName: "lm_records" | "tp_records" | "acti
   return new Set(rows.map((row) => row.column_name));
 }
 
+
+async function getExistingColumnsAny(tableName: string) {
+  const rows = await prisma.$queryRawUnsafe<{ column_name: string }[]>(
+    `select column_name from information_schema.columns where table_schema = 'public' and table_name = $1`,
+    tableName
+  );
+  return new Set(rows.map((row) => row.column_name));
+}
+
+function legacyRowToRecord(row: any, managementType: "LM" | "TP") {
+  const mandanteName = row.mandante || row.mandante_name || row.client_name || null;
+  const entidad = row.entity || row.entidad || row.afp_name || null;
+  const razonSocial = row.business_name || row.razon_social || row.company_name || null;
+  const rut = row.rut || row.company_rut || null;
+
+  return {
+    id: row.management_id || row.id,
+    management_type: managementType,
+    mandante_id: row.mandante_id || null,
+    group_id: row.group_id || null,
+    company_id: row.company_id || null,
+    line_id: row.line_id || null,
+    line_afp_id: row.line_afp_id || null,
+    entidad,
+    rut,
+    estado_gestion: row.management_status || row.estado_gestion || "Pendiente Gestión",
+    monto_devolucion: row.refund_amount ?? row.monto_devolucion ?? null,
+    monto_pagado: row.actual_paid_amount ?? row.monto_pagado ?? null,
+    monto_cliente: row.client_amount ?? row.monto_cliente ?? null,
+    monto_finanfix_solutions: row.finanfix_amount ?? row.monto_finanfix_solutions ?? null,
+    monto_real_cliente: row.actual_client_amount ?? row.monto_real_cliente ?? null,
+    monto_real_finanfix_solutions: row.actual_finanfix_amount ?? row.monto_real_finanfix_solutions ?? null,
+    fee: row.fee ?? null,
+    razon_social: razonSocial,
+    numero_solicitud: row.request_number || row.numero_solicitud || null,
+    grupo_empresa: row.search_group || row.grupo_empresa || null,
+    confirmacion_cc: Boolean(row.confirmation_cc ?? row.confirmacion_cc ?? false),
+    confirmacion_poder: Boolean(row.confirmation_power ?? row.confirmacion_poder ?? false),
+    banco: row.bank_name || row.banco || null,
+    tipo_cuenta: row.account_type || row.tipo_cuenta || null,
+    numero_cuenta: row.account_number || row.numero_cuenta || null,
+    acceso_portal: row.portal_access || row.acceso_portal || null,
+    motivo_tipo_exceso: row.excess_type_reason || row.motivo_tipo_exceso || null,
+    mes_produccion_2026: row.production_months || row.mes_produccion_2026 || null,
+    estado_contrato_cliente: row.client_contract_status || row.estado_contrato_cliente || null,
+    fecha_termino_contrato: row.contract_end_date || row.fecha_termino_contrato || null,
+    fecha_rechazo: row.rejection_date || row.fecha_rechazo || null,
+    motivo_rechazo: row.rejection_reason || row.motivo_rechazo || null,
+    envio_afp: row.afp_shipment || row.envio_afp || null,
+    fecha_ingreso_afp: row.afp_entry_date || row.fecha_ingreso_afp || null,
+    fecha_presentacion_afp: row.afp_submission_date || row.fecha_presentacion_afp || null,
+    fecha_pago_afp: row.afp_payment_date || row.fecha_pago_afp || null,
+    fecha_factura_finanfix: row.finanfix_invoice_date || row.fecha_factura_finanfix || null,
+    fecha_pago_factura_finanfix: row.finanfix_invoice_payment_date || row.fecha_pago_factura_finanfix || null,
+    fecha_notificacion_cliente: row.client_notification_date || row.fecha_notificacion_cliente || null,
+    numero_factura: row.invoice_number || row.numero_factura || null,
+    numero_oc: row.oc_number || row.numero_oc || null,
+    consulta_cen: row.cen_query || row.consulta_cen || null,
+    contenido_cen: row.cen_content || row.contenido_cen || null,
+    respuesta_cen: row.cen_response || row.respuesta_cen || null,
+    estado_trabajador: row.worker_status || row.estado_trabajador || null,
+    comment: row.comment || null,
+    created_at: row.created_at || null,
+    updated_at: row.updated_at || null,
+    last_activity_at: row.last_activity_at || null,
+    mandante: mandanteName ? { id: row.mandante_id || null, name: mandanteName } : null,
+    group: row.search_group || row.grupo_empresa ? { id: row.group_id || null, name: row.search_group || row.grupo_empresa } : null,
+    company: { id: row.company_id || null, razon_social: razonSocial, rut },
+    line: row.line_id ? { id: row.line_id, line_type: managementType, name: `${razonSocial || "Empresa"} - ${managementType}` } : null,
+    lineAfp: { id: row.line_afp_id || null, afp_name: entidad },
+    documents: [],
+    notes: [],
+    activities: [],
+  };
+}
+
+async function findLegacyRecordById(id: string) {
+  for (const tableName of ["lm_records", "tp_records"] as const) {
+    try {
+      const columns = await getExistingColumnsAny(tableName);
+      const conditions: string[] = [];
+      if (columns.has("id")) conditions.push(`id = $1`);
+      if (columns.has("management_id")) conditions.push(`management_id = $1`);
+      if (!conditions.length) continue;
+      const rows = await prisma.$queryRawUnsafe<any[]>(`select * from ${tableName} where ${conditions.join(" or ")} limit 1`, id);
+      if (rows?.[0]) return legacyRowToRecord(rows[0], tableName === "tp_records" ? "TP" : "LM");
+    } catch (error) {
+      console.warn(`No se pudo buscar registro legacy en ${tableName}:`, error);
+    }
+  }
+  return null;
+}
+
+async function resolveMandanteName(body: any) {
+  const directName = nullableString(body.mandante_name) || nullableString(body.mandante);
+  if (directName) return directName;
+  const mandanteId = nullableString(body.mandante_id);
+  if (!mandanteId) return "Sin mandante";
+  try {
+    const mandante = await prisma.mandante.findUnique({ where: { id: mandanteId } });
+    if (mandante?.name) return mandante.name;
+  } catch {}
+  try {
+    const rows = await prisma.$queryRawUnsafe<any[]>(`select name from mandantes where id = $1 limit 1`, mandanteId);
+    if (rows?.[0]?.name) return rows[0].name;
+  } catch {}
+  return "Sin mandante";
+}
+
 async function insertDynamic(tableName: "lm_records" | "tp_records", candidateData: Record<string, unknown>) {
   const existingColumns = await getExistingColumns(tableName);
   const now = new Date();
@@ -264,7 +373,7 @@ async function createLegacyActivity(recordId: string) {
 
 async function createLegacyRecord(body: any) {
   const managementType: "LM" | "TP" = body.management_type === "TP" ? "TP" : "LM";
-  const mandanteName = nullableString(body.mandante_name) || "Sin mandante";
+  const mandanteName = await resolveMandanteName(body);
   const rut = nullableString(body.rut) || `TEMP-${Date.now()}`;
   const razonSocial = nullableString(body.razon_social) || "Empresa sin razón social";
   const estadoGestion = nullableString(body.estado_gestion) || "Pendiente Gestión";
@@ -273,6 +382,7 @@ async function createLegacyRecord(body: any) {
   if (managementType === "TP") {
     const row = await insertDynamic("tp_records", {
       mandante: mandanteName,
+      mandante_id: nullableString(body.mandante_id),
       rut,
       entity: nullableString(body.entidad),
       business_name: razonSocial,
@@ -330,6 +440,7 @@ async function createLegacyRecord(body: any) {
     afp_shipment: nullableString(body.envio_afp),
     afp_entry_date: nullableDate(body.fecha_ingreso_afp),
     mandante: mandanteName,
+    mandante_id: nullableString(body.mandante_id),
     portal_access: nullableString(body.acceso_portal),
     cen_response: nullableString(body.respuesta_cen),
     cen_query: nullableString(body.consulta_cen),
@@ -388,7 +499,7 @@ async function ensureRecordContext(body: any) {
   }
 
   if (!mandante) {
-    const mandanteName = nullableString(body.mandante_name) || "Sin mandante";
+    const mandanteName = await resolveMandanteName(body);
     mandante = await prisma.mandante.upsert({
       where: { name: mandanteName },
       update: {},
@@ -533,17 +644,29 @@ recordsRouter.get("/", async (req, res, next) => {
 });
 
 
-recordsRouter.get("/:id", async (req, res, next) => {
+recordsRouter.get("/:id", async (req, res) => {
+  const id = String(req.params.id);
   try {
-    const row = await prisma.management.findUnique({
-      where: { id: req.params.id },
-      include: recordInclude,
-    });
+    try {
+      const row = await prisma.management.findUnique({
+        where: { id },
+        include: recordInclude,
+      });
+      if (row) return res.json(row);
+    } catch (managementError: any) {
+      console.error("ERROR /api/records/:id usando managements. Se buscará modo compatible:", managementError?.message || managementError);
+    }
 
-    if (!row) return res.status(404).json({ message: "Registro no encontrado" });
-    res.json(row);
-  } catch (error) {
-    next(error);
+    const legacyRow = await findLegacyRecordById(id);
+    if (legacyRow) return res.json(legacyRow);
+
+    return res.status(404).json({ message: "Registro no encontrado" });
+  } catch (error: any) {
+    console.error("ERROR FINAL /api/records/:id:", error?.message || error);
+    return res.status(500).json({
+      message: "No se pudo cargar la ficha del registro.",
+      detail: String(error?.message || error),
+    });
   }
 });
 
