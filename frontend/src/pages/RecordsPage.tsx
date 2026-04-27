@@ -154,6 +154,25 @@ function boolLabel(value?: boolean | null) {
   return value ? "Sí" : "No";
 }
 
+function normalizeMandanteText(value?: string | null) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function rowMatchesMandante(row: RecordItem, mandante: MandanteOption) {
+  const rowAny: any = row;
+  const rowMandante: any = row.mandante || {};
+  const possibleIds = [rowMandante.id, rowAny.mandante_id, rowAny.mandanteId].filter(Boolean).map(String);
+  if (possibleIds.includes(String(mandante.id))) return true;
+
+  const targetName = normalizeMandanteText(mandante.name);
+  const possibleNames = [rowMandante.name, rowAny.mandante_name, rowAny.mandante].map((value) => normalizeMandanteText(value));
+  return possibleNames.includes(targetName);
+}
+
 export default function RecordsPage() {
   const navigate = useNavigate();
 
@@ -289,7 +308,10 @@ export default function RecordsPage() {
     let data = [...rows];
 
     if (activeView !== "todos" && activeView !== "mis") {
-      data = data.filter((row) => row.mandante?.id === activeView);
+      const selectedMandante = mandantes.find((mandante) => mandante.id === activeView);
+      if (selectedMandante) {
+        data = data.filter((row) => rowMatchesMandante(row, selectedMandante));
+      }
     }
 
     if (activeView === "mis") {
@@ -321,7 +343,7 @@ export default function RecordsPage() {
     }
 
     return data;
-  }, [rows, activeRules, quickSearch, activeView]);
+  }, [rows, activeRules, quickSearch, activeView, mandantes]);
 
   return (
     <div className="zoho-module-page">
