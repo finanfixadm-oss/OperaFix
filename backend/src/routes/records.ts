@@ -139,6 +139,177 @@ function managementPatchData(body: any) {
   return data;
 }
 
+
+
+function normalizeLegacyRow(row: any, managementType: "LM" | "TP", body: any) {
+  return {
+    id: row.id,
+    management_type: managementType,
+    entidad: nullableString(body.entidad),
+    rut: nullableString(body.rut),
+    estado_gestion: nullableString(body.estado_gestion) || "Pendiente Gestión",
+    monto_devolucion: nullableNumber(body.monto_devolucion),
+    razon_social: nullableString(body.razon_social),
+    numero_solicitud: nullableString(body.numero_solicitud),
+    grupo_empresa: nullableString(body.grupo_empresa),
+    confirmacion_cc: toBoolean(body.confirmacion_cc),
+    confirmacion_poder: toBoolean(body.confirmacion_poder),
+    banco: nullableString(body.banco),
+    tipo_cuenta: nullableString(body.tipo_cuenta),
+    numero_cuenta: nullableString(body.numero_cuenta),
+    acceso_portal: nullableString(body.acceso_portal),
+    motivo_tipo_exceso: nullableString(body.motivo_tipo_exceso),
+    mes_produccion_2026: nullableString(body.mes_produccion_2026),
+    mandante: body.mandante_name ? { name: nullableString(body.mandante_name) } : null,
+    company: { razon_social: nullableString(body.razon_social), rut: nullableString(body.rut) },
+    lineAfp: { afp_name: nullableString(body.entidad) },
+    documents: [],
+    notes: [],
+    activities: [],
+  };
+}
+
+async function getExistingColumns(tableName: "lm_records" | "tp_records" | "activities") {
+  const rows = await prisma.$queryRawUnsafe<{ column_name: string }[]>(
+    `select column_name from information_schema.columns where table_schema = 'public' and table_name = $1`,
+    tableName
+  );
+  return new Set(rows.map((row) => row.column_name));
+}
+
+async function insertDynamic(tableName: "lm_records" | "tp_records", candidateData: Record<string, unknown>) {
+  const existingColumns = await getExistingColumns(tableName);
+  const entries = Object.entries(candidateData).filter(([column, value]) => existingColumns.has(column) && value !== undefined);
+
+  if (!entries.length) {
+    throw new Error(`La tabla ${tableName} no tiene columnas compatibles para crear el registro.`);
+  }
+
+  const columns = entries.map(([column]) => `"${column}"`).join(", ");
+  const placeholders = entries.map((_, index) => `$${index + 1}`).join(", ");
+  const values = entries.map(([, value]) => value);
+  const rows = await prisma.$queryRawUnsafe<any[]>(
+    `insert into ${tableName} (${columns}) values (${placeholders}) returning id`,
+    ...values
+  );
+
+  return rows[0];
+}
+
+async function createLegacyActivity(recordId: string) {
+  try {
+    const columns = await getExistingColumns("activities");
+    if (!columns.has("related_module") || !columns.has("related_record_id")) return;
+
+    const data: Record<string, unknown> = {
+      related_module: "records",
+      related_record_id: recordId,
+      activity_type: "CREACIÓN",
+      status: "Completada",
+      description: "Registro de empresa creado en modo compatible Railway",
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+
+    const entries = Object.entries(data).filter(([column]) => columns.has(column));
+    const sqlColumns = entries.map(([column]) => `"${column}"`).join(", ");
+    const placeholders = entries.map((_, index) => `$${index + 1}`).join(", ");
+    await prisma.$executeRawUnsafe(
+      `insert into activities (${sqlColumns}) values (${placeholders})`,
+      ...entries.map(([, value]) => value)
+    );
+  } catch (activityError) {
+    console.warn("No se pudo crear actividad legacy:", activityError);
+  }
+}
+
+async function createLegacyRecord(body: any) {
+  const managementType: "LM" | "TP" = body.management_type === "TP" ? "TP" : "LM";
+  const mandanteName = nullableString(body.mandante_name) || "Sin mandante";
+  const rut = nullableString(body.rut) || `TEMP-${Date.now()}`;
+  const razonSocial = nullableString(body.razon_social) || "Empresa sin razón social";
+  const estadoGestion = nullableString(body.estado_gestion) || "Pendiente Gestión";
+  const now = new Date();
+
+  if (managementType === "TP") {
+    const row = await insertDynamic("tp_records", {
+      mandante: mandanteName,
+      rut,
+      entity: nullableString(body.entidad),
+      business_name: razonSocial,
+      management_status: estadoGestion,
+      refund_amount: nullableNumber(body.monto_devolucion),
+      request_number: nullableString(body.numero_solicitud),
+      search_group: nullableString(body.grupo_empresa),
+      bank_name: nullableString(body.banco),
+      account_number: nullableString(body.numero_cuenta),
+      account_type: nullableString(body.tipo_cuenta),
+      portal_access: nullableString(body.acceso_portal),
+      production_months: nullableString(body.mes_produccion_2026),
+      comment: nullableString(body.comment) || `Registro TP creado desde Registros de empresas. RUT: ${rut}. Razón Social: ${razonSocial}. AFP/Entidad: ${nullableString(body.entidad) || ""}. Estado: ${estadoGestion}. Monto: ${nullableString(body.monto_devolucion) || ""}.`,
+      client_contract_status: nullableString(body.estado_contrato_cliente),
+      contract_end_date: nullableDate(body.fecha_termino_contrato),
+      cen_content: nullableString(body.contenido_cen),
+      cen_query: nullableString(body.consulta_cen),
+      cen_response: nullableString(body.respuesta_cen),
+      last_activity_at: now,
+      created_at: now,
+      updated_at: now,
+    });
+    await createLegacyActivity(row.id);
+    return normalizeLegacyRow(row, "TP", body);
+  }
+
+  const row = await insertDynamic("lm_records", {
+    search_group: nullableString(body.grupo_empresa),
+    rut,
+    entity: nullableString(body.entidad),
+    management_status: estadoGestion,
+    refund_amount: nullableNumber(body.monto_devolucion),
+    confirmation_cc: toBoolean(body.confirmacion_cc),
+    confirmation_power: toBoolean(body.confirmacion_poder),
+    actual_paid_amount: nullableNumber(body.monto_pagado),
+    excess_type_reason: nullableString(body.motivo_tipo_exceso),
+    worker_status: nullableString(body.estado_trabajador),
+    request_number: nullableString(body.numero_solicitud),
+    business_name: razonSocial,
+    actual_finanfix_amount: nullableNumber(body.monto_real_finanfix_solutions),
+    production_months: nullableString(body.mes_produccion_2026),
+    invoice_number: nullableString(body.numero_factura),
+    bank_name: nullableString(body.banco),
+    account_number: nullableString(body.numero_cuenta),
+    account_type: nullableString(body.tipo_cuenta),
+    client_contract_status: nullableString(body.estado_contrato_cliente),
+    fee: nullableNumber(body.fee),
+    client_amount: nullableNumber(body.monto_cliente),
+    finanfix_amount: nullableNumber(body.monto_finanfix_solutions),
+    actual_client_amount: nullableNumber(body.monto_real_cliente),
+    contract_end_date: nullableDate(body.fecha_termino_contrato),
+    rejection_date: nullableDate(body.fecha_rechazo),
+    comment: nullableString(body.comment),
+    oc_number: nullableString(body.numero_oc),
+    afp_shipment: nullableString(body.envio_afp),
+    afp_entry_date: nullableDate(body.fecha_ingreso_afp),
+    mandante: mandanteName,
+    portal_access: nullableString(body.acceso_portal),
+    cen_response: nullableString(body.respuesta_cen),
+    cen_query: nullableString(body.consulta_cen),
+    request_entry_month: nullableString(body.mes_ingreso_solicitud),
+    cen_content: nullableString(body.contenido_cen),
+    afp_payment_date: nullableDate(body.fecha_pago_afp),
+    afp_submission_date: nullableDate(body.fecha_presentacion_afp),
+    finanfix_invoice_date: nullableDate(body.fecha_factura_finanfix),
+    finanfix_invoice_payment_date: nullableDate(body.fecha_pago_factura_finanfix),
+    client_notification_date: nullableDate(body.fecha_notificacion_cliente),
+    last_activity_at: now,
+    created_at: now,
+    updated_at: now,
+  });
+
+  await createLegacyActivity(row.id);
+  return normalizeLegacyRow(row, "LM", body);
+}
+
 const recordInclude = {
   mandante: true,
   group: true,
@@ -339,28 +510,34 @@ recordsRouter.get("/:id", async (req, res, next) => {
 
 recordsRouter.post("/", async (req, res, next) => {
   try {
-    const context = await ensureRecordContext(req.body);
+    try {
+      const context = await ensureRecordContext(req.body);
 
-    const row = await prisma.management.create({
-      data: {
-        ...context,
-        ...managementCreateData(req.body),
-      } as any,
-      include: recordInclude,
-    });
+      const row = await prisma.management.create({
+        data: {
+          ...context,
+          ...managementCreateData(req.body),
+        } as any,
+        include: recordInclude,
+      });
 
-    await prisma.activity.create({
-      data: {
-        related_module: "records",
-        related_record_id: row.id,
-        management_id: row.id,
-        activity_type: "CREACIÓN",
-        status: "Completada",
-        description: "Registro de empresa creado",
-      },
-    });
+      await prisma.activity.create({
+        data: {
+          related_module: "records",
+          related_record_id: row.id,
+          management_id: row.id,
+          activity_type: "CREACIÓN",
+          status: "Completada",
+          description: "Registro de empresa creado",
+        },
+      });
 
-    res.status(201).json(row);
+      return res.status(201).json(row);
+    } catch (managementError: any) {
+      console.error("ERROR /api/records POST usando managements. Se usará modo compatible:", managementError?.message || managementError);
+      const legacyRow = await createLegacyRecord(req.body);
+      return res.status(201).json(legacyRow);
+    }
   } catch (error) {
     next(error);
   }
