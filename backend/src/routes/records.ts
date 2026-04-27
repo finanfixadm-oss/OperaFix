@@ -605,6 +605,134 @@ async function createEmailTrace(recordId: string, status: string, description: s
   }
 }
 
+
+async function managementRecordExists(recordId: string) {
+  try {
+    const row = await prisma.management.findUnique({ where: { id: recordId }, select: { id: true } });
+    return Boolean(row?.id);
+  } catch (error) {
+    console.warn("No se pudo validar existencia en managements:", error);
+    return false;
+  }
+}
+
+async function createActivityTrace(recordId: string, activityType: string, status: string, description: string) {
+  const existsInManagements = await managementRecordExists(recordId);
+
+  try {
+    await prisma.activity.create({
+      data: {
+        related_module: "records",
+        related_record_id: recordId,
+        management_id: existsInManagements ? recordId : null,
+        activity_type: activityType,
+        status,
+        description,
+      } as any,
+    });
+    return;
+  } catch (error) {
+    console.warn(`No se pudo crear actividad ${activityType} con Prisma. Se usará modo compatible:`, error);
+  }
+
+  try {
+    const columns = await getExistingColumnsAny("activities");
+    if (!columns.has("related_module") || !columns.has("related_record_id")) return;
+
+    const now = new Date();
+    const data: Record<string, unknown> = {
+      id: columns.has("id") ? randomUUID() : undefined,
+      related_module: "records",
+      related_record_id: recordId,
+      management_id: columns.has("management_id") && existsInManagements ? recordId : undefined,
+      activity_type: activityType,
+      status,
+      description,
+      created_at: now,
+      updated_at: now,
+    };
+
+    const entries = Object.entries(data).filter(([column, value]) => columns.has(column) && value !== undefined);
+    if (!entries.length) return;
+
+    const sqlColumns = entries.map(([column]) => `"${column}"`).join(", ");
+    const placeholders = entries.map((_, index) => `$${index + 1}`).join(", ");
+    await prisma.$executeRawUnsafe(
+      `insert into activities (${sqlColumns}) values (${placeholders})`,
+      ...entries.map(([, value]) => value)
+    );
+  } catch (legacyError) {
+    console.warn(`No se pudo crear actividad ${activityType} en modo compatible:`, legacyError);
+  }
+}
+
+async function createDocumentCompatible(recordId: string, file: any, body: any) {
+  const category = mapDocumentCategory(body.category) as any;
+  const fileUrl = `/storage/management-documents/${file.filename}`;
+  const uploadedById = nullableString(body.uploaded_by_id);
+  const existsInManagements = await managementRecordExists(recordId);
+
+  try {
+    const doc = await prisma.document.create({
+      data: {
+        related_module: "records",
+        related_record_id: recordId,
+        management_id: existsInManagements ? recordId : null,
+        category,
+        file_name: file.originalname,
+        file_url: fileUrl,
+        file_size: file.size,
+        mime_type: file.mimetype,
+        uploaded_by_id: uploadedById,
+      } as any,
+    });
+    return doc;
+  } catch (error) {
+    console.warn("No se pudo crear documento con Prisma. Se usará modo compatible:", error);
+  }
+
+  const columns = await getExistingColumnsAny("documents");
+  const now = new Date();
+  const data: Record<string, unknown> = {
+    id: columns.has("id") ? randomUUID() : undefined,
+    related_module: "records",
+    related_record_id: recordId,
+    management_id: columns.has("management_id") && existsInManagements ? recordId : undefined,
+    category,
+    file_name: file.originalname,
+    file_url: fileUrl,
+    file_size: file.size,
+    mime_type: file.mimetype,
+    uploaded_by_id: uploadedById,
+    created_at: now,
+    updated_at: now,
+  };
+
+  const entries = Object.entries(data).filter(([column, value]) => columns.has(column) && value !== undefined);
+  if (!entries.length) throw new Error("La tabla documents no tiene columnas compatibles para adjuntar archivos.");
+
+  const sqlColumns = entries.map(([column]) => `"${column}"`).join(", ");
+  const placeholders = entries.map((_, index) => `$${index + 1}`).join(", ");
+  const rows = await prisma.$queryRawUnsafe<any[]>(
+    `insert into documents (${sqlColumns}) values (${placeholders}) returning *`,
+    ...entries.map(([, value]) => value)
+  );
+
+  return rows[0] || {
+    id: data.id,
+    related_module: "records",
+    related_record_id: recordId,
+    category,
+    file_name: file.originalname,
+    file_url: fileUrl,
+    file_size: file.size,
+    mime_type: file.mimetype,
+    uploaded_by_id: uploadedById,
+    created_at: now,
+    updated_at: now,
+  };
+}
+
 async function insertDynamic(tableName: "lm_records" | "tp_records", candidateData: Record<string, unknown>) {
   const existingColumns = await getExistingColumns(tableName);
   const now = new Date();
@@ -1196,40 +1324,29 @@ recordsRouter.post("/:id/notes", async (req, res, next) => {
   }
 });
 
-recordsRouter.post("/:id/documents/upload", upload.single("file"), async (req, res, next) => {
+recordsRouter.post("/:id/documents/upload", upload.single("file"), async (req, res) => {
+  const recordId = String(req.params.id);
+
   try {
     if (!req.file) return res.status(400).json({ message: "Archivo requerido" });
 
-    const recordId = String(req.params.id);
-    const fileUrl = `/storage/management-documents/${req.file.filename}`;
-    const doc = await prisma.document.create({
-      data: {
-        management_id: recordId,
-        related_module: "records",
-        related_record_id: recordId,
-        category: mapDocumentCategory(req.body.category) as any,
-        file_name: req.file.originalname,
-        file_url: fileUrl,
-        file_size: req.file.size,
-        mime_type: req.file.mimetype,
-        uploaded_by_id: req.body.uploaded_by_id || null,
-      },
-    });
+    const doc = await createDocumentCompatible(recordId, req.file, req.body || {});
 
-    await prisma.activity.create({
-      data: {
-        related_module: "records",
-        related_record_id: recordId,
-        management_id: recordId,
-        activity_type: "DOCUMENTO",
-        status: "Completada",
-        description: `Documento cargado: ${req.file.originalname}`,
-      },
-    });
+    await createActivityTrace(
+      recordId,
+      "DOCUMENTO",
+      "Completada",
+      `Documento cargado: ${req.file.originalname}`
+    );
 
-    res.status(201).json(doc);
-  } catch (error) {
-    next(error);
+    return res.status(201).json(doc);
+  } catch (error: any) {
+    console.error("ERROR /api/records/:id/documents/upload:", error?.message || error);
+    return res.status(500).json({
+      message: "No se pudo subir el documento.",
+      detail: String(error?.message || error),
+      hint: "Revisa que exista la tabla documents y que el registro pueda asociarse por related_record_id. En Railway, los registros legacy no deben guardar management_id obligatorio.",
+    });
   }
 });
 
