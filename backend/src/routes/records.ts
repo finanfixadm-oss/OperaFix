@@ -28,6 +28,45 @@ function nullableString(value: unknown) {
   return String(value);
 }
 
+function isAutoLineValue(value: unknown) {
+  const raw = String(value ?? "").trim().toLowerCase();
+  return (
+    !raw ||
+    raw === "auto" ||
+    raw === "automatico" ||
+    raw === "automático" ||
+    raw === "crear_auto" ||
+    raw === "crear-automaticamente" ||
+    raw === "crear_automaticamente" ||
+    raw.includes("crear automáticamente") ||
+    raw.includes("crear automaticamente")
+  );
+}
+
+function nullableId(value: unknown) {
+  if (isAutoLineValue(value)) return null;
+  const text = String(value ?? "").trim();
+  const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidLike.test(text) ? text : null;
+}
+
+function sanitizeRecordBody(body: any) {
+  const clean = { ...(body || {}) };
+
+  if (hasOwn(clean, "line_afp_id")) clean.line_afp_id = nullableId(clean.line_afp_id);
+  if (hasOwn(clean, "line_id")) clean.line_id = nullableId(clean.line_id);
+  if (hasOwn(clean, "company_id")) clean.company_id = nullableId(clean.company_id);
+  if (hasOwn(clean, "group_id")) clean.group_id = nullableId(clean.group_id);
+  if (hasOwn(clean, "mandante_id")) clean.mandante_id = nullableId(clean.mandante_id);
+
+  delete clean.afp_linea;
+  delete clean.afpLinea;
+  delete clean.linea_afp;
+  delete clean.afp_linea_id;
+
+  return clean;
+}
+
 function nullableNumber(value: unknown) {
   if (value === undefined || value === null || value === "") return null;
   const parsed = Number(value);
@@ -129,11 +168,11 @@ function managementPatchData(body: any) {
     if (hasOwn(body, key)) data[key] = parser(body[key]);
   }
 
-  if (hasOwn(body, "mandante_id")) data.mandante_id = nullableString(body.mandante_id);
-  if (hasOwn(body, "group_id")) data.group_id = nullableString(body.group_id);
-  if (hasOwn(body, "company_id")) data.company_id = nullableString(body.company_id);
-  if (hasOwn(body, "line_id")) data.line_id = nullableString(body.line_id);
-  if (hasOwn(body, "line_afp_id")) data.line_afp_id = nullableString(body.line_afp_id);
+  if (hasOwn(body, "mandante_id")) data.mandante_id = nullableId(body.mandante_id);
+  if (hasOwn(body, "group_id")) data.group_id = nullableId(body.group_id);
+  if (hasOwn(body, "company_id")) data.company_id = nullableId(body.company_id);
+  if (hasOwn(body, "line_id")) data.line_id = nullableId(body.line_id);
+  if (hasOwn(body, "line_afp_id")) data.line_afp_id = nullableId(body.line_afp_id);
 
   data.last_activity_at = new Date();
   return data;
@@ -323,7 +362,7 @@ const recordInclude = {
 
 async function ensureRecordContext(body: any) {
   const managementType = body.management_type === "TP" ? "TP" : "LM";
-  const requestedAfpId = nullableString(body.line_afp_id);
+  const requestedAfpId = nullableId(body.line_afp_id);
 
   if (requestedAfpId) {
     const lineAfp = await prisma.managementLineAfp.findUnique({
@@ -343,7 +382,7 @@ async function ensureRecordContext(body: any) {
   }
 
   let mandante = null;
-  const requestedMandanteId = nullableString(body.mandante_id);
+  const requestedMandanteId = nullableId(body.mandante_id);
   if (requestedMandanteId) {
     mandante = await prisma.mandante.findUnique({ where: { id: requestedMandanteId } });
   }
@@ -510,13 +549,15 @@ recordsRouter.get("/:id", async (req, res, next) => {
 
 recordsRouter.post("/", async (req, res, next) => {
   try {
+    const body = sanitizeRecordBody(req.body);
+
     try {
-      const context = await ensureRecordContext(req.body);
+      const context = await ensureRecordContext(body);
 
       const row = await prisma.management.create({
         data: {
           ...context,
-          ...managementCreateData(req.body),
+          ...managementCreateData(body),
         } as any,
         include: recordInclude,
       });
@@ -535,7 +576,7 @@ recordsRouter.post("/", async (req, res, next) => {
       return res.status(201).json(row);
     } catch (managementError: any) {
       console.error("ERROR /api/records POST usando managements. Se usará modo compatible:", managementError?.message || managementError);
-      const legacyRow = await createLegacyRecord(req.body);
+      const legacyRow = await createLegacyRecord(body);
       return res.status(201).json(legacyRow);
     }
   } catch (error) {
@@ -545,11 +586,12 @@ recordsRouter.post("/", async (req, res, next) => {
 
 recordsRouter.put("/:id", async (req, res, next) => {
   try {
+    const body = sanitizeRecordBody(req.body);
     const previous = await prisma.management.findUnique({ where: { id: req.params.id } });
     if (!previous) return res.status(404).json({ message: "Registro no encontrado" });
 
-    const patch = managementPatchData(req.body);
-    const changedDescriptions = Object.entries(req.body || {})
+    const patch = managementPatchData(body);
+    const changedDescriptions = Object.entries(body || {})
       .filter(([key]) => key in fieldParsers || ["mandante_id", "group_id", "company_id", "line_id", "line_afp_id"].includes(key))
       .map(([key, newValue]) => `${key}: "${String((previous as any)[key] ?? "")}" → "${String(newValue ?? "")}"`);
 
