@@ -29,7 +29,7 @@ type EmailDraft = {
 };
 
 
-type EmailTemplateKey = "ingreso_gestion" | "comprobante_detalle" | "informe_gestion" | "libre";
+type EmailTemplateKey = "ingreso_solicitud_entidad" | "confirmacion_entidad" | "rechazo_gestion" | "comprobante_detalle" | "informe_semanal_lm" | "correo_tipo" | "correo_colaboradores" | "libre";
 
 type EmailTemplateOption = {
   key: EmailTemplateKey;
@@ -52,9 +52,13 @@ const BulkEditContext = createContext<BulkEditContextValue>({
 
 
 const emailTemplateOptions: EmailTemplateOption[] = [
-  { key: "ingreso_gestion", label: "Comprobante ingreso gestión", description: "Aviso de solicitud ingresada ante AFP/Entidad." },
-  { key: "comprobante_detalle", label: "Envío comprobante y detalle", description: "Envío de comprobante, detalle de pago, archivo AFP y carta explicativa." },
-  { key: "informe_gestion", label: "Informe mensual de gestión", description: "Resumen mensual de estados: gestionado, pagado y pendiente." },
+  { key: "ingreso_solicitud_entidad", label: "Ingreso solicitud a entidad", description: "Cambio de estado: Ingreso solicitud a entidad." },
+  { key: "confirmacion_entidad", label: "Ingreso por parte de entidad / N° solicitud", description: "Cambio de estado: Ingreso por parte de entidad." },
+  { key: "rechazo_gestion", label: "Rechazo de gestión", description: "Cambio de estado: RECHAZO." },
+  { key: "comprobante_detalle", label: "Envío comprobante y detalle de pago", description: "Cambio de estado: Pago realizado. Adjunta comprobante y detalle." },
+  { key: "informe_semanal_lm", label: "Informe semanal de gestiones LM", description: "Resumen semanal/mensual de gestiones LM." },
+  { key: "correo_tipo", label: "Correo tipo", description: "Comunicación manual estandarizada." },
+  { key: "correo_colaboradores", label: "Correo tipo colaboradores", description: "Comunicación interna o a colaboradores." },
   { key: "libre", label: "Correo libre", description: "No aplica plantilla; permite escribir manualmente." },
 ];
 
@@ -64,12 +68,13 @@ function normalizeTemplateStatus(value?: string | null) {
 
 function suggestedTemplateForRecord(record: RecordItem): EmailTemplateKey {
   const status = normalizeTemplateStatus(record.estado_gestion || record.envio_afp);
+  if (status.includes("rechazo") || status.includes("rechaz")) return "rechazo_gestion";
   if (status.includes("pag") || status.includes("comprobante")) return "comprobante_detalle";
-  if (status.includes("envi") || status.includes("ingres")) return "ingreso_gestion";
-  if (status.includes("informe") || status.includes("gestionado") || status.includes("pendiente")) return "informe_gestion";
-  return "ingreso_gestion";
+  if (status.includes("numero") || status.includes("n solicitud") || status.includes("por parte de entidad")) return "confirmacion_entidad";
+  if (status.includes("ingreso") || status.includes("envi") || status.includes("entidad")) return "ingreso_solicitud_entidad";
+  if (status.includes("informe") || status.includes("semanal")) return "informe_semanal_lm";
+  return "ingreso_solicitud_entidad";
 }
-
 function recordTemplateValues(record: RecordItem) {
   const mandante = record.mandante?.name || "Mandante";
   const razonSocial = record.razon_social || record.company?.razon_social || "Razón social";
@@ -78,72 +83,53 @@ function recordTemplateValues(record: RecordItem) {
   const tipo = record.motivo_tipo_exceso || record.management_type || "gestión";
   const numeroSolicitud = record.numero_solicitud || "N° solicitud";
   const mes = record.mes_produccion_2026 || "MES AÑO";
-  const monto = formatMoney(record.monto_devolucion);
-  return { mandante, razonSocial, rut, entidad, tipo, numeroSolicitud, mes, monto };
+  const monto = formatMoney(record.monto_real_finanfix_solutions || record.monto_pagado || record.monto_devolucion);
+  const fechaPresentacion = formatDate(record.fecha_presentacion_afp);
+  const fechaIngresoAfp = formatDate(record.fecha_ingreso_afp);
+  const fechaPago = formatDate(record.fecha_pago_afp);
+  const estadoGestion = record.estado_gestion || "Estado gestión";
+  const motivoRechazo = record.motivo_rechazo || "Motivo de rechazo/anulación";
+  return { mandante, razonSocial, rut, entidad, tipo, numeroSolicitud, mes, monto, fechaPresentacion, fechaIngresoAfp, fechaPago, estadoGestion, motivoRechazo };
 }
-
 function buildTemplateSubject(record: RecordItem, templateKey: EmailTemplateKey) {
   const v = recordTemplateValues(record);
-  if (templateKey === "ingreso_gestion") return `Comprobante ingreso solicitud ${v.tipo} - ${v.razonSocial} - ${v.rut}`;
+  if (templateKey === "ingreso_solicitud_entidad") return `Ingreso solicitud a entidad - ${v.tipo} - ${v.razonSocial} - ${v.rut}`;
+  if (templateKey === "confirmacion_entidad") return `Ingreso por parte de entidad / N° solicitud - ${v.razonSocial} - ${v.rut}`;
+  if (templateKey === "rechazo_gestion") return `Rechazo de gestión - ${v.razonSocial} - ${v.rut}`;
   if (templateKey === "comprobante_detalle") return `Envío comprobante y detalle de pago - ${v.razonSocial} - ${v.rut}`;
-  if (templateKey === "informe_gestion") return `Informe de gestión ${v.mes} - ${v.mandante}`;
+  if (templateKey === "informe_semanal_lm") return `Informe semanal de gestiones LM - ${v.mes} - ${v.mandante}`;
+  if (templateKey === "correo_colaboradores") return `Comunicación colaboradores - ${v.razonSocial}`;
   return `Gestión ${v.tipo} - ${v.razonSocial} - ${v.rut}`;
 }
 
 function buildTemplateBody(record: RecordItem, templateKey: EmailTemplateKey) {
   const v = recordTemplateValues(record);
-  if (templateKey === "ingreso_gestion") {
-    return `Hola ${v.mandante},
 
-Te informamos que la solicitud correspondiente a ${v.tipo} del caso ${v.razonSocial}, RUT ${v.rut}, ya fue ingresada en ${v.entidad} y actualmente se encuentra en estado Gestionado.
-
-Nos encontramos a la espera de la respuesta del ingreso de la solicitud por parte de la entidad. Apenas contemos con nueva información, se las haremos llegar.
-
-Quedamos atentos a cualquier consulta,
-
-Saludos cordiales,
-Finanfix Solutions SpA`;
+  if (templateKey === "ingreso_solicitud_entidad") {
+    return `Hola ${v.mandante},\n\nTe informamos que la solicitud correspondiente a ${v.tipo} del caso ${v.razonSocial}, RUT ${v.rut}, ya fue ingresada en ${v.entidad} y actualmente se encuentra en estado ${v.estadoGestion}.\n\nNos encontramos a la espera de la respuesta del ingreso de la solicitud por parte de la entidad. Apenas contemos con nueva información, se las haremos llegar.\n\nQuedamos atentos a cualquier consulta,\n\nSaludos cordiales,\nFinanfix Solutions SpA`;
   }
+
+  if (templateKey === "confirmacion_entidad") {
+    return `Hola ${v.mandante},\n\nTe informamos que la solicitud correspondiente a ${v.tipo} del caso ${v.razonSocial}, RUT ${v.rut}, se encuentra ingresada en ${v.entidad}.\n\nLa presentación se realizó con fecha ${v.fechaPresentacion} y fue recepcionada por la administradora el ${v.fechaIngresoAfp}. El número de solicitud asignado es ${v.numeroSolicitud}.\n\nNos encontramos a la espera de la respuesta por parte de la entidad. Apenas contemos con nueva información, te la haremos llegar.\n\nQuedamos atentos a cualquier consulta,\n\nSaludos cordiales,\nFinanfix Solutions SpA`;
+  }
+
+  if (templateKey === "rechazo_gestion") {
+    return `Hola ${v.mandante},\n\nTe informamos que la solicitud correspondiente al caso ${v.razonSocial}, RUT ${v.rut}, ya fue ingresada en ${v.entidad} y actualmente se encuentra en estado ${v.estadoGestion}.\n\nLa presentación se realizó con fecha ${v.fechaPresentacion} y nos responden desde la administradora el rechazo/anulación de la solicitud. El número de solicitud asignado es ${v.numeroSolicitud}.\n\nEl motivo del rechazo informado por la entidad es: ${v.motivoRechazo}.\n\nQuedamos atentos a cualquier consulta,\n\nSaludos cordiales,\nFinanfix Solutions SpA`;
+  }
+
   if (templateKey === "comprobante_detalle") {
-    return `Hola ${v.mandante},
-
-Te informamos que ${v.entidad} nos ha enviado el comprobante y el detalle de pago. El depósito fue realizado con fecha correspondiente al número de solicitud asociado al caso indicado a continuación:
-
-Razón Social: ${v.razonSocial}
-RUT: ${v.rut}
-Monto: ${v.monto}
-N° Solicitud: ${v.numeroSolicitud}
-
-Adjuntamos comprobante de pago, detalle de pago, archivo de envío y carta explicativa para su revisión.
-
-Agradecería confirmar la recepción de este mensaje.
-
-Quedamos atentos ante cualquier duda o consulta adicional.
-
-Saludos cordiales,
-Finanfix Solutions SpA`;
+    return `Hola ${v.mandante},\n\nTe informamos que ${v.entidad} nos ha enviado el comprobante y el detalle de pago. El depósito fue realizado con fecha ${v.fechaPago}, correspondiente al número de solicitud ${v.numeroSolicitud}, asociado al caso indicado a continuación:\n\nRazón Social: ${v.razonSocial}\nRUT: ${v.rut}\nMonto: ${v.monto}\n\nAdjuntamos comprobante de pago, detalle de pago, archivo de envío y carta explicativa para su revisión.\n\nAgradecería confirmar la recepción de este mensaje.\n\nQuedamos atentos ante cualquier duda o consulta adicional.\n\nSaludos cordiales,\nFinanfix Solutions SpA`;
   }
-  if (templateKey === "informe_gestion") {
-    return `Hola ${v.mandante},
 
-Les comparto informe correspondiente al período de: ${v.mes}.
-
-En el archivo Excel adjunto podrán revisar el detalle de cada caso, donde se indican los siguientes estados:
-
-• Gestionado: solicitudes ingresadas y en proceso ante la administradora.
-
-• Pagado: gestiones que ya cuentan con devolución realizada.
-
-• Pendiente: casos que no han podido ser gestionados por falta de Cuenta Corriente (CC) y/o Poder vigente.
-
-Este archivo permite tener una visión completa de lo ya recuperado y de lo que aún se encuentra detenido por falta de antecedentes.
-
-Quedamos atentos a cualquier consulta,
-
-Saludos cordiales,
-Finanfix Solutions SpA`;
+  if (templateKey === "informe_semanal_lm") {
+    return `Hola ${v.mandante},\n\nLes comparto el informe correspondiente al período de: ${v.mes}.\n\nEn el archivo Excel adjunto podrás revisar el detalle de cada caso, donde se indican los siguientes estados:\n\n• Gestionado: solicitudes ingresadas y en proceso ante la administradora.\n\n• Pagado: gestiones que ya cuentan con devolución realizada.\n\n• Pendiente: casos que no han podido ser gestionados por falta de Cuenta Corriente (CC) y/o Poder vigente.\n\nEste archivo permite tener una visión completa de lo ya recuperado y de lo que aún se encuentra detenido por falta de antecedentes.\n\nQuedamos atentos a cualquier consulta,\n\nSaludos cordiales,\nFinanfix Solutions SpA`;
   }
-  return "";
+
+  if (templateKey === "correo_colaboradores") {
+    return `Hola {{Colaboradores.Nombre}},\n\nJunto con saludar,\n\nQuedo atento a cualquier consulta,\n\nSaludos cordiales,\nFinanfix Solutions SpA`;
+  }
+
+  return `Hola ${v.mandante},\n\nJunto con saludar,\n\nQuedo atento a cualquier consulta,\n\nSaludos cordiales,\nFinanfix Solutions SpA`;
 }
 
 const documentCategories = [
@@ -257,6 +243,31 @@ function buildBulkForm(record: RecordItem) {
   };
 }
 
+
+function getDocumentUrl(doc: DocumentItem) {
+  if (!doc.file_url) return "";
+  return doc.file_url.startsWith("http") ? doc.file_url : `${publicBaseUrl}${doc.file_url}`;
+}
+
+function getDocumentExtension(doc: DocumentItem) {
+  const source = `${doc.file_name || ""} ${doc.file_url || ""}`.toLowerCase();
+  const clean = source.split("?")[0];
+  const match = clean.match(/\.([a-z0-9]+)$/i);
+  return match?.[1] || "";
+}
+
+function canPreviewDocument(doc: DocumentItem) {
+  const mime = String(doc.mime_type || "").toLowerCase();
+  const ext = getDocumentExtension(doc);
+  return mime.includes("pdf") || mime.startsWith("image/") || ["pdf", "png", "jpg", "jpeg", "webp", "gif", "bmp", "svg"].includes(ext);
+}
+
+function isImageDocument(doc: DocumentItem) {
+  const mime = String(doc.mime_type || "").toLowerCase();
+  const ext = getDocumentExtension(doc);
+  return mime.startsWith("image/") || ["png", "jpg", "jpeg", "webp", "gif", "bmp", "svg"].includes(ext);
+}
+
 export default function RecordDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
@@ -275,10 +286,11 @@ export default function RecordDetailPage() {
   const [uploadCategory, setUploadCategory] = useState("Poder");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadSaving, setUploadSaving] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
 
   const [emailOpen, setEmailOpen] = useState(false);
   const [emailDraft, setEmailDraft] = useState<EmailDraft | null>(null);
-  const [selectedEmailTemplate, setSelectedEmailTemplate] = useState<EmailTemplateKey>("ingreso_gestion");
+  const [selectedEmailTemplate, setSelectedEmailTemplate] = useState<EmailTemplateKey>("ingreso_solicitud_entidad");
   const [selectedEmailDocs, setSelectedEmailDocs] = useState<Record<string, boolean>>({});
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
@@ -407,12 +419,33 @@ export default function RecordDetailPage() {
     }
   }
 
+  async function deleteDocument(documentId: string) {
+    if (!window.confirm("¿Eliminar este documento de la gestión?")) return;
+
+    try {
+      await fetchJson(`/records/documents/${documentId}`, { method: "DELETE" });
+      await loadRecord();
+    } catch (error) {
+      console.error(error);
+      alert("No se pudo eliminar el documento.");
+    }
+  }
+
+  function openDocumentPreview(document: DocumentItem) {
+    if (!canPreviewDocument(document)) {
+      window.open(getDocumentUrl(document), "_blank", "noopener,noreferrer");
+      return;
+    }
+    setPreviewDoc(document);
+  }
+
+
 
   async function openEmailComposer() {
     setEmailLoading(true);
     try {
       const draft = await fetchJson<EmailDraft>(`/records/${id}/email/compose`);
-      const templateKey = record ? suggestedTemplateForRecord(record) : "ingreso_gestion";
+      const templateKey = record ? suggestedTemplateForRecord(record) : "ingreso_solicitud_entidad";
       setSelectedEmailTemplate(templateKey);
       setEmailDraft({
         ...draft,
@@ -470,6 +503,7 @@ export default function RecordDetailPage() {
         bcc: emailDraft.bcc || "",
         subject: emailDraft.subject,
         body: emailDraft.body,
+        template_key: selectedEmailTemplate,
         document_ids: documentIds,
       });
 
@@ -621,7 +655,7 @@ export default function RecordDetailPage() {
           (record.documents || []).length === 0 ? (
             <div className="zoho-empty">Sin archivos adjuntos.</div>
           ) : (
-            (record.documents || []).map((doc) => <DocumentLink key={doc.id} doc={doc} />)
+            (record.documents || []).map((doc) => <DocumentLink key={doc.id} doc={doc} onDelete={deleteDocument} onPreview={openDocumentPreview} />)
           )
         )}
       </div>
@@ -645,7 +679,7 @@ export default function RecordDetailPage() {
           <EditableInfo label="RUT" value={record.rut || record.company?.rut} field="rut" onEdit={openEdit} />
           <EditableInfo label="Dirección" value={record.direccion} field="direccion" onEdit={openEdit} />
           <EditableInfo label="Comentario" value={record.comment} field="comment" type="textarea" onEdit={openEdit} />
-          <DocSlot label="Poder" docs={getDocumentsForCategory(documentsByCategory, "Poder")} onAttach={() => { setUploadCategory("Poder"); setUploadOpen(true); }} />
+          <DocSlot label="Poder" docs={getDocumentsForCategory(documentsByCategory, "Poder")} onAttach={() => { setUploadCategory("Poder"); setUploadOpen(true); }} onDelete={deleteDocument} onPreview={openDocumentPreview} />
         </DetailSection>
 
         <DetailSection title="DATOS BANCARIOS">
@@ -656,7 +690,7 @@ export default function RecordDetailPage() {
 
         <DetailSection title="ANTECEDENTES RECHAZO">
           <EditableInfo label="Fecha Rechazo" value={toDateInput(record.fecha_rechazo)} displayValue={formatDate(record.fecha_rechazo)} field="fecha_rechazo" type="date" onEdit={openEdit} />
-          <DocSlot label="Comprobante rechazo" docs={getDocumentsForCategory(documentsByCategory, "Comprobante rechazo")} onAttach={() => { setUploadCategory("Comprobante rechazo"); setUploadOpen(true); }} />
+          <DocSlot label="Comprobante rechazo" docs={getDocumentsForCategory(documentsByCategory, "Comprobante rechazo")} onAttach={() => { setUploadCategory("Comprobante rechazo"); setUploadOpen(true); }} onDelete={deleteDocument} onPreview={openDocumentPreview} />
           <EditableInfo label="Motivo del rechazo/anulación" value={record.motivo_rechazo} field="motivo_rechazo" onEdit={openEdit} />
         </DetailSection>
 
@@ -679,7 +713,7 @@ export default function RecordDetailPage() {
         </DetailSection>
 
         <DetailSection title="ARCHIVOS / RESPALDO" wide>
-          <DocumentMatrix documentsByCategory={documentsByCategory} onAttach={(category) => { setUploadCategory(category); setUploadOpen(true); }} />
+          <DocumentMatrix documentsByCategory={documentsByCategory} onAttach={(category) => { setUploadCategory(category); setUploadOpen(true); }} onDelete={deleteDocument} onPreview={openDocumentPreview} />
         </DetailSection>
 
         <DetailSection title="MONTOS RECUPERACIÓN">
@@ -701,8 +735,8 @@ export default function RecordDetailPage() {
           <EditableInfo label="Fecha notificación cliente" value={toDateInput(record.fecha_notificacion_cliente)} displayValue={formatDate(record.fecha_notificacion_cliente)} field="fecha_notificacion_cliente" type="date" onEdit={openEdit} />
           <EditableInfo label="N° Factura" value={record.numero_factura} field="numero_factura" onEdit={openEdit} />
           <EditableInfo label="N° OC" value={record.numero_oc} field="numero_oc" onEdit={openEdit} />
-          <DocSlot label="Factura" docs={getDocumentsForCategory(documentsByCategory, "Factura")} onAttach={() => { setUploadCategory("Factura"); setUploadOpen(true); }} />
-          <DocSlot label="OC" docs={getDocumentsForCategory(documentsByCategory, "OC")} onAttach={() => { setUploadCategory("OC"); setUploadOpen(true); }} />
+          <DocSlot label="Factura" docs={getDocumentsForCategory(documentsByCategory, "Factura")} onAttach={() => { setUploadCategory("Factura"); setUploadOpen(true); }} onDelete={deleteDocument} onPreview={openDocumentPreview} />
+          <DocSlot label="OC" docs={getDocumentsForCategory(documentsByCategory, "OC")} onAttach={() => { setUploadCategory("OC"); setUploadOpen(true); }} onDelete={deleteDocument} onPreview={openDocumentPreview} />
         </DetailSection>
       </div>
       </BulkEditContext.Provider>
@@ -817,6 +851,24 @@ export default function RecordDetailPage() {
           <button className="zoho-btn zoho-btn-primary" onClick={uploadDocument} disabled={uploadSaving}>{uploadSaving ? "Subiendo..." : "Subir documento"}</button>
         </div>
       </ZohoModal>
+
+      <ZohoModal title={previewDoc?.file_name || "Vista previa de documento"} isOpen={Boolean(previewDoc)} onClose={() => setPreviewDoc(null)}>
+        {previewDoc && (
+          <div className="record-document-preview">
+            <div className="record-document-preview-actions">
+              <span><strong>Tipo:</strong> {previewDoc.category || "Documento"}</span>
+              <a className="zoho-btn" href={getDocumentUrl(previewDoc)} target="_blank" rel="noreferrer">Abrir en otra pestaña</a>
+              <a className="zoho-btn" href={getDocumentUrl(previewDoc)} download>Descargar</a>
+              <button className="zoho-btn zoho-btn-danger" onClick={() => deleteDocument(previewDoc.id).then(() => setPreviewDoc(null))}>Eliminar</button>
+            </div>
+            {isImageDocument(previewDoc) ? (
+              <img className="record-document-preview-image" src={getDocumentUrl(previewDoc)} alt={previewDoc.file_name || "Documento"} />
+            ) : (
+              <iframe className="record-document-preview-frame" src={getDocumentUrl(previewDoc)} title={previewDoc.file_name || "Documento"} />
+            )}
+          </div>
+        )}
+      </ZohoModal>
     </div>
   );
 }
@@ -873,19 +925,41 @@ function EditableInfo({
   );
 }
 
-function DocSlot({ label, docs, onAttach }: { label: string; docs?: DocumentItem[]; onAttach: () => void }) {
+function DocSlot({
+  label,
+  docs,
+  onAttach,
+  onDelete,
+  onPreview,
+}: {
+  label: string;
+  docs?: DocumentItem[];
+  onAttach: () => void;
+  onDelete?: (documentId: string) => void;
+  onPreview?: (document: DocumentItem) => void;
+}) {
   return (
     <div className="record-info-field">
       <span>{label}</span>
       <strong className="record-doc-links">
-        {docs?.length ? docs.map((doc) => <DocumentLink key={doc.id} doc={doc} />) : "—"}
+        {docs?.length ? docs.map((doc) => <DocumentLink key={doc.id} doc={doc} onDelete={onDelete} onPreview={onPreview} />) : "—"}
         <button type="button" className="zoho-small-btn" onClick={onAttach}>Adjuntar</button>
       </strong>
     </div>
   );
 }
 
-function DocumentMatrix({ documentsByCategory, onAttach }: { documentsByCategory: Record<string, DocumentItem[]>; onAttach: (category: string) => void }) {
+function DocumentMatrix({
+  documentsByCategory,
+  onAttach,
+  onDelete,
+  onPreview,
+}: {
+  documentsByCategory: Record<string, DocumentItem[]>;
+  onAttach: (category: string) => void;
+  onDelete?: (documentId: string) => void;
+  onPreview?: (document: DocumentItem) => void;
+}) {
   return (
     <div className="record-doc-matrix">
       {documentCategories.map((category) => {
@@ -893,7 +967,7 @@ function DocumentMatrix({ documentsByCategory, onAttach }: { documentsByCategory
         return (
           <div className="record-doc-slot" key={category}>
             <div className="record-doc-title"><strong>{category}</strong><button className="zoho-small-btn" onClick={() => onAttach(category)}>Adjuntar</button></div>
-            {docs.length === 0 ? <span className="record-doc-empty">Sin archivo</span> : docs.map((doc) => <DocumentLink key={doc.id} doc={doc} />)}
+            {docs.length === 0 ? <span className="record-doc-empty">Sin archivo</span> : docs.map((doc) => <DocumentLink key={doc.id} doc={doc} onDelete={onDelete} onPreview={onPreview} />)}
           </div>
         );
       })}
@@ -901,7 +975,48 @@ function DocumentMatrix({ documentsByCategory, onAttach }: { documentsByCategory
   );
 }
 
-function DocumentLink({ doc }: { doc: DocumentItem }) {
-  if (!doc.file_url) return <span>{doc.file_name || doc.category || "Documento"}</span>;
-  return <a href={`${publicBaseUrl}${doc.file_url}`} target="_blank" rel="noreferrer">{doc.file_name || doc.category}</a>;
+function DocumentLink({
+  doc,
+  onDelete,
+  onPreview,
+}: {
+  doc: DocumentItem;
+  onDelete?: (documentId: string) => void;
+  onPreview?: (document: DocumentItem) => void;
+}) {
+  const label = doc.file_name || doc.category || "Documento";
+  const url = getDocumentUrl(doc);
+  return (
+    <span className="record-doc-link-row">
+      <button
+        type="button"
+        className="record-doc-preview"
+        title="Vista previa"
+        disabled={!url}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onPreview ? onPreview(doc) : window.open(url, "_blank", "noopener,noreferrer");
+        }}
+      >
+        Ver
+      </button>
+      {url ? <a href={url} target="_blank" rel="noreferrer">{label}</a> : <span>{label}</span>}
+      {url && <a className="record-doc-download" href={url} download onClick={(event) => event.stopPropagation()}>Descargar</a>}
+      {onDelete && (
+        <button
+          type="button"
+          className="record-doc-delete"
+          title="Eliminar documento"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onDelete(doc.id);
+          }}
+        >
+          Eliminar
+        </button>
+      )}
+    </span>
+  );
 }

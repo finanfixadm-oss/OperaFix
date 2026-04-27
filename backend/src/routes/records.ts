@@ -497,17 +497,30 @@ function emailDocumentUrl(fileUrl: unknown) {
 
 async function getRecordDocumentsForEmail(recordId: string) {
   try {
-    return await prisma.document.findMany({
-      where: {
-        OR: [
-          { related_module: "records", related_record_id: recordId },
-          { management_id: recordId },
-        ],
-      },
-      orderBy: { created_at: "desc" },
-    });
+    const columns = await getExistingColumnsAny("documents");
+    const filters: string[] = [];
+    const values: unknown[] = [];
+
+    if (columns.has("related_record_id")) {
+      values.push(recordId);
+      filters.push(`"related_record_id" = $${values.length}`);
+    }
+    if (columns.has("management_id")) {
+      values.push(recordId);
+      filters.push(`"management_id" = $${values.length}`);
+    }
+
+    if (!filters.length) return [] as any[];
+
+    const orderBy = columns.has("created_at") ? " order by created_at desc" : "";
+    const rows = await prisma.$queryRawUnsafe<any[]>(
+      `select * from documents where (${filters.join(" or ")})${orderBy}`,
+      ...values
+    );
+
+    return rows;
   } catch (error) {
-    console.warn("No se pudieron cargar documentos para correo:", error);
+    console.warn("No se pudieron cargar documentos compatibles:", error);
     return [] as any[];
   }
 }
@@ -1301,6 +1314,7 @@ recordsRouter.post("/:id/email/send", async (req, res) => {
     const subject = nullableString(req.body.subject) || buildEmailSubject(record);
     const body = nullableString(req.body.body) || "";
     const selectedIds = Array.isArray(req.body.document_ids) ? req.body.document_ids.map(String) : [];
+    const templateKey = nullableString(req.body.template_key) || nullableString(req.body.templateKey) || "sin_plantilla";
 
     if (!to) return res.status(400).json({ message: "Debes indicar el correo destino." });
 
@@ -1329,12 +1343,13 @@ recordsRouter.post("/:id/email/send", async (req, res) => {
       razon_social: record?.razon_social || record?.company?.razon_social || "",
       rut: record?.rut || record?.company?.rut || "",
       attachments,
+      template_key: templateKey,
       sent_at: new Date().toISOString(),
     };
 
     const sendResult = await trySendEmailWebhook(payload);
     const attachmentNames = attachments.length ? attachments.map((doc) => doc.filename).join(", ") : "Sin adjuntos";
-    const description = `Correo ${sendResult.sent ? "enviado" : "registrado"} a ${to}. Asunto: ${subject}. Adjuntos: ${attachmentNames}. Detalle: ${sendResult.detail}`;
+    const description = `Correo ${sendResult.sent ? "enviado" : "registrado"} a ${to}. Plantilla: ${templateKey}. Asunto: ${subject}. Adjuntos: ${attachmentNames}. Detalle: ${sendResult.detail}`;
     await createEmailTrace(recordId, sendResult.status, description);
 
     return res.json({ ok: sendResult.sent, status: sendResult.status, detail: sendResult.detail, trace: description, payload });
@@ -1371,6 +1386,56 @@ recordsRouter.post("/:id/notes", async (req, res, next) => {
     res.status(201).json(note);
   } catch (error) {
     next(error);
+  }
+});
+
+recordsRouter.delete("/documents/:documentId", async (req, res) => {
+  const documentId = String(req.params.documentId);
+  try {
+    const columns = await getExistingColumnsAny("documents");
+    if (!columns.has("id")) return res.status(500).json({ message: "La tabla documents no tiene columna id." });
+
+    const rows = await prisma.$queryRawUnsafe<any[]>(`select * from documents where id = $1 limit 1`, documentId);
+    const doc = rows[0];
+
+    if (!doc) return res.status(404).json({ message: "Documento no encontrado." });
+
+    const fileUrl = nullableString(doc.file_url);
+    if (fileUrl) {
+      const cleanRelative = fileUrl.replace(/^\/+/, "");
+      const possiblePaths = [
+        path.resolve(process.cwd(), cleanRelative),
+        path.resolve(process.cwd(), "storage", "management-documents", path.basename(cleanRelative)),
+      ];
+
+      for (const filePath of possiblePaths) {
+        try {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+            break;
+          }
+        } catch (fileError) {
+          console.warn("No se pudo borrar archivo físico:", fileError);
+        }
+      }
+    }
+
+    await prisma.$executeRawUnsafe(`delete from documents where id = $1`, documentId);
+
+    const relatedRecordId = nullableString(doc.related_record_id) || nullableString(doc.management_id) || "";
+    if (relatedRecordId) {
+      await createActivityTrace(
+        relatedRecordId,
+        "DOCUMENTO",
+        "Completada",
+        `Documento eliminado: ${nullableString(doc.file_name) || nullableString(doc.category) || documentId}`
+      );
+    }
+
+    return res.json({ ok: true });
+  } catch (error: any) {
+    console.error("ERROR DELETE /api/records/documents/:documentId:", error?.message || error);
+    return res.status(500).json({ message: "No se pudo eliminar el documento.", detail: String(error?.message || error) });
   }
 });
 

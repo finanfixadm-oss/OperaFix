@@ -1083,3 +1083,93 @@
   color: #475569;
   font-size: 12px;
 }
+
+/* v19 - documentos visibles con opción eliminar */
+.record-doc-link-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 3px 8px 3px 0;
+  padding: 3px 6px;
+  border: 1px solid #d7e7ff;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.record-doc-delete {
+  border: 1px solid #f3b2b2;
+  background: #fff7f7;
+  color: #b42318;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.record-doc-delete:hover {
+  background: #fee4e2;
+}
+
+/* v20 - preview de documentos */
+.record-doc-link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.record-doc-preview,
+.record-doc-download,
+.record-doc-delete {
+  border: 1px solid #cfe0ff;
+  background: #ffffff;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #005bd3;
+  text-decoration: none;
+}
+.record-doc-delete {
+  border-color: #ffd2d2;
+  color: #c62828;
+}
+.record-doc-preview:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+.record-document-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: min(1000px, 86vw);
+}
+.record-document-preview-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.record-document-preview-actions span {
+  margin-right: auto;
+}
+.record-document-preview-frame {
+  width: 100%;
+  height: 72vh;
+  border: 1px solid #d8e4f7;
+  border-radius: 10px;
+  background: #fff;
+}
+.record-document-preview-image {
+  width: 100%;
+  max-height: 72vh;
+  object-fit: contain;
+  border: 1px solid #d8e4f7;
+  border-radius: 10px;
+  background: #fff;
+}
+.zoho-btn-danger {
+  border-color: #ffd2d2 !important;
+  color: #c62828 !important;
+  background: #fff7f7 !important;
+}
