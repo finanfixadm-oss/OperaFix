@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import fs from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { prisma } from "../config/prisma.js";
 
 const recordsRouter = Router();
@@ -28,42 +29,30 @@ function nullableString(value: unknown) {
   return String(value);
 }
 
-function isAutoLineValue(value: unknown) {
-  const raw = String(value ?? "").trim().toLowerCase();
+function isAutoLineAfpValue(value: unknown) {
+  if (value === undefined || value === null || value === "") return false;
+  const raw = String(value).trim().toLowerCase();
   return (
-    !raw ||
     raw === "auto" ||
     raw === "automatico" ||
     raw === "automático" ||
-    raw === "crear_auto" ||
-    raw === "crear-automaticamente" ||
-    raw === "crear_automaticamente" ||
     raw.includes("crear automáticamente") ||
-    raw.includes("crear automaticamente")
+    raw.includes("crear automaticamente") ||
+    raw.includes("razón social") ||
+    raw.includes("razon social")
   );
 }
 
-function nullableId(value: unknown) {
-  if (isAutoLineValue(value)) return null;
-  const text = String(value ?? "").trim();
-  const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  return uuidLike.test(text) ? text : null;
-}
-
-function sanitizeRecordBody(body: any) {
+function cleanRecordBody(body: any) {
   const clean = { ...(body || {}) };
-
-  if (hasOwn(clean, "line_afp_id")) clean.line_afp_id = nullableId(clean.line_afp_id);
-  if (hasOwn(clean, "line_id")) clean.line_id = nullableId(clean.line_id);
-  if (hasOwn(clean, "company_id")) clean.company_id = nullableId(clean.company_id);
-  if (hasOwn(clean, "group_id")) clean.group_id = nullableId(clean.group_id);
-  if (hasOwn(clean, "mandante_id")) clean.mandante_id = nullableId(clean.mandante_id);
-
-  delete clean.afp_linea;
-  delete clean.afpLinea;
-  delete clean.linea_afp;
-  delete clean.afp_linea_id;
-
+  if (isAutoLineAfpValue(clean.line_afp_id) || isAutoLineAfpValue(clean.afp_linea) || isAutoLineAfpValue(clean.linea_afp)) {
+    delete clean.line_afp_id;
+    delete clean.afp_linea;
+    delete clean.linea_afp;
+  }
+  if (clean.line_afp_id && !String(clean.line_afp_id).startsWith("c") && String(clean.line_afp_id).length < 12) {
+    delete clean.line_afp_id;
+  }
   return clean;
 }
 
@@ -168,11 +157,11 @@ function managementPatchData(body: any) {
     if (hasOwn(body, key)) data[key] = parser(body[key]);
   }
 
-  if (hasOwn(body, "mandante_id")) data.mandante_id = nullableId(body.mandante_id);
-  if (hasOwn(body, "group_id")) data.group_id = nullableId(body.group_id);
-  if (hasOwn(body, "company_id")) data.company_id = nullableId(body.company_id);
-  if (hasOwn(body, "line_id")) data.line_id = nullableId(body.line_id);
-  if (hasOwn(body, "line_afp_id")) data.line_afp_id = nullableId(body.line_afp_id);
+  if (hasOwn(body, "mandante_id")) data.mandante_id = nullableString(body.mandante_id);
+  if (hasOwn(body, "group_id")) data.group_id = nullableString(body.group_id);
+  if (hasOwn(body, "company_id")) data.company_id = nullableString(body.company_id);
+  if (hasOwn(body, "line_id")) data.line_id = nullableString(body.line_id);
+  if (hasOwn(body, "line_afp_id")) data.line_afp_id = nullableString(body.line_afp_id);
 
   data.last_activity_at = new Date();
   return data;
@@ -218,7 +207,17 @@ async function getExistingColumns(tableName: "lm_records" | "tp_records" | "acti
 
 async function insertDynamic(tableName: "lm_records" | "tp_records", candidateData: Record<string, unknown>) {
   const existingColumns = await getExistingColumns(tableName);
-  const entries = Object.entries(candidateData).filter(([column, value]) => existingColumns.has(column) && value !== undefined);
+  const now = new Date();
+  const safeData: Record<string, unknown> = { ...candidateData };
+
+  if (existingColumns.has("id") && (safeData.id === undefined || safeData.id === null || safeData.id === "")) {
+    safeData.id = randomUUID();
+  }
+  if (existingColumns.has("created_at") && safeData.created_at === undefined) safeData.created_at = now;
+  if (existingColumns.has("updated_at") && safeData.updated_at === undefined) safeData.updated_at = now;
+  if (existingColumns.has("last_activity_at") && safeData.last_activity_at === undefined) safeData.last_activity_at = now;
+
+  const entries = Object.entries(safeData).filter(([column, value]) => existingColumns.has(column) && value !== undefined);
 
   if (!entries.length) {
     throw new Error(`La tabla ${tableName} no tiene columnas compatibles para crear el registro.`);
@@ -241,6 +240,7 @@ async function createLegacyActivity(recordId: string) {
     if (!columns.has("related_module") || !columns.has("related_record_id")) return;
 
     const data: Record<string, unknown> = {
+      id: columns.has("id") ? randomUUID() : undefined,
       related_module: "records",
       related_record_id: recordId,
       activity_type: "CREACIÓN",
@@ -362,7 +362,7 @@ const recordInclude = {
 
 async function ensureRecordContext(body: any) {
   const managementType = body.management_type === "TP" ? "TP" : "LM";
-  const requestedAfpId = nullableId(body.line_afp_id);
+  const requestedAfpId = isAutoLineAfpValue(body.line_afp_id) ? null : nullableString(body.line_afp_id);
 
   if (requestedAfpId) {
     const lineAfp = await prisma.managementLineAfp.findUnique({
@@ -382,7 +382,7 @@ async function ensureRecordContext(body: any) {
   }
 
   let mandante = null;
-  const requestedMandanteId = nullableId(body.mandante_id);
+  const requestedMandanteId = nullableString(body.mandante_id);
   if (requestedMandanteId) {
     mandante = await prisma.mandante.findUnique({ where: { id: requestedMandanteId } });
   }
@@ -547,10 +547,10 @@ recordsRouter.get("/:id", async (req, res, next) => {
   }
 });
 
-recordsRouter.post("/", async (req, res, next) => {
-  try {
-    const body = sanitizeRecordBody(req.body);
+recordsRouter.post("/", async (req, res) => {
+  const body = cleanRecordBody(req.body);
 
+  try {
     try {
       const context = await ensureRecordContext(body);
 
@@ -562,16 +562,20 @@ recordsRouter.post("/", async (req, res, next) => {
         include: recordInclude,
       });
 
-      await prisma.activity.create({
-        data: {
-          related_module: "records",
-          related_record_id: row.id,
-          management_id: row.id,
-          activity_type: "CREACIÓN",
-          status: "Completada",
-          description: "Registro de empresa creado",
-        },
-      });
+      try {
+        await prisma.activity.create({
+          data: {
+            related_module: "records",
+            related_record_id: row.id,
+            management_id: row.id,
+            activity_type: "CREACIÓN",
+            status: "Completada",
+            description: "Registro de empresa creado",
+          },
+        });
+      } catch (activityError) {
+        console.warn("Registro creado, pero no se pudo crear actividad:", activityError);
+      }
 
       return res.status(201).json(row);
     } catch (managementError: any) {
@@ -579,14 +583,19 @@ recordsRouter.post("/", async (req, res, next) => {
       const legacyRow = await createLegacyRecord(body);
       return res.status(201).json(legacyRow);
     }
-  } catch (error) {
-    next(error);
+  } catch (error: any) {
+    console.error("ERROR FINAL /api/records POST:", error?.message || error);
+    return res.status(500).json({
+      message: "No se pudo crear el registro de empresa.",
+      detail: String(error?.message || error),
+      hint: "Revisa en Railway que existan las tablas managements o lm_records/tp_records y que DATABASE_URL apunte a la base correcta.",
+    });
   }
 });
 
 recordsRouter.put("/:id", async (req, res, next) => {
   try {
-    const body = sanitizeRecordBody(req.body);
+    const body = cleanRecordBody(req.body);
     const previous = await prisma.management.findUnique({ where: { id: req.params.id } });
     if (!previous) return res.status(404).json({ message: "Registro no encontrado" });
 

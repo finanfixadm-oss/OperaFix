@@ -10,38 +10,26 @@ function toNullableString(value: unknown) {
 }
 
 // LISTAR AFPs DE LÍNEAS
-managementLineAfpsRouter.get("/", async (req, res, next) => {
+// IMPORTANTE: si Railway todavía no tiene la tabla nueva management_line_afps,
+// este endpoint NO debe devolver 500 porque bloquea el formulario Crear Registro.
+managementLineAfpsRouter.get("/", async (req, res) => {
   try {
     const lineId =
       typeof req.query.line_id === "string" ? req.query.line_id : undefined;
     const search =
       typeof req.query.search === "string" ? req.query.search.trim() : "";
 
-    const where: Prisma.ManagementLineAfpWhereInput = {
-      line_id: lineId,
-      OR: search
-        ? [
-            {
-              afp_name: {
-                contains: search,
-                mode: Prisma.QueryMode.insensitive,
-              },
-            },
-            {
-              owner_name: {
-                contains: search,
-                mode: Prisma.QueryMode.insensitive,
-              },
-            },
-            {
-              current_status: {
-                contains: search,
-                mode: Prisma.QueryMode.insensitive,
-              },
-            },
-          ]
-        : undefined,
-    };
+    const where: Prisma.ManagementLineAfpWhereInput = {};
+
+    if (lineId) where.line_id = lineId;
+
+    if (search) {
+      where.OR = [
+        { afp_name: { contains: search, mode: Prisma.QueryMode.insensitive } },
+        { owner_name: { contains: search, mode: Prisma.QueryMode.insensitive } },
+        { current_status: { contains: search, mode: Prisma.QueryMode.insensitive } },
+      ];
+    }
 
     const items = await prisma.managementLineAfp.findMany({
       where,
@@ -60,9 +48,14 @@ managementLineAfpsRouter.get("/", async (req, res, next) => {
       orderBy: [{ afp_name: "asc" }, { created_at: "desc" }],
     });
 
-    res.json(items);
-  } catch (error) {
-    next(error);
+    return res.json(items);
+  } catch (error: any) {
+    console.error(
+      "ERROR /api/management-line-afps. Respondiendo [] en modo compatible Railway:",
+      error?.message || error
+    );
+
+    return res.json([]);
   }
 });
 
