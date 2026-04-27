@@ -298,6 +298,117 @@ async function findLegacyRecordById(id: string) {
   return null;
 }
 
+function legacyPatchCandidates(body: any) {
+  return {
+    mandante: body.mandante_name || body.mandante,
+    mandante_id: nullableString(body.mandante_id),
+    search_group: nullableString(body.grupo_empresa),
+    business_name: nullableString(body.razon_social),
+    rut: nullableString(body.rut),
+    entity: nullableString(body.entidad),
+    management_status: nullableString(body.estado_gestion),
+    refund_amount: nullableNumber(body.monto_devolucion),
+    actual_paid_amount: nullableNumber(body.monto_pagado),
+    client_amount: nullableNumber(body.monto_cliente),
+    finanfix_amount: nullableNumber(body.monto_finanfix_solutions),
+    actual_client_amount: nullableNumber(body.monto_real_cliente),
+    actual_finanfix_amount: nullableNumber(body.monto_real_finanfix_solutions),
+    fee: nullableNumber(body.fee),
+    request_number: nullableString(body.numero_solicitud),
+    confirmation_cc: toBoolean(body.confirmacion_cc),
+    confirmation_power: toBoolean(body.confirmacion_poder),
+    bank_name: nullableString(body.banco),
+    account_type: nullableString(body.tipo_cuenta),
+    account_number: nullableString(body.numero_cuenta),
+    portal_access: nullableString(body.acceso_portal),
+    excess_type_reason: nullableString(body.motivo_tipo_exceso),
+    production_months: nullableString(body.mes_produccion_2026),
+    client_contract_status: nullableString(body.estado_contrato_cliente),
+    contract_end_date: nullableDate(body.fecha_termino_contrato),
+    rejection_date: nullableDate(body.fecha_rechazo),
+    rejection_reason: nullableString(body.motivo_rechazo),
+    afp_shipment: nullableString(body.envio_afp),
+    afp_entry_date: nullableDate(body.fecha_ingreso_afp),
+    afp_submission_date: nullableDate(body.fecha_presentacion_afp),
+    afp_payment_date: nullableDate(body.fecha_pago_afp),
+    finanfix_invoice_date: nullableDate(body.fecha_factura_finanfix),
+    finanfix_invoice_payment_date: nullableDate(body.fecha_pago_factura_finanfix),
+    client_notification_date: nullableDate(body.fecha_notificacion_cliente),
+    invoice_number: nullableString(body.numero_factura),
+    oc_number: nullableString(body.numero_oc),
+    cen_query: nullableString(body.consulta_cen),
+    cen_content: nullableString(body.contenido_cen),
+    cen_response: nullableString(body.respuesta_cen),
+    worker_status: nullableString(body.estado_trabajador),
+    comment: nullableString(body.comment),
+    updated_at: new Date(),
+    last_activity_at: new Date(),
+  };
+}
+
+async function updateLegacyRecord(id: string, body: any) {
+  for (const tableName of ["lm_records", "tp_records"] as const) {
+    const columns = await getExistingColumnsAny(tableName);
+    const conditions: string[] = [];
+    if (columns.has("id")) conditions.push(`id = $1`);
+    if (columns.has("management_id")) conditions.push(`management_id = $1`);
+    if (!conditions.length) continue;
+
+    const exists = await prisma.$queryRawUnsafe<any[]>(`select * from ${tableName} where ${conditions.join(" or ")} limit 1`, id);
+    if (!exists?.[0]) continue;
+
+    const candidateData = legacyPatchCandidates(body);
+    const entries = Object.entries(candidateData).filter(([column, value]) =>
+      columns.has(column) && hasOwn(candidateData, column) && value !== undefined
+    );
+
+    if (!entries.length) return legacyRowToRecord(exists[0], tableName === "tp_records" ? "TP" : "LM");
+
+    const setSql = entries.map(([column], index) => `"${column}" = $${index + 2}`).join(", ");
+    const values = entries.map(([, value]) => value);
+    const rows = await prisma.$queryRawUnsafe<any[]>(
+      `update ${tableName} set ${setSql} where ${conditions.join(" or ")} returning *`,
+      id,
+      ...values
+    );
+
+    await createLegacyEditActivity(id, Object.keys(body || {}));
+    return legacyRowToRecord(rows[0], tableName === "tp_records" ? "TP" : "LM");
+  }
+
+  return null;
+}
+
+async function createLegacyEditActivity(recordId: string, fields: string[]) {
+  try {
+    const columns = await getExistingColumnsAny("activities");
+    if (!columns.has("related_module") || !columns.has("related_record_id")) return;
+
+    const data: Record<string, unknown> = {
+      id: columns.has("id") ? randomUUID() : undefined,
+      related_module: "records",
+      related_record_id: recordId,
+      activity_type: "EDICIÓN",
+      status: "Completada",
+      description: fields.length
+        ? `Campos modificados en modo Zoho: ${fields.join(", ")}`
+        : "Registro actualizado en modo Zoho",
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+
+    const entries = Object.entries(data).filter(([column, value]) => columns.has(column) && value !== undefined);
+    const sqlColumns = entries.map(([column]) => `"${column}"`).join(", ");
+    const placeholders = entries.map((_, index) => `$${index + 1}`).join(", ");
+    await prisma.$executeRawUnsafe(
+      `insert into activities (${sqlColumns}) values (${placeholders})`,
+      ...entries.map(([, value]) => value)
+    );
+  } catch (error) {
+    console.warn("No se pudo crear actividad legacy de edición:", error);
+  }
+}
+
 async function resolveMandanteName(body: any) {
   const directName = nullableString(body.mandante_name) || nullableString(body.mandante);
   if (directName) return directName;
@@ -716,39 +827,59 @@ recordsRouter.post("/", async (req, res) => {
   }
 });
 
-recordsRouter.put("/:id", async (req, res, next) => {
+recordsRouter.put("/:id", async (req, res) => {
+  const id = String(req.params.id);
+  const body = cleanRecordBody(req.body);
+
   try {
-    const body = cleanRecordBody(req.body);
-    const previous = await prisma.management.findUnique({ where: { id: req.params.id } });
-    if (!previous) return res.status(404).json({ message: "Registro no encontrado" });
+    try {
+      const previous = await prisma.management.findUnique({ where: { id } });
 
-    const patch = managementPatchData(body);
-    const changedDescriptions = Object.entries(body || {})
-      .filter(([key]) => key in fieldParsers || ["mandante_id", "group_id", "company_id", "line_id", "line_afp_id"].includes(key))
-      .map(([key, newValue]) => `${key}: "${String((previous as any)[key] ?? "")}" → "${String(newValue ?? "")}"`);
+      if (previous) {
+        const patch = managementPatchData(body);
+        const changedDescriptions = Object.entries(body || {})
+          .filter(([key]) => key in fieldParsers || ["mandante_id", "group_id", "company_id", "line_id", "line_afp_id"].includes(key))
+          .map(([key, newValue]) => `${key}: "${String((previous as any)[key] ?? "")}" → "${String(newValue ?? "")}"`);
 
-    const row = await prisma.management.update({
-      where: { id: req.params.id },
-      data: patch as any,
-      include: recordInclude,
+        const row = await prisma.management.update({
+          where: { id },
+          data: patch as any,
+          include: recordInclude,
+        });
+
+        try {
+          await prisma.activity.create({
+            data: {
+              related_module: "records",
+              related_record_id: row.id,
+              management_id: row.id,
+              activity_type: "EDICIÓN",
+              status: "Completada",
+              description: changedDescriptions.length
+                ? `Campos modificados: ${changedDescriptions.join("; ")}`
+                : "Registro actualizado desde modo Zoho",
+            },
+          });
+        } catch (activityError) {
+          console.warn("Registro editado, pero no se pudo crear actividad:", activityError);
+        }
+
+        return res.json(row);
+      }
+    } catch (managementError: any) {
+      console.error("ERROR /api/records PUT usando managements. Se usará modo compatible:", managementError?.message || managementError);
+    }
+
+    const legacyRow = await updateLegacyRecord(id, body);
+    if (legacyRow) return res.json(legacyRow);
+
+    return res.status(404).json({ message: "Registro no encontrado" });
+  } catch (error: any) {
+    console.error("ERROR FINAL /api/records PUT:", error?.message || error);
+    return res.status(500).json({
+      message: "No se pudo actualizar el registro de empresa.",
+      detail: String(error?.message || error),
     });
-
-    await prisma.activity.create({
-      data: {
-        related_module: "records",
-        related_record_id: row.id,
-        management_id: row.id,
-        activity_type: "EDICIÓN",
-        status: "Completada",
-        description: changedDescriptions.length
-          ? `Campos modificados: ${changedDescriptions.join("; ")}`
-          : "Registro actualizado desde ficha de detalle",
-      },
-    });
-
-    res.json(row);
-  } catch (error) {
-    next(error);
   }
 });
 

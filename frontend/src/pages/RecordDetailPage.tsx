@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import ZohoModal from "../components/ZohoModal";
 import { fetchJson, postJson, publicBaseUrl, uploadForm } from "../api";
@@ -16,6 +16,19 @@ type EditState = {
   type: "text" | "number" | "date" | "select" | "textarea";
   options?: Array<{ label: string; value: string }>;
 };
+
+type BulkEditContextValue = {
+  enabled: boolean;
+  values: Record<string, string>;
+  setValue: (field: string, value: string) => void;
+};
+
+const BulkEditContext = createContext<BulkEditContextValue>({
+  enabled: false,
+  values: {},
+  setValue: () => {},
+});
+
 
 const documentCategories = [
   "Poder",
@@ -61,6 +74,55 @@ function boolString(value?: boolean | null) {
   return value ? "true" : "false";
 }
 
+function buildBulkForm(record: RecordItem) {
+  const companyName = record.razon_social || record.company?.razon_social || "";
+  return {
+    mandante_id: String(record.mandante_id || record.mandante?.id || ""),
+    estado_contrato_cliente: String(record.estado_contrato_cliente || ""),
+    fecha_termino_contrato: toDateInput(record.fecha_termino_contrato),
+    grupo_empresa: String(record.grupo_empresa || record.group?.name || ""),
+    razon_social: String(companyName || ""),
+    rut: String(record.rut || record.company?.rut || ""),
+    direccion: String(record.direccion || ""),
+    comment: String(record.comment || ""),
+    banco: String(record.banco || ""),
+    tipo_cuenta: String(record.tipo_cuenta || ""),
+    numero_cuenta: String(record.numero_cuenta || ""),
+    fecha_rechazo: toDateInput(record.fecha_rechazo),
+    motivo_rechazo: String(record.motivo_rechazo || ""),
+    mes_produccion_2026: String(record.mes_produccion_2026 || ""),
+    motivo_tipo_exceso: String(record.motivo_tipo_exceso || ""),
+    confirmacion_poder: boolString(record.confirmacion_poder),
+    estado_gestion: String(record.estado_gestion || ""),
+    consulta_cen: String(record.consulta_cen || ""),
+    mes_ingreso_solicitud: String(record.mes_ingreso_solicitud || ""),
+    envio_afp: String(record.envio_afp || ""),
+    confirmacion_cc: boolString(record.confirmacion_cc),
+    fecha_presentacion_afp: toDateInput(record.fecha_presentacion_afp),
+    respuesta_cen: String(record.respuesta_cen || ""),
+    numero_solicitud: String(record.numero_solicitud || ""),
+    entidad: String(record.entidad || record.lineAfp?.afp_name || ""),
+    acceso_portal: String(record.acceso_portal || ""),
+    fecha_ingreso_afp: toDateInput(record.fecha_ingreso_afp),
+    estado_trabajador: String(record.estado_trabajador || ""),
+    monto_devolucion: String(record.monto_devolucion ?? ""),
+    monto_cliente: String(record.monto_cliente ?? ""),
+    monto_finanfix_solutions: String(record.monto_finanfix_solutions ?? ""),
+    monto_pagado: String(record.monto_pagado ?? ""),
+    monto_real_cliente: String(record.monto_real_cliente ?? ""),
+    fee: String(record.fee ?? ""),
+    monto_real_finanfix_solutions: String(record.monto_real_finanfix_solutions ?? ""),
+    facturado_finanfix: String(record.facturado_finanfix || ""),
+    facturado_cliente: String(record.facturado_cliente || ""),
+    fecha_pago_afp: toDateInput(record.fecha_pago_afp),
+    fecha_factura_finanfix: toDateInput(record.fecha_factura_finanfix),
+    fecha_pago_factura_finanfix: toDateInput(record.fecha_pago_factura_finanfix),
+    fecha_notificacion_cliente: toDateInput(record.fecha_notificacion_cliente),
+    numero_factura: String(record.numero_factura || ""),
+    numero_oc: String(record.numero_oc || ""),
+  };
+}
+
 export default function RecordDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
@@ -71,6 +133,9 @@ export default function RecordDetailPage() {
   const [note, setNote] = useState("");
   const [edit, setEdit] = useState<EditState | null>(null);
   const [editSaving, setEditSaving] = useState(false);
+  const [bulkEdit, setBulkEdit] = useState(false);
+  const [bulkForm, setBulkForm] = useState<Record<string, string>>({});
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadCategory, setUploadCategory] = useState("Poder");
@@ -143,6 +208,40 @@ export default function RecordDetailPage() {
     }
   }
 
+
+
+  function startBulkEdit() {
+    if (!record) return;
+    setBulkForm(buildBulkForm(record));
+    setBulkEdit(true);
+  }
+
+  function cancelBulkEdit() {
+    setBulkEdit(false);
+    setBulkForm({});
+  }
+
+  function setBulkField(field: string, value: string) {
+    setBulkForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function saveBulkEdit() {
+    setBulkSaving(true);
+    try {
+      await fetchJson(`/records/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(bulkForm),
+      });
+      setBulkEdit(false);
+      await loadRecord();
+    } catch (error) {
+      console.error(error);
+      alert("No se pudieron guardar los cambios del registro.");
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
   async function uploadDocument() {
     if (!uploadFile) {
       alert("Selecciona un archivo.");
@@ -196,9 +295,9 @@ export default function RecordDetailPage() {
           <button className="zoho-btn zoho-btn-primary">Enviar correo electrónico</button>
           <button
             className="zoho-btn"
-            onClick={() => openEdit("razon_social", "Razón Social", companyName)}
+            onClick={startBulkEdit}
           >
-            Editar
+            {bulkEdit ? "Editando" : "Editar"}
           </button>
           <button className="zoho-btn">...</button>
           <button className="zoho-btn">‹</button>
@@ -210,6 +309,17 @@ export default function RecordDetailPage() {
           <div><span>Motivo (Tipo de exceso):</span> <strong>{motive}</strong></div>
         </div>
       </div>
+
+      {bulkEdit && (
+        <div className="record-bulk-edit-bar">
+          <strong>Modo edición masiva activo</strong>
+          <span>Modifica los campos de las secciones inferiores y guarda todo junto.</span>
+          <button className="zoho-btn" onClick={cancelBulkEdit} disabled={bulkSaving}>Cancelar</button>
+          <button className="zoho-btn zoho-btn-primary" onClick={saveBulkEdit} disabled={bulkSaving}>
+            {bulkSaving ? "Guardando..." : "Guardar cambios"}
+          </button>
+        </div>
+      )}
 
       <div className="record-tabs">
         {[
@@ -279,6 +389,7 @@ export default function RecordDetailPage() {
         )}
       </div>
 
+      <BulkEditContext.Provider value={{ enabled: bulkEdit, values: bulkForm, setValue: setBulkField }}>
       <div className="record-sections-grid">
         <DetailSection title="DATOS EMPRESA">
           <EditableInfo
@@ -357,6 +468,7 @@ export default function RecordDetailPage() {
           <DocSlot label="OC" docs={documentsByCategory["orden compra"] || documentsByCategory["oc"]} onAttach={() => { setUploadCategory("OC"); setUploadOpen(true); }} />
         </DetailSection>
       </div>
+      </BulkEditContext.Provider>
 
       <ZohoModal title={`Editar ${edit?.label || ""}`} isOpen={Boolean(edit)} onClose={() => setEdit(null)}>
         {edit && (
@@ -429,6 +541,29 @@ function EditableInfo({
   options?: EditState["options"];
   onEdit: (field: string, label: string, current: unknown, type?: EditState["type"], options?: EditState["options"]) => void;
 }) {
+  const bulk = useContext(BulkEditContext);
+  const bulkValue = bulk.values[field] ?? String(value ?? "");
+
+  if (bulk.enabled) {
+    return (
+      <div className="record-info-field record-info-field-form">
+        <span>{label}</span>
+        {type === "select" ? (
+          <select className="zoho-select" value={bulkValue} onChange={(event) => bulk.setValue(field, event.target.value)}>
+            <option value="">Seleccionar</option>
+            {(options || []).map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        ) : type === "textarea" ? (
+          <textarea className="zoho-input zoho-textarea" value={bulkValue} onChange={(event) => bulk.setValue(field, event.target.value)} />
+        ) : (
+          <input className="zoho-input" type={type} value={bulkValue} onChange={(event) => bulk.setValue(field, event.target.value)} />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="record-info-field editable" onClick={() => onEdit(field, label, value ?? "", type, options)}>
       <span>{label} <button type="button" className="record-pencil" title="Editar">✎</button></span>

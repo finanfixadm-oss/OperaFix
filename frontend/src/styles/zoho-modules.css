@@ -959,3 +959,40 @@
     grid-template-columns: 1fr;
   }
 }
+
+.record-bulk-edit-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: #fff8e6;
+  border: 1px solid #f5c86b;
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: #513c00;
+}
+
+.record-bulk-edit-bar span {
+  color: #6f5b1d;
+  flex: 1;
+  min-width: 240px;
+}
+
+.record-info-field-form {
+  background: #f8fbff;
+  border: 1px solid #d7e7fb;
+  border-radius: 8px;
+}
+
+.record-info-field-form .zoho-input,
+.record-info-field-form .zoho-select,
+.record-info-field-form .zoho-textarea {
+  min-height: 34px;
+  font-size: 13px;
+}
+
+.record-info-field-form .zoho-textarea {
+  height: 82px;
+  padding-top: 8px;
+  resize: vertical;
+}
