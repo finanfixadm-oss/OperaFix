@@ -28,6 +28,15 @@ type EmailDraft = {
   documents: DocumentItem[];
 };
 
+
+type EmailTemplateKey = "ingreso_gestion" | "comprobante_detalle" | "informe_gestion" | "libre";
+
+type EmailTemplateOption = {
+  key: EmailTemplateKey;
+  label: string;
+  description: string;
+};
+
 type BulkEditContextValue = {
   enabled: boolean;
   values: Record<string, string>;
@@ -40,6 +49,102 @@ const BulkEditContext = createContext<BulkEditContextValue>({
   setValue: () => {},
 });
 
+
+
+const emailTemplateOptions: EmailTemplateOption[] = [
+  { key: "ingreso_gestion", label: "Comprobante ingreso gestión", description: "Aviso de solicitud ingresada ante AFP/Entidad." },
+  { key: "comprobante_detalle", label: "Envío comprobante y detalle", description: "Envío de comprobante, detalle de pago, archivo AFP y carta explicativa." },
+  { key: "informe_gestion", label: "Informe mensual de gestión", description: "Resumen mensual de estados: gestionado, pagado y pendiente." },
+  { key: "libre", label: "Correo libre", description: "No aplica plantilla; permite escribir manualmente." },
+];
+
+function normalizeTemplateStatus(value?: string | null) {
+  return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function suggestedTemplateForRecord(record: RecordItem): EmailTemplateKey {
+  const status = normalizeTemplateStatus(record.estado_gestion || record.envio_afp);
+  if (status.includes("pag") || status.includes("comprobante")) return "comprobante_detalle";
+  if (status.includes("envi") || status.includes("ingres")) return "ingreso_gestion";
+  if (status.includes("informe") || status.includes("gestionado") || status.includes("pendiente")) return "informe_gestion";
+  return "ingreso_gestion";
+}
+
+function recordTemplateValues(record: RecordItem) {
+  const mandante = record.mandante?.name || "Mandante";
+  const razonSocial = record.razon_social || record.company?.razon_social || "Razón social";
+  const rut = record.rut || record.company?.rut || "RUT";
+  const entidad = record.entidad || record.lineAfp?.afp_name || "Entidad";
+  const tipo = record.motivo_tipo_exceso || record.management_type || "gestión";
+  const numeroSolicitud = record.numero_solicitud || "N° solicitud";
+  const mes = record.mes_produccion_2026 || "MES AÑO";
+  const monto = formatMoney(record.monto_devolucion);
+  return { mandante, razonSocial, rut, entidad, tipo, numeroSolicitud, mes, monto };
+}
+
+function buildTemplateSubject(record: RecordItem, templateKey: EmailTemplateKey) {
+  const v = recordTemplateValues(record);
+  if (templateKey === "ingreso_gestion") return `Comprobante ingreso solicitud ${v.tipo} - ${v.razonSocial} - ${v.rut}`;
+  if (templateKey === "comprobante_detalle") return `Envío comprobante y detalle de pago - ${v.razonSocial} - ${v.rut}`;
+  if (templateKey === "informe_gestion") return `Informe de gestión ${v.mes} - ${v.mandante}`;
+  return `Gestión ${v.tipo} - ${v.razonSocial} - ${v.rut}`;
+}
+
+function buildTemplateBody(record: RecordItem, templateKey: EmailTemplateKey) {
+  const v = recordTemplateValues(record);
+  if (templateKey === "ingreso_gestion") {
+    return `Hola ${v.mandante},
+
+Te informamos que la solicitud correspondiente a ${v.tipo} del caso ${v.razonSocial}, RUT ${v.rut}, ya fue ingresada en ${v.entidad} y actualmente se encuentra en estado Gestionado.
+
+Nos encontramos a la espera de la respuesta del ingreso de la solicitud por parte de la entidad. Apenas contemos con nueva información, se las haremos llegar.
+
+Quedamos atentos a cualquier consulta,
+
+Saludos cordiales,
+Finanfix Solutions SpA`;
+  }
+  if (templateKey === "comprobante_detalle") {
+    return `Hola ${v.mandante},
+
+Te informamos que ${v.entidad} nos ha enviado el comprobante y el detalle de pago. El depósito fue realizado con fecha correspondiente al número de solicitud asociado al caso indicado a continuación:
+
+Razón Social: ${v.razonSocial}
+RUT: ${v.rut}
+Monto: ${v.monto}
+N° Solicitud: ${v.numeroSolicitud}
+
+Adjuntamos comprobante de pago, detalle de pago, archivo de envío y carta explicativa para su revisión.
+
+Agradecería confirmar la recepción de este mensaje.
+
+Quedamos atentos ante cualquier duda o consulta adicional.
+
+Saludos cordiales,
+Finanfix Solutions SpA`;
+  }
+  if (templateKey === "informe_gestion") {
+    return `Hola ${v.mandante},
+
+Les comparto informe correspondiente al período de: ${v.mes}.
+
+En el archivo Excel adjunto podrán revisar el detalle de cada caso, donde se indican los siguientes estados:
+
+• Gestionado: solicitudes ingresadas y en proceso ante la administradora.
+
+• Pagado: gestiones que ya cuentan con devolución realizada.
+
+• Pendiente: casos que no han podido ser gestionados por falta de Cuenta Corriente (CC) y/o Poder vigente.
+
+Este archivo permite tener una visión completa de lo ya recuperado y de lo que aún se encuentra detenido por falta de antecedentes.
+
+Quedamos atentos a cualquier consulta,
+
+Saludos cordiales,
+Finanfix Solutions SpA`;
+  }
+  return "";
+}
 
 const documentCategories = [
   "Poder",
@@ -79,6 +184,24 @@ function toDateInput(value?: string | null) {
 
 function normalizedCategory(category?: string | null) {
   return String(category || "").replace(/_/g, " ").toLowerCase();
+}
+
+
+function getDocumentsForCategory(documentsByCategory: Record<string, DocumentItem[]>, category: string) {
+  const key = normalizedCategory(category);
+  const aliases: Record<string, string[]> = {
+    "poder": ["poder"],
+    "carta explicativa": ["carta explicativa"],
+    "archivo afp": ["archivo afp", "archivo gestion", "archivo gestión"],
+    "detalle de pago": ["detalle de pago", "detalle trabajadores"],
+    "comprobante pago": ["comprobante pago", "comprobante de pago"],
+    "comprobante rechazo": ["comprobante rechazo", "otro"],
+    "archivo respuesta cen": ["archivo respuesta cen", "respuesta cen"],
+    "factura": ["factura"],
+    "oc": ["oc", "orden compra", "orden de compra"],
+  };
+  const keys = aliases[key] || [key];
+  return keys.flatMap((item) => documentsByCategory[item] || []);
 }
 
 function boolString(value?: boolean | null) {
@@ -155,6 +278,7 @@ export default function RecordDetailPage() {
 
   const [emailOpen, setEmailOpen] = useState(false);
   const [emailDraft, setEmailDraft] = useState<EmailDraft | null>(null);
+  const [selectedEmailTemplate, setSelectedEmailTemplate] = useState<EmailTemplateKey>("ingreso_gestion");
   const [selectedEmailDocs, setSelectedEmailDocs] = useState<Record<string, boolean>>({});
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
@@ -288,7 +412,13 @@ export default function RecordDetailPage() {
     setEmailLoading(true);
     try {
       const draft = await fetchJson<EmailDraft>(`/records/${id}/email/compose`);
-      setEmailDraft(draft);
+      const templateKey = record ? suggestedTemplateForRecord(record) : "ingreso_gestion";
+      setSelectedEmailTemplate(templateKey);
+      setEmailDraft({
+        ...draft,
+        subject: record ? buildTemplateSubject(record, templateKey) : draft.subject,
+        body: record ? buildTemplateBody(record, templateKey) : draft.body,
+      });
       const initialSelection: Record<string, boolean> = {};
       for (const doc of draft.documents || []) {
         initialSelection[doc.id] = true;
@@ -305,6 +435,16 @@ export default function RecordDetailPage() {
 
   function setEmailField(field: keyof EmailDraft, value: string) {
     setEmailDraft((prev) => prev ? { ...prev, [field]: value } : prev);
+  }
+
+  function applyEmailTemplate(templateKey: EmailTemplateKey) {
+    setSelectedEmailTemplate(templateKey);
+    if (templateKey === "libre" || !record) return;
+    setEmailDraft((prev) => prev ? {
+      ...prev,
+      subject: buildTemplateSubject(record, templateKey),
+      body: buildTemplateBody(record, templateKey),
+    } : prev);
   }
 
   function toggleEmailDocument(documentId: string) {
@@ -505,7 +645,7 @@ export default function RecordDetailPage() {
           <EditableInfo label="RUT" value={record.rut || record.company?.rut} field="rut" onEdit={openEdit} />
           <EditableInfo label="Dirección" value={record.direccion} field="direccion" onEdit={openEdit} />
           <EditableInfo label="Comentario" value={record.comment} field="comment" type="textarea" onEdit={openEdit} />
-          <DocSlot label="Poder" docs={documentsByCategory["poder"]} onAttach={() => { setUploadCategory("Poder"); setUploadOpen(true); }} />
+          <DocSlot label="Poder" docs={getDocumentsForCategory(documentsByCategory, "Poder")} onAttach={() => { setUploadCategory("Poder"); setUploadOpen(true); }} />
         </DetailSection>
 
         <DetailSection title="DATOS BANCARIOS">
@@ -516,7 +656,7 @@ export default function RecordDetailPage() {
 
         <DetailSection title="ANTECEDENTES RECHAZO">
           <EditableInfo label="Fecha Rechazo" value={toDateInput(record.fecha_rechazo)} displayValue={formatDate(record.fecha_rechazo)} field="fecha_rechazo" type="date" onEdit={openEdit} />
-          <DocSlot label="Comprobante rechazo" docs={documentsByCategory["comprobante rechazo"]} onAttach={() => { setUploadCategory("Comprobante rechazo"); setUploadOpen(true); }} />
+          <DocSlot label="Comprobante rechazo" docs={getDocumentsForCategory(documentsByCategory, "Comprobante rechazo")} onAttach={() => { setUploadCategory("Comprobante rechazo"); setUploadOpen(true); }} />
           <EditableInfo label="Motivo del rechazo/anulación" value={record.motivo_rechazo} field="motivo_rechazo" onEdit={openEdit} />
         </DetailSection>
 
@@ -561,8 +701,8 @@ export default function RecordDetailPage() {
           <EditableInfo label="Fecha notificación cliente" value={toDateInput(record.fecha_notificacion_cliente)} displayValue={formatDate(record.fecha_notificacion_cliente)} field="fecha_notificacion_cliente" type="date" onEdit={openEdit} />
           <EditableInfo label="N° Factura" value={record.numero_factura} field="numero_factura" onEdit={openEdit} />
           <EditableInfo label="N° OC" value={record.numero_oc} field="numero_oc" onEdit={openEdit} />
-          <DocSlot label="Factura" docs={documentsByCategory["factura"]} onAttach={() => { setUploadCategory("Factura"); setUploadOpen(true); }} />
-          <DocSlot label="OC" docs={documentsByCategory["orden compra"] || documentsByCategory["oc"]} onAttach={() => { setUploadCategory("OC"); setUploadOpen(true); }} />
+          <DocSlot label="Factura" docs={getDocumentsForCategory(documentsByCategory, "Factura")} onAttach={() => { setUploadCategory("Factura"); setUploadOpen(true); }} />
+          <DocSlot label="OC" docs={getDocumentsForCategory(documentsByCategory, "OC")} onAttach={() => { setUploadCategory("OC"); setUploadOpen(true); }} />
         </DetailSection>
       </div>
       </BulkEditContext.Provider>
@@ -600,6 +740,15 @@ export default function RecordDetailPage() {
           <>
             {emailDraft.warning && <div className="record-email-warning">{emailDraft.warning}</div>}
             <div className="zoho-form-grid">
+              <div className="zoho-form-field zoho-form-field-wide">
+                <label>Plantilla según estado de gestión</label>
+                <select className="zoho-select" value={selectedEmailTemplate} onChange={(event) => applyEmailTemplate(event.target.value as EmailTemplateKey)}>
+                  {emailTemplateOptions.map((template) => (
+                    <option key={template.key} value={template.key}>{template.label}</option>
+                  ))}
+                </select>
+                <small className="record-template-help">{emailTemplateOptions.find((item) => item.key === selectedEmailTemplate)?.description}</small>
+              </div>
               <div className="zoho-form-field">
                 <label>Para</label>
                 <input className="zoho-input" value={emailDraft.to} onChange={(event) => setEmailField("to", event.target.value)} placeholder="correo@entidad.cl" />
@@ -740,7 +889,7 @@ function DocumentMatrix({ documentsByCategory, onAttach }: { documentsByCategory
   return (
     <div className="record-doc-matrix">
       {documentCategories.map((category) => {
-        const docs = documentsByCategory[category.toLowerCase()] || documentsByCategory[normalizedCategory(category)] || [];
+        const docs = getDocumentsForCategory(documentsByCategory, category);
         return (
           <div className="record-doc-slot" key={category}>
             <div className="record-doc-title"><strong>{category}</strong><button className="zoho-small-btn" onClick={() => onAttach(category)}>Adjuntar</button></div>

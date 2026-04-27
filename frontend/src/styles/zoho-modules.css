@@ -1076,3 +1076,10 @@
   padding: 3px 7px;
   border-radius: 999px;
 }
+
+.record-template-help {
+  display: block;
+  margin-top: 6px;
+  color: #475569;
+  font-size: 12px;
+}

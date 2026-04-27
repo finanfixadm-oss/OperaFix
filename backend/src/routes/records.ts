@@ -512,6 +512,56 @@ async function getRecordDocumentsForEmail(recordId: string) {
   }
 }
 
+async function getRecordActivitiesCompatible(recordId: string) {
+  try {
+    return await prisma.activity.findMany({
+      where: {
+        OR: [
+          { related_module: "records", related_record_id: recordId },
+          { management_id: recordId },
+        ],
+      },
+      orderBy: { created_at: "desc" },
+    });
+  } catch (error) {
+    console.warn("No se pudieron cargar actividades compatibles:", error);
+    return [] as any[];
+  }
+}
+
+async function getRecordNotesCompatible(recordId: string) {
+  try {
+    return await prisma.note.findMany({
+      where: {
+        OR: [
+          { related_module: "records", related_record_id: recordId },
+          { management_id: recordId },
+        ],
+      },
+      orderBy: { created_at: "desc" },
+    });
+  } catch (error) {
+    console.warn("No se pudieron cargar notas compatibles:", error);
+    return [] as any[];
+  }
+}
+
+async function enrichRecordWithCompatibleChildren(record: any) {
+  if (!record?.id) return record;
+  const [documents, activities, notes] = await Promise.all([
+    getRecordDocumentsForEmail(record.id),
+    getRecordActivitiesCompatible(record.id),
+    getRecordNotesCompatible(record.id),
+  ]);
+
+  return {
+    ...record,
+    documents: documents.length ? documents : (record.documents || []),
+    activities: activities.length ? activities : (record.activities || []),
+    notes: notes.length ? notes : (record.notes || []),
+  };
+}
+
 async function getRecordForEmail(recordId: string) {
   try {
     const row = await prisma.management.findUnique({
@@ -1071,13 +1121,13 @@ recordsRouter.get("/:id", async (req, res) => {
         where: { id },
         include: recordInclude,
       });
-      if (row) return res.json(row);
+      if (row) return res.json(await enrichRecordWithCompatibleChildren(row));
     } catch (managementError: any) {
       console.error("ERROR /api/records/:id usando managements. Se buscará modo compatible:", managementError?.message || managementError);
     }
 
     const legacyRow = await findLegacyRecordById(id);
-    if (legacyRow) return res.json(legacyRow);
+    if (legacyRow) return res.json(await enrichRecordWithCompatibleChildren(legacyRow));
 
     return res.status(404).json({ message: "Registro no encontrado" });
   } catch (error: any) {
