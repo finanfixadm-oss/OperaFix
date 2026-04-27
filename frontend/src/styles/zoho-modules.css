@@ -996,3 +996,83 @@
   padding-top: 8px;
   resize: vertical;
 }
+
+/* v16 - Envío de correo de gestión con checklist de adjuntos */
+.record-mail-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.record-email-warning {
+  padding: 10px 12px;
+  border: 1px solid #f4c56b;
+  border-radius: 10px;
+  background: #fff8e6;
+  color: #7a4b00;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.zoho-form-field-wide {
+  grid-column: 1 / -1;
+}
+
+.record-email-body {
+  min-height: 190px;
+  resize: vertical;
+  white-space: pre-wrap;
+}
+
+.record-email-attachments {
+  margin-top: 14px;
+  border: 1px solid #d9e2f2;
+  border-radius: 12px;
+  padding: 12px;
+  background: #f8fbff;
+}
+
+.record-email-attachments-title {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 10px;
+}
+
+.record-email-attachments-title strong {
+  color: #001b44;
+}
+
+.record-email-attachments-title span {
+  color: #5c6b82;
+  font-size: 12px;
+}
+
+.record-email-doc-check {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 8px;
+  border-bottom: 1px solid #e4ebf5;
+  cursor: pointer;
+}
+
+.record-email-doc-check:last-child {
+  border-bottom: none;
+}
+
+.record-email-doc-check span {
+  font-weight: 600;
+  color: #001b44;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-email-doc-check small {
+  color: #6b7a90;
+  font-size: 11px;
+  background: #eef4ff;
+  padding: 3px 7px;
+  border-radius: 999px;
+}

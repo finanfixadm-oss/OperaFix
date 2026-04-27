@@ -17,6 +17,17 @@ type EditState = {
   options?: Array<{ label: string; value: string }>;
 };
 
+type EmailDraft = {
+  to: string;
+  cc?: string;
+  bcc?: string;
+  subject: string;
+  body: string;
+  entity?: string;
+  warning?: string | null;
+  documents: DocumentItem[];
+};
+
 type BulkEditContextValue = {
   enabled: boolean;
   values: Record<string, string>;
@@ -142,6 +153,12 @@ export default function RecordDetailPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadSaving, setUploadSaving] = useState(false);
 
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailDraft, setEmailDraft] = useState<EmailDraft | null>(null);
+  const [selectedEmailDocs, setSelectedEmailDocs] = useState<Record<string, boolean>>({});
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+
   async function loadRecord() {
     const data = await fetchJson<RecordItem>(`/records/${id}`);
     setRecord(data);
@@ -266,6 +283,71 @@ export default function RecordDetailPage() {
     }
   }
 
+
+  async function openEmailComposer() {
+    setEmailLoading(true);
+    try {
+      const draft = await fetchJson<EmailDraft>(`/records/${id}/email/compose`);
+      setEmailDraft(draft);
+      const initialSelection: Record<string, boolean> = {};
+      for (const doc of draft.documents || []) {
+        initialSelection[doc.id] = true;
+      }
+      setSelectedEmailDocs(initialSelection);
+      setEmailOpen(true);
+    } catch (error) {
+      console.error(error);
+      alert("No se pudo preparar el correo de la gestión.");
+    } finally {
+      setEmailLoading(false);
+    }
+  }
+
+  function setEmailField(field: keyof EmailDraft, value: string) {
+    setEmailDraft((prev) => prev ? { ...prev, [field]: value } : prev);
+  }
+
+  function toggleEmailDocument(documentId: string) {
+    setSelectedEmailDocs((prev) => ({ ...prev, [documentId]: !prev[documentId] }));
+  }
+
+  async function sendRecordEmail() {
+    if (!emailDraft) return;
+    if (!emailDraft.to.trim()) {
+      alert("Debes indicar el correo destino.");
+      return;
+    }
+
+    const documentIds = Object.entries(selectedEmailDocs)
+      .filter(([, selected]) => selected)
+      .map(([documentId]) => documentId);
+
+    setEmailSending(true);
+    try {
+      const result = await postJson<{ ok: boolean; status: string; detail: string }>(`/records/${id}/email/send`, {
+        to: emailDraft.to,
+        cc: emailDraft.cc || "",
+        bcc: emailDraft.bcc || "",
+        subject: emailDraft.subject,
+        body: emailDraft.body,
+        document_ids: documentIds,
+      });
+
+      setEmailOpen(false);
+      await loadRecord();
+      if (result.ok) {
+        alert("Correo enviado y trazabilidad registrada.");
+      } else {
+        alert(result.detail || "El correo quedó registrado, pero falta configurar el envío real.");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("No se pudo enviar el correo.");
+    } finally {
+      setEmailSending(false);
+    }
+  }
+
   const documentsByCategory = useMemo(() => {
     const map: Record<string, DocumentItem[]> = {};
     for (const doc of record?.documents || []) {
@@ -292,7 +374,9 @@ export default function RecordDetailPage() {
         </div>
 
         <div className="record-header-actions">
-          <button className="zoho-btn zoho-btn-primary">Enviar correo electrónico</button>
+          <button className="zoho-btn zoho-btn-primary" onClick={openEmailComposer} disabled={emailLoading}>
+            {emailLoading ? "Preparando correo..." : "Enviar correo electrónico"}
+          </button>
           <button
             className="zoho-btn"
             onClick={startBulkEdit}
@@ -361,10 +445,23 @@ export default function RecordDetailPage() {
         )}
 
         {tab === "correos" && (
-          <div className="record-mail-folders">
-            <span>Enviados</span>
-            <span>Programados</span>
-            <span>Borradores</span>
+          <div className="record-mail-panel">
+            <div className="record-mail-folders">
+              <span>Enviados</span>
+              <span>Programados</span>
+              <span>Borradores</span>
+            </div>
+            {(record.activities || []).filter((item) => item.activity_type === "CORREO").length === 0 ? (
+              <div className="zoho-empty">Sin correos enviados o registrados.</div>
+            ) : (
+              (record.activities || [])
+                .filter((item) => item.activity_type === "CORREO")
+                .map((item) => (
+                  <div className="record-timeline-item" key={item.id}>
+                    <strong>{item.status || "CORREO"}</strong>: {item.description || "—"}
+                  </div>
+                ))
+            )}
           </div>
         )}
 
@@ -492,6 +589,61 @@ export default function RecordDetailPage() {
               <button className="zoho-btn" onClick={() => setEdit(null)}>Cancelar</button>
               <button className="zoho-btn zoho-btn-primary" onClick={saveInlineEdit} disabled={editSaving}>
                 {editSaving ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          </>
+        )}
+      </ZohoModal>
+
+      <ZohoModal title="Enviar correo electrónico" isOpen={emailOpen} onClose={() => setEmailOpen(false)}>
+        {emailDraft && (
+          <>
+            {emailDraft.warning && <div className="record-email-warning">{emailDraft.warning}</div>}
+            <div className="zoho-form-grid">
+              <div className="zoho-form-field">
+                <label>Para</label>
+                <input className="zoho-input" value={emailDraft.to} onChange={(event) => setEmailField("to", event.target.value)} placeholder="correo@entidad.cl" />
+              </div>
+              <div className="zoho-form-field">
+                <label>CC</label>
+                <input className="zoho-input" value={emailDraft.cc || ""} onChange={(event) => setEmailField("cc", event.target.value)} />
+              </div>
+              <div className="zoho-form-field">
+                <label>CCO</label>
+                <input className="zoho-input" value={emailDraft.bcc || ""} onChange={(event) => setEmailField("bcc", event.target.value)} />
+              </div>
+              <div className="zoho-form-field zoho-form-field-wide">
+                <label>Asunto</label>
+                <input className="zoho-input" value={emailDraft.subject} onChange={(event) => setEmailField("subject", event.target.value)} />
+              </div>
+              <div className="zoho-form-field zoho-form-field-wide">
+                <label>Mensaje</label>
+                <textarea className="zoho-input zoho-textarea record-email-body" value={emailDraft.body} onChange={(event) => setEmailField("body", event.target.value)} />
+              </div>
+            </div>
+
+            <div className="record-email-attachments">
+              <div className="record-email-attachments-title">
+                <strong>Archivos de la gestión</strong>
+                <span>Selecciona con checklist los archivos que quieres adjuntar.</span>
+              </div>
+              {(emailDraft.documents || []).length === 0 ? (
+                <div className="zoho-empty">Esta gestión no tiene archivos cargados.</div>
+              ) : (
+                (emailDraft.documents || []).map((doc) => (
+                  <label className="record-email-doc-check" key={doc.id}>
+                    <input type="checkbox" checked={Boolean(selectedEmailDocs[doc.id])} onChange={() => toggleEmailDocument(doc.id)} />
+                    <span>{doc.file_name || doc.category}</span>
+                    <small>{doc.category}</small>
+                  </label>
+                ))
+              )}
+            </div>
+
+            <div className="zoho-form-actions">
+              <button className="zoho-btn" onClick={() => setEmailOpen(false)} disabled={emailSending}>Cancelar</button>
+              <button className="zoho-btn zoho-btn-primary" onClick={sendRecordEmail} disabled={emailSending}>
+                {emailSending ? "Enviando..." : "Enviar y registrar trazabilidad"}
               </button>
             </div>
           </>

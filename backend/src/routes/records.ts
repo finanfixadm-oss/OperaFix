@@ -439,6 +439,172 @@ async function resolveMandanteName(body: any) {
   return "Sin mandante";
 }
 
+function normalizeEntityName(value: unknown) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+function parseEntityEmailsEnv() {
+  try {
+    const raw = process.env.ENTITY_EMAILS_JSON || process.env.AFP_EMAILS_JSON || "";
+    if (!raw) return {} as Record<string, string>;
+    const parsed = JSON.parse(raw);
+    const result: Record<string, string> = {};
+    for (const [key, value] of Object.entries(parsed || {})) {
+      if (value) result[normalizeEntityName(key)] = String(value);
+    }
+    return result;
+  } catch (error) {
+    console.warn("No se pudo leer ENTITY_EMAILS_JSON:", error);
+    return {} as Record<string, string>;
+  }
+}
+
+const defaultEntityEmails: Record<string, string> = {
+  "capital": "",
+  "afp capital": "",
+  "modelo": "",
+  "afp modelo": "",
+  "provida": "",
+  "afp provida": "",
+  "cuprum": "",
+  "afp cuprum": "",
+  "habitat": "",
+  "afp habitat": "",
+  "uno": "",
+  "afp uno": "",
+  "planvital": "",
+  "afp planvital": "",
+};
+
+function resolveEntityEmail(entity: unknown) {
+  const key = normalizeEntityName(entity);
+  const configured = parseEntityEmailsEnv();
+  return configured[key] || defaultEntityEmails[key] || "";
+}
+
+function emailDocumentUrl(fileUrl: unknown) {
+  const raw = nullableString(fileUrl) || "";
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const base = (process.env.PUBLIC_BASE_URL || process.env.APP_PUBLIC_URL || "").replace(/\/$/, "");
+  return base ? `${base}${raw.startsWith("/") ? raw : `/${raw}`}` : raw;
+}
+
+async function getRecordDocumentsForEmail(recordId: string) {
+  try {
+    return await prisma.document.findMany({
+      where: {
+        OR: [
+          { related_module: "records", related_record_id: recordId },
+          { management_id: recordId },
+        ],
+      },
+      orderBy: { created_at: "desc" },
+    });
+  } catch (error) {
+    console.warn("No se pudieron cargar documentos para correo:", error);
+    return [] as any[];
+  }
+}
+
+async function getRecordForEmail(recordId: string) {
+  try {
+    const row = await prisma.management.findUnique({
+      where: { id: recordId },
+      include: { mandante: true, company: true, lineAfp: true },
+    });
+    if (row) return row as any;
+  } catch (error) {
+    console.warn("No se pudo buscar management para correo:", error);
+  }
+  return await findLegacyRecordById(recordId);
+}
+
+function buildEmailSubject(record: any) {
+  const entidad = record?.entidad || record?.lineAfp?.afp_name || "Entidad";
+  const razonSocial = record?.razon_social || record?.company?.razon_social || "Empresa";
+  const rut = record?.rut || record?.company?.rut || "Sin RUT";
+  const tipo = record?.motivo_tipo_exceso || record?.management_type || "gestión";
+  return `Solicitud ${tipo} - ${razonSocial} - ${rut} - ${entidad}`;
+}
+
+function buildEmailBody(record: any, docs: any[]) {
+  const razonSocial = record?.razon_social || record?.company?.razon_social || "";
+  const rut = record?.rut || record?.company?.rut || "";
+  const entidad = record?.entidad || record?.lineAfp?.afp_name || "";
+  const solicitud = record?.numero_solicitud || "";
+  const tipo = record?.motivo_tipo_exceso || record?.management_type || "gestión";
+  const fileList = docs.length ? docs.map((doc) => `- ${doc.file_name || doc.category}`).join("\n") : "- Sin adjuntos seleccionados";
+  return `Estimados,\n\nJunto con saludar, enviamos antecedentes asociados a la gestión indicada.\n\nRazón social: ${razonSocial}\nRUT: ${rut}\nEntidad: ${entidad}\nTipo de gestión: ${tipo}\nN° Solicitud: ${solicitud || "Sin información"}\n\nArchivos adjuntos seleccionados:\n${fileList}\n\nQuedamos atentos a sus comentarios.\n\nSaludos,\nFinanfix Solutions SpA`;
+}
+
+async function trySendEmailWebhook(payload: Record<string, unknown>) {
+  const webhookUrl = process.env.EMAIL_WEBHOOK_URL || process.env.MAIL_WEBHOOK_URL || "";
+  if (!webhookUrl) {
+    return {
+      sent: false,
+      status: "PENDIENTE_CONFIGURACION",
+      detail: "No existe EMAIL_WEBHOOK_URL configurado. Se registró la trazabilidad, pero no se ejecutó envío real.",
+    };
+  }
+
+  const response = await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    return { sent: false, status: "ERROR_ENVIO", detail: text || `Webhook respondió HTTP ${response.status}` };
+  }
+
+  return { sent: true, status: "ENVIADO", detail: "Correo enviado mediante EMAIL_WEBHOOK_URL." };
+}
+
+async function createEmailTrace(recordId: string, status: string, description: string) {
+  try {
+    await prisma.activity.create({
+      data: {
+        related_module: "records",
+        related_record_id: recordId,
+        management_id: recordId,
+        activity_type: "CORREO",
+        status,
+        description,
+      },
+    });
+  } catch (error) {
+    console.warn("No se pudo registrar trazabilidad de correo:", error);
+    try {
+      const columns = await getExistingColumnsAny("activities");
+      if (!columns.has("related_module") || !columns.has("related_record_id")) return;
+      const data: Record<string, unknown> = {
+        id: columns.has("id") ? randomUUID() : undefined,
+        related_module: "records",
+        related_record_id: recordId,
+        management_id: columns.has("management_id") ? recordId : undefined,
+        activity_type: "CORREO",
+        status,
+        description,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+      const entries = Object.entries(data).filter(([column, value]) => columns.has(column) && value !== undefined);
+      const sqlColumns = entries.map(([column]) => `"${column}"`).join(", ");
+      const placeholders = entries.map((_, index) => `$${index + 1}`).join(", ");
+      await prisma.$executeRawUnsafe(`insert into activities (${sqlColumns}) values (${placeholders})`, ...entries.map(([, value]) => value));
+    } catch (legacyError) {
+      console.warn("No se pudo registrar trazabilidad legacy de correo:", legacyError);
+    }
+  }
+}
+
 async function insertDynamic(tableName: "lm_records" | "tp_records", candidateData: Record<string, unknown>) {
   const existingColumns = await getExistingColumns(tableName);
   const now = new Date();
@@ -909,6 +1075,95 @@ recordsRouter.put("/:id", async (req, res) => {
       message: "No se pudo actualizar el registro de empresa.",
       detail: String(error?.message || error),
     });
+  }
+});
+
+recordsRouter.get("/:id/email/compose", async (req, res) => {
+  const recordId = String(req.params.id);
+  try {
+    const record = await getRecordForEmail(recordId);
+    if (!record) return res.status(404).json({ message: "Registro no encontrado" });
+
+    const docs = await getRecordDocumentsForEmail(recordId);
+    const entidad = record?.entidad || record?.lineAfp?.afp_name || "";
+    const defaultTo = resolveEntityEmail(entidad);
+
+    return res.json({
+      to: defaultTo,
+      cc: "",
+      bcc: "",
+      subject: buildEmailSubject(record),
+      body: buildEmailBody(record, docs),
+      entity: entidad,
+      documents: docs.map((doc) => ({
+        id: doc.id,
+        category: doc.category,
+        file_name: doc.file_name,
+        file_url: doc.file_url,
+        file_size: doc.file_size,
+        mime_type: doc.mime_type,
+      })),
+      warning: defaultTo ? null : "No hay correo configurado para esta entidad. Puedes ingresarlo manualmente o configurar ENTITY_EMAILS_JSON en Railway.",
+    });
+  } catch (error: any) {
+    console.error("ERROR /api/records/:id/email/compose:", error?.message || error);
+    return res.status(500).json({ message: "No se pudo preparar el correo.", detail: String(error?.message || error) });
+  }
+});
+
+recordsRouter.post("/:id/email/send", async (req, res) => {
+  const recordId = String(req.params.id);
+  try {
+    const record = await getRecordForEmail(recordId);
+    if (!record) return res.status(404).json({ message: "Registro no encontrado" });
+
+    const to = nullableString(req.body.to);
+    const cc = nullableString(req.body.cc);
+    const bcc = nullableString(req.body.bcc);
+    const subject = nullableString(req.body.subject) || buildEmailSubject(record);
+    const body = nullableString(req.body.body) || "";
+    const selectedIds = Array.isArray(req.body.document_ids) ? req.body.document_ids.map(String) : [];
+
+    if (!to) return res.status(400).json({ message: "Debes indicar el correo destino." });
+
+    const allDocs = await getRecordDocumentsForEmail(recordId);
+    const selectedDocs = selectedIds.length ? allDocs.filter((doc) => selectedIds.includes(doc.id)) : [];
+    const attachments = selectedDocs.map((doc) => ({
+      id: doc.id,
+      category: doc.category,
+      filename: doc.file_name,
+      fileName: doc.file_name,
+      url: emailDocumentUrl(doc.file_url),
+      file_url: doc.file_url,
+      mime_type: doc.mime_type,
+      size: doc.file_size,
+    }));
+
+    const payload = {
+      record_id: recordId,
+      from: process.env.EMAIL_FROM || "notificaciones@finanfix.cl",
+      to,
+      cc,
+      bcc,
+      subject,
+      body,
+      entity: record?.entidad || record?.lineAfp?.afp_name || "",
+      razon_social: record?.razon_social || record?.company?.razon_social || "",
+      rut: record?.rut || record?.company?.rut || "",
+      attachments,
+      sent_at: new Date().toISOString(),
+    };
+
+    const sendResult = await trySendEmailWebhook(payload);
+    const attachmentNames = attachments.length ? attachments.map((doc) => doc.filename).join(", ") : "Sin adjuntos";
+    const description = `Correo ${sendResult.sent ? "enviado" : "registrado"} a ${to}. Asunto: ${subject}. Adjuntos: ${attachmentNames}. Detalle: ${sendResult.detail}`;
+    await createEmailTrace(recordId, sendResult.status, description);
+
+    return res.json({ ok: sendResult.sent, status: sendResult.status, detail: sendResult.detail, trace: description, payload });
+  } catch (error: any) {
+    console.error("ERROR /api/records/:id/email/send:", error?.message || error);
+    await createEmailTrace(recordId, "ERROR", `Error al enviar correo: ${String(error?.message || error)}`);
+    return res.status(500).json({ message: "No se pudo enviar el correo.", detail: String(error?.message || error) });
   }
 });
 
