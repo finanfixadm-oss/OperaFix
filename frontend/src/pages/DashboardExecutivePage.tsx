@@ -236,7 +236,7 @@ function getColumnValue(row: RecordItem, field: string) {
 function formatGroupValue(row: RecordItem, field: string) {
   const column = recordColumns.find((item) => item.field === field);
   const value = getColumnValue(row, field);
-  if (column?.type === "money") return formatCellValue(value, column);
+  if (column?.money) return formatCellValue(value, column);
   if (column?.type === "date") return formatCellValue(value, column);
   if (column?.type === "boolean") return formatCellValue(value, column);
   return keyText(value, "Sin asignar");
