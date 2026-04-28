@@ -17,12 +17,16 @@ function numberValue(value: unknown) {
 }
 
 function keyText(value: unknown, fallback = "Sin información") {
-  const text = String(value || "").trim();
+  const text = String(value ?? "").trim();
   return text || fallback;
 }
 
 function normalize(value: unknown) {
   return String(value ?? "").trim().toLowerCase();
+}
+
+function stripAccents(value: unknown) {
+  return normalize(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
 function matchRule(value: unknown, rule: FilterRule) {
@@ -81,69 +85,116 @@ type DashboardScopedSettings = {
   columnOrder: string[];
 };
 
-type PanelFilter = { id: string; field: string; operator: "equals" | "contains" | "not_equals"; value: string };
+type PanelOperator = "equals" | "contains" | "not_equals" | "empty" | "not_empty" | "greater_than" | "less_than";
+type PanelFilter = { id: string; field: string; operator: PanelOperator; value: string };
 type PanelChartType = "table" | "bar" | "pie" | "kpi";
-type PanelMetric = "count" | "monto_devolucion" | "monto_real_finanfix_solutions" | "monto_real_cliente" | "monto_cliente" | "monto_finanfix_solutions";
+type MetricAggregation = "count" | "sum" | "avg" | "min" | "max";
+type DatePart = "none" | "year" | "month" | "day";
+type PanelGroupField = { id: string; field: string; datePart?: DatePart };
+type PanelMetricConfig = { aggregation: MetricAggregation; field?: string };
 type PanelConfig = {
   id: string;
   title: string;
   chartType: PanelChartType;
-  metric: PanelMetric;
-  groupFields: string[];
+  module: string;
+  relatedModule: string;
+  metric: PanelMetricConfig;
+  groupFields: PanelGroupField[];
   filters: PanelFilter[];
+  criteriaMode: "AND" | "OR";
 };
 
 type PanelDraft = Omit<PanelConfig, "id">;
 
-const metricOptions: { value: PanelMetric; label: string; type: "number" | "money" }[] = [
-  { value: "count", label: "Cantidad de registros", type: "number" },
-  { value: "monto_devolucion", label: "Suma Monto Devolución", type: "money" },
-  { value: "monto_real_finanfix_solutions", label: "Suma Monto Real Finanfix", type: "money" },
-  { value: "monto_real_cliente", label: "Suma Monto Real Cliente", type: "money" },
-  { value: "monto_cliente", label: "Suma Monto Cliente", type: "money" },
-  { value: "monto_finanfix_solutions", label: "Suma Monto Finanfix", type: "money" },
+type PanelRow = { labels: string[]; key: string; count: number; value: number; rawValues: number[] };
+
+const moduleOptions = [
+  "Grupos de empresas - LM",
+  "Registros de empresas",
+  "Posibles clientes",
+  "Contactos",
+  "Tratos",
+  "Tareas",
+  "Reuniones",
+  "Llamadas",
+  "Presupuestos",
+  "Órdenes de venta",
+  "Facturas",
+  "Casos",
+  "Soluciones",
+  "Previsiónes",
+  "Visitas",
+  "Notas",
+  "Empresas",
+  "Colaboradores",
+  "Correos electrónicos",
+  "Forecast Targets",
+  "Forecast Items",
 ];
 
 const chartTypeOptions: { value: PanelChartType; label: string }[] = [
-  { value: "table", label: "Tabla dinámica" },
+  { value: "table", label: "Gráfico de tablas" },
   { value: "bar", label: "Gráfico de barras" },
   { value: "pie", label: "Gráfico circular" },
   { value: "kpi", label: "Indicador KPI" },
 ];
 
+const moneyFieldAliases = new Set([
+  "monto_devolucion",
+  "monto_pagado",
+  "monto_cliente",
+  "monto_finanfix_solutions",
+  "monto_real_cliente",
+  "monto_real_finanfix_solutions",
+  "fee",
+]);
+
+const numericColumns = recordColumns.filter((column) => column.type === "number" || column.money || moneyFieldAliases.has(column.field));
+const dateColumns = recordColumns.filter((column) => column.type === "date");
+const dimensionColumns = recordColumns.filter((column) => column.type !== "number" || !moneyFieldAliases.has(column.field));
+
 const defaultPanels: PanelConfig[] = [
   {
     id: "panel-afp-monto",
-    title: "Monto por AFP / Entidad",
+    title: "Monto ganancia Finanfix Solutions por AFP",
     chartType: "pie",
-    metric: "monto_devolucion",
-    groupFields: ["entidad"],
+    module: "Grupos de empresas - LM",
+    relatedModule: "Registros de empresas",
+    metric: { aggregation: "sum", field: "monto_real_finanfix_solutions" },
+    groupFields: [{ id: "g1", field: "entidad" }],
     filters: [],
+    criteriaMode: "AND",
   },
   {
     id: "panel-colaboradores",
     title: "Colaboradores por mandante",
     chartType: "table",
-    metric: "count",
-    groupFields: ["mandante", "propietario"],
+    module: "Grupos de empresas - LM",
+    relatedModule: "Registros de empresas",
+    metric: { aggregation: "count" },
+    groupFields: [{ id: "g1", field: "mandante.name" }, { id: "g2", field: "owner_name" }],
     filters: [],
+    criteriaMode: "AND",
   },
   {
     id: "panel-facturacion",
     title: "Estado de pago facturas",
     chartType: "table",
-    metric: "monto_real_finanfix_solutions",
-    groupFields: ["facturado_finanfix", "fecha_factura_finanfix"],
+    module: "Grupos de empresas - LM",
+    relatedModule: "Registros de empresas",
+    metric: { aggregation: "sum", field: "monto_real_finanfix_solutions" },
+    groupFields: [{ id: "g1", field: "facturado_cliente" }, { id: "g2", field: "fecha_pago_factura_finanfix", datePart: "year" }],
     filters: [],
+    criteriaMode: "AND",
   },
 ];
 
 function dashboardScopedKey(mandante: string) {
-  return `operafix_dashboard_scoped_settings_v30_${mandante || "todos"}`;
+  return `operafix_dashboard_scoped_settings_v32_${mandante || "todos"}`;
 }
 
 function dashboardPanelsKey(mandante: string) {
-  return `operafix_dashboard_panels_v30_${mandante || "todos"}`;
+  return `operafix_dashboard_panels_v32_${mandante || "todos"}`;
 }
 
 function cleanDashboardColumns(fields: unknown) {
@@ -185,22 +236,68 @@ function saveDashboardScopedSettings(mandante: string, settings: DashboardScoped
   }));
 }
 
+function normalizeMetric(raw: any): PanelMetricConfig {
+  if (raw && typeof raw === "object" && raw.aggregation) {
+    const aggregation: MetricAggregation = ["count", "sum", "avg", "min", "max"].includes(raw.aggregation) ? raw.aggregation : "count";
+    const field = typeof raw.field === "string" && recordColumns.some((column) => column.field === raw.field) ? raw.field : undefined;
+    return aggregation === "count" ? { aggregation: "count" } : { aggregation, field: field || "monto_devolucion" };
+  }
+
+  if (typeof raw === "string") {
+    if (raw === "count") return { aggregation: "count" };
+    if (recordColumns.some((column) => column.field === raw)) return { aggregation: "sum", field: raw };
+  }
+
+  return { aggregation: "count" };
+}
+
+function normalizeGroupFields(raw: any): PanelGroupField[] {
+  const allowedFields = new Set(recordColumns.map((column) => column.field));
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item, index) => {
+      if (typeof item === "string") return { id: `g-${index}-${item}`, field: item, datePart: "none" as DatePart };
+      return {
+        id: String(item?.id || crypto.randomUUID()),
+        field: String(item?.field || ""),
+        datePart: ["none", "year", "month", "day"].includes(item?.datePart) ? item.datePart : "none",
+      };
+    })
+    .filter((item) => allowedFields.has(item.field))
+    .slice(0, 6);
+}
+
+function normalizeFilters(raw: any): PanelFilter[] {
+  const allowedFields = new Set(recordColumns.map((column) => column.field));
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((rule) => ({
+      id: String(rule?.id || crypto.randomUUID()),
+      field: String(rule?.field || ""),
+      operator: (["equals", "contains", "not_equals", "empty", "not_empty", "greater_than", "less_than"].includes(rule?.operator) ? rule.operator : "equals") as PanelOperator,
+      value: String(rule?.value || ""),
+    }))
+    .filter((rule) => rule.field && allowedFields.has(rule.field));
+}
+
 function readDashboardPanels(mandante: string): PanelConfig[] {
   try {
     const saved = localStorage.getItem(dashboardPanelsKey(mandante));
     if (!saved) return defaultPanels;
     const parsed = JSON.parse(saved);
     if (!Array.isArray(parsed)) return defaultPanels;
-    const allowedFields = new Set(recordColumns.map((column) => column.field));
     return parsed
       .filter((panel) => panel && typeof panel.title === "string")
       .map((panel) => ({
         id: String(panel.id || crypto.randomUUID()),
         title: String(panel.title || "Panel"),
         chartType: chartTypeOptions.some((item) => item.value === panel.chartType) ? panel.chartType : "table",
-        metric: metricOptions.some((item) => item.value === panel.metric) ? panel.metric : "count",
-        groupFields: Array.isArray(panel.groupFields) ? panel.groupFields.filter((field: string) => allowedFields.has(field)).slice(0, 3) : [],
-        filters: Array.isArray(panel.filters) ? panel.filters.filter((rule: PanelFilter) => rule?.field && allowedFields.has(rule.field)) : [],
+        module: moduleOptions.includes(panel.module) ? panel.module : "Grupos de empresas - LM",
+        relatedModule: moduleOptions.includes(panel.relatedModule) ? panel.relatedModule : "Registros de empresas",
+        metric: normalizeMetric(panel.metric),
+        groupFields: normalizeGroupFields(panel.groupFields),
+        filters: normalizeFilters(panel.filters),
+        criteriaMode: panel.criteriaMode === "OR" ? "OR" : "AND",
       })) as PanelConfig[];
   } catch {
     return defaultPanels;
@@ -215,16 +312,24 @@ function fieldLabel(field: string) {
   return recordColumns.find((column) => column.field === field)?.label || field;
 }
 
-function metricLabel(metric: PanelMetric) {
-  return metricOptions.find((item) => item.value === metric)?.label || metric;
+function fieldLongLabel(field: string) {
+  return `${fieldLabel(field)} - Registros de empresas (Empresas del grupo)`;
 }
 
-function metricType(metric: PanelMetric) {
-  return metricOptions.find((item) => item.value === metric)?.type || "number";
+function metricLabel(metric: PanelMetricConfig) {
+  if (metric.aggregation === "count") return "Cantidad de registros";
+  const prefix: Record<Exclude<MetricAggregation, "count">, string> = { sum: "Suma de", avg: "Promedio de", min: "Mínimo de", max: "Máximo de" };
+  return `${prefix[metric.aggregation]} ${fieldLabel(metric.field || "monto_devolucion")}`;
 }
 
-function formatMetric(value: number, metric: PanelMetric) {
-  return metricType(metric) === "money" ? money(value) : new Intl.NumberFormat("es-CL").format(value || 0);
+function metricIsMoney(metric: PanelMetricConfig) {
+  if (metric.aggregation === "count") return false;
+  const column = recordColumns.find((item) => item.field === metric.field);
+  return Boolean(column?.money || moneyFieldAliases.has(metric.field || ""));
+}
+
+function formatMetric(value: number, metric: PanelMetricConfig) {
+  return metricIsMoney(metric) ? money(value) : new Intl.NumberFormat("es-CL").format(value || 0);
 }
 
 function getColumnValue(row: RecordItem, field: string) {
@@ -233,60 +338,125 @@ function getColumnValue(row: RecordItem, field: string) {
   return getValueByPath(row, field);
 }
 
-function formatGroupValue(row: RecordItem, field: string) {
-  const column = recordColumns.find((item) => item.field === field);
-  const value = getColumnValue(row, field);
+function datePartValue(value: unknown, part?: DatePart) {
+  if (!part || part === "none") return null;
+  if (!value) return "Ninguno";
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return "Ninguno";
+  if (part === "year") return String(date.getFullYear());
+  if (part === "month") return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  return date.toLocaleDateString("es-CL");
+}
+
+function formatGroupValue(row: RecordItem, group: PanelGroupField) {
+  const column = recordColumns.find((item) => item.field === group.field);
+  const value = getColumnValue(row, group.field);
+  const dateValue = datePartValue(value, group.datePart);
+  if (dateValue) return dateValue;
   if (column?.money) return formatCellValue(value, column);
   if (column?.type === "date") return formatCellValue(value, column);
   if (column?.type === "boolean") return formatCellValue(value, column);
   return keyText(value, "Sin asignar");
 }
 
-function metricValue(row: RecordItem, metric: PanelMetric) {
-  if (metric === "count") return 1;
-  return numberValue(getColumnValue(row, metric));
+function rawMetricValue(row: RecordItem, metric: PanelMetricConfig) {
+  if (metric.aggregation === "count") return 1;
+  return numberValue(getColumnValue(row, metric.field || "monto_devolucion"));
 }
 
-function applyPanelFilters(rows: RecordItem[], filters: PanelFilter[]) {
-  if (!filters.length) return rows;
-  return rows.filter((row) => filters.every((rule) => {
-    const value = getColumnValue(row, rule.field);
-    const left = normalize(value);
-    const right = normalize(rule.value);
-    if (!right) return true;
-    if (rule.operator === "equals") return left === right;
-    if (rule.operator === "not_equals") return left !== right;
-    return left.includes(right);
-  }));
+function aggregateMetric(values: number[], metric: PanelMetricConfig) {
+  if (metric.aggregation === "count") return values.length;
+  if (!values.length) return 0;
+  if (metric.aggregation === "sum") return values.reduce((sum, value) => sum + value, 0);
+  if (metric.aggregation === "avg") return values.reduce((sum, value) => sum + value, 0) / values.length;
+  if (metric.aggregation === "min") return Math.min(...values);
+  if (metric.aggregation === "max") return Math.max(...values);
+  return 0;
+}
+
+function parseMultiValue(value: string) {
+  return value.split(",").map((item) => stripAccents(item)).filter(Boolean);
+}
+
+function matchPanelFilter(row: RecordItem, rule: PanelFilter) {
+  const value = getColumnValue(row, rule.field);
+  const left = stripAccents(value);
+  const right = stripAccents(rule.value);
+  const list = parseMultiValue(rule.value);
+
+  if (rule.operator === "empty") return !left;
+  if (rule.operator === "not_empty") return Boolean(left);
+  if (!right && !["empty", "not_empty"].includes(rule.operator)) return true;
+  if (rule.operator === "equals") return list.length > 1 ? list.includes(left) : left === right;
+  if (rule.operator === "not_equals") return list.length > 1 ? !list.includes(left) : left !== right;
+  if (rule.operator === "contains") return list.length > 1 ? list.some((part) => left.includes(part)) : left.includes(right);
+  if (rule.operator === "greater_than") return numberValue(value) > Number(rule.value || 0);
+  if (rule.operator === "less_than") return numberValue(value) < Number(rule.value || 0);
+  return true;
+}
+
+function applyPanelFilters(rows: RecordItem[], filters: PanelFilter[], criteriaMode: "AND" | "OR" = "AND") {
+  const validFilters = filters.filter((rule) => rule.field && (rule.value.trim() || rule.operator === "empty" || rule.operator === "not_empty"));
+  if (!validFilters.length) return rows;
+  return rows.filter((row) => criteriaMode === "OR" ? validFilters.some((rule) => matchPanelFilter(row, rule)) : validFilters.every((rule) => matchPanelFilter(row, rule)));
 }
 
 function buildPanelRows(rows: RecordItem[], panel: PanelConfig) {
-  const filtered = applyPanelFilters(rows, panel.filters);
+  const filtered = applyPanelFilters(rows, panel.filters, panel.criteriaMode);
   if (panel.chartType === "kpi" || !panel.groupFields.length) {
-    return [{ labels: [panel.title], key: panel.title, count: filtered.length, value: filtered.reduce((sum, row) => sum + metricValue(row, panel.metric), 0) }];
+    const rawValues = filtered.map((row) => rawMetricValue(row, panel.metric));
+    return [{ labels: [panel.title], key: panel.title, count: filtered.length, value: aggregateMetric(rawValues, panel.metric), rawValues }];
   }
 
-  const map = new Map<string, { labels: string[]; key: string; count: number; value: number }>();
+  const map = new Map<string, PanelRow>();
   filtered.forEach((row) => {
     const labels = panel.groupFields.map((field) => formatGroupValue(row, field));
     const key = labels.join("||");
-    const current = map.get(key) || { labels, key, count: 0, value: 0 };
+    const current = map.get(key) || { labels, key, count: 0, value: 0, rawValues: [] };
     current.count += 1;
-    current.value += metricValue(row, panel.metric);
+    current.rawValues.push(rawMetricValue(row, panel.metric));
+    current.value = aggregateMetric(current.rawValues, panel.metric);
     map.set(key, current);
   });
 
-  return Array.from(map.values()).sort((a, b) => b.value - a.value || b.count - a.count);
+  return Array.from(map.values()).sort((a, b) => b.value - a.value || b.count - a.count || a.key.localeCompare(b.key));
 }
 
 function blankPanelDraft(mandante: string): PanelDraft {
   return {
     title: mandante === "todos" ? "Nuevo panel" : `Nuevo panel - ${mandante}`,
     chartType: "table",
-    metric: "count",
-    groupFields: ["mandante"],
-    filters: mandante === "todos" ? [] : [{ id: crypto.randomUUID(), field: "mandante", operator: "equals", value: mandante }],
+    module: "Grupos de empresas - LM",
+    relatedModule: "Registros de empresas",
+    metric: { aggregation: "sum", field: "monto_real_finanfix_solutions" },
+    groupFields: [{ id: crypto.randomUUID(), field: "facturado_cliente" }, { id: crypto.randomUUID(), field: "fecha_pago_factura_finanfix", datePart: "year" }],
+    filters: mandante === "todos" ? [] : [{ id: crypto.randomUUID(), field: "mandante.name", operator: "equals", value: mandante }],
+    criteriaMode: "AND",
   };
+}
+
+function filterPattern(filters: PanelFilter[], criteriaMode: "AND" | "OR") {
+  const active = filters.filter((rule) => rule.field && (rule.value.trim() || rule.operator === "empty" || rule.operator === "not_empty"));
+  if (!active.length) return "Sin patrón";
+  const joiner = criteriaMode === "OR" ? " o " : " y ";
+  return `( ${active.map((_, index) => index + 1).join(joiner)} )`;
+}
+
+function moduleSupported(module: string) {
+  return ["Grupos de empresas - LM", "Registros de empresas", "Empresas", "Colaboradores", "Notas", "Correos electrónicos"].includes(module);
+}
+
+function operatorLabel(operator: PanelOperator) {
+  const map: Record<PanelOperator, string> = {
+    equals: "es",
+    contains: "contiene",
+    not_equals: "no es",
+    empty: "está vacío",
+    not_empty: "no está vacío",
+    greater_than: "mayor que",
+    less_than: "menor que",
+  };
+  return map[operator];
 }
 
 export default function DashboardExecutivePage() {
@@ -436,7 +606,16 @@ export default function DashboardExecutivePage() {
 
   function editPanel(panel: PanelConfig) {
     setEditingPanelId(panel.id);
-    setPanelDraft({ title: panel.title, chartType: panel.chartType, metric: panel.metric, groupFields: [...panel.groupFields], filters: [...panel.filters] });
+    setPanelDraft({
+      title: panel.title,
+      chartType: panel.chartType,
+      module: panel.module,
+      relatedModule: panel.relatedModule,
+      metric: { ...panel.metric },
+      groupFields: panel.groupFields.map((group) => ({ ...group })),
+      filters: panel.filters.map((rule) => ({ ...rule })),
+      criteriaMode: panel.criteriaMode,
+    });
     setPanelModalOpen(true);
   }
 
@@ -444,8 +623,9 @@ export default function DashboardExecutivePage() {
     const cleanedDraft: PanelDraft = {
       ...panelDraft,
       title: panelDraft.title.trim() || "Panel sin nombre",
-      groupFields: panelDraft.chartType === "kpi" ? [] : panelDraft.groupFields.filter(Boolean).slice(0, 3),
-      filters: panelDraft.filters.filter((rule) => rule.field && rule.value.trim()),
+      groupFields: panelDraft.chartType === "kpi" ? [] : panelDraft.groupFields.filter((group) => group.field).slice(0, 6),
+      filters: panelDraft.filters.filter((rule) => rule.field && (rule.value.trim() || rule.operator === "empty" || rule.operator === "not_empty")),
+      metric: panelDraft.metric.aggregation === "count" ? { aggregation: "count" } : { aggregation: panelDraft.metric.aggregation, field: panelDraft.metric.field || "monto_devolucion" },
     };
 
     if (editingPanelId) {
@@ -456,13 +636,17 @@ export default function DashboardExecutivePage() {
     setPanelModalOpen(false);
   }
 
+  function clonePanel(panel: PanelConfig) {
+    setPanels((prev) => [{ ...panel, id: crypto.randomUUID(), title: `${panel.title} (copia)` }, ...prev]);
+  }
+
   function deletePanel(panelId: string) {
     if (!confirm("¿Eliminar este panel del dashboard?")) return;
     setPanels((prev) => prev.filter((panel) => panel.id !== panelId));
   }
 
   function addPanelFilter() {
-    setPanelDraft((prev) => ({ ...prev, filters: [...prev.filters, { id: crypto.randomUUID(), field: "mandante", operator: "equals", value: "" }] }));
+    setPanelDraft((prev) => ({ ...prev, filters: [...prev.filters, { id: crypto.randomUUID(), field: "mandante.name", operator: "equals", value: "" }] }));
   }
 
   function updatePanelFilter(id: string, patch: Partial<PanelFilter>) {
@@ -473,28 +657,28 @@ export default function DashboardExecutivePage() {
     setPanelDraft((prev) => ({ ...prev, filters: prev.filters.filter((rule) => rule.id !== id) }));
   }
 
-  function updateGroupField(index: number, field: string) {
-    setPanelDraft((prev) => {
-      const next = [...prev.groupFields];
-      next[index] = field;
-      return { ...prev, groupFields: next.filter(Boolean).slice(0, 3) };
-    });
+  function updateGroupField(id: string, patch: Partial<PanelGroupField>) {
+    setPanelDraft((prev) => ({ ...prev, groupFields: prev.groupFields.map((group) => group.id === id ? { ...group, ...patch } : group) }));
   }
 
   function addGroupField() {
-    setPanelDraft((prev) => prev.groupFields.length >= 3 ? prev : { ...prev, groupFields: [...prev.groupFields, "estado_gestion"] });
+    setPanelDraft((prev) => prev.groupFields.length >= 6 ? prev : { ...prev, groupFields: [...prev.groupFields, { id: crypto.randomUUID(), field: "estado_gestion" }] });
   }
 
-  function removeGroupField(index: number) {
-    setPanelDraft((prev) => ({ ...prev, groupFields: prev.groupFields.filter((_, i) => i !== index) }));
+  function removeGroupField(id: string) {
+    setPanelDraft((prev) => ({ ...prev, groupFields: prev.groupFields.filter((group) => group.id !== id) }));
+  }
+
+  function updateMetricAggregation(aggregation: MetricAggregation) {
+    setPanelDraft((prev) => ({ ...prev, metric: aggregation === "count" ? { aggregation: "count" } : { aggregation, field: prev.metric.field || numericColumns[0]?.field || "monto_devolucion" } }));
   }
 
   return (
     <div className="zoho-module-page dashboard-page">
-      <div className="zoho-module-header">
+      <div className="zoho-module-header dashboard-hero-header">
         <div>
           <h1>Dashboard ejecutivo</h1>
-          <p>Control de recuperación por mandante, AFP, estado, antigüedad, prioridad y paneles personalizados.</p>
+          <p>Constructor de paneles tipo Zoho: módulos, medidas, agrupamientos múltiples y criterios de filtro.</p>
         </div>
         <div className="zoho-module-actions">
           <button className="zoho-btn" onClick={() => exportCsv("operafix_dashboard.csv", data, selectedColumns)}>Exportar CSV</button>
@@ -524,7 +708,7 @@ export default function DashboardExecutivePage() {
         </label>
       </section>
 
-      <div className="zoho-scope-hint">Los filtros, columnas y paneles personalizados se guardan por mandante seleccionado.</div>
+      <div className="zoho-scope-hint">Los filtros, columnas y paneles personalizados se guardan por mandante seleccionado. Registros base encontrados: <strong>{data.length}</strong>.</div>
 
       <div className="dashboard-advanced-layout">
         <ModuleFilterPanel
@@ -533,7 +717,7 @@ export default function DashboardExecutivePage() {
           onApply={(rules, search) => { setActiveRules(rules); setQuickSearch(search); }}
         />
         <div className="dashboard-filter-help">
-          <strong>Constructor de paneles:</strong> usa Crear panel para armar gráficos o tablas como Zoho, seleccionando medida, agrupaciones y filtros propios.
+          <strong>Constructor de paneles:</strong> crea componentes como los de Zoho seleccionando el módulo, una medida, varios agrupamientos y filtros con patrón <strong>{"((1 y 2) y 3)"}</strong>.
         </div>
       </div>
 
@@ -553,13 +737,13 @@ export default function DashboardExecutivePage() {
             <div className="zoho-card-title-row dashboard-builder-title">
               <div>
                 <h2>Paneles personalizados</h2>
-                <p>Crea paneles según los datos y filtros que selecciones, igual que los reportes de análisis.</p>
+                <p>Crea tablas, gráficos circulares, barras o KPI con agrupamientos y filtros propios.</p>
               </div>
               <button className="zoho-btn zoho-btn-primary" onClick={openNewPanel}>Agregar componente</button>
             </div>
             {panels.length === 0 ? <div className="zoho-empty">No tienes paneles creados para esta vista.</div> : (
               <div className="dashboard-custom-grid">
-                {panels.map((panel) => <CustomPanel key={panel.id} panel={panel} rows={data} onEdit={editPanel} onDelete={deletePanel} onOpenRecord={(id) => navigate(`/records/${id}`)} />)}
+                {panels.map((panel) => <CustomPanel key={panel.id} panel={panel} rows={data} onEdit={editPanel} onClone={clonePanel} onDelete={deletePanel} onOpenRecord={(id) => navigate(`/records/${id}`)} />)}
               </div>
             )}
           </section>
@@ -624,56 +808,109 @@ export default function DashboardExecutivePage() {
         </>
       )}
 
-      <ZohoModal title={editingPanelId ? "Editar panel" : "Crear panel del dashboard"} isOpen={panelModalOpen} onClose={() => setPanelModalOpen(false)}>
-        <div className="dashboard-panel-editor">
+      <ZohoModal title={editingPanelId ? "Editar gráfico" : "Crear panel de información"} isOpen={panelModalOpen} onClose={() => setPanelModalOpen(false)}>
+        <div className="dashboard-panel-editor dashboard-panel-editor-zoho">
           <div className="panel-editor-form">
             <label>Nombre del componente
               <input className="zoho-input" value={panelDraft.title} onChange={(e) => setPanelDraft((prev) => ({ ...prev, title: e.target.value }))} />
+            </label>
+            <label>Módulo(s)
+              <select className="zoho-select" value={panelDraft.module} onChange={(e) => setPanelDraft((prev) => ({ ...prev, module: e.target.value }))}>
+                {moduleOptions.map((option) => <option key={option} value={option}>{option}{moduleSupported(option) ? "" : " (referencial)"}</option>)}
+              </select>
+            </label>
+            <label>Datos relacionados
+              <select className="zoho-select" value={panelDraft.relatedModule} onChange={(e) => setPanelDraft((prev) => ({ ...prev, relatedModule: e.target.value }))}>
+                {moduleOptions.map((option) => <option key={option} value={option}>{option}{moduleSupported(option) ? "" : " (referencial)"}</option>)}
+              </select>
             </label>
             <label>Tipo de gráfico
               <select className="zoho-select" value={panelDraft.chartType} onChange={(e) => setPanelDraft((prev) => ({ ...prev, chartType: e.target.value as PanelChartType }))}>
                 {chartTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
-            <label>Medida
-              <select className="zoho-select" value={panelDraft.metric} onChange={(e) => setPanelDraft((prev) => ({ ...prev, metric: e.target.value as PanelMetric }))}>
-                {metricOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-            </label>
+            <div className="panel-editor-block">
+              <strong>Medida (Eje Y)</strong>
+              <div className="panel-editor-row">
+                <select className="zoho-select short" value={panelDraft.metric.aggregation} onChange={(e) => updateMetricAggregation(e.target.value as MetricAggregation)}>
+                  <option value="count">Cantidad de registros</option>
+                  <option value="sum">Suma de</option>
+                  <option value="avg">Promedio de</option>
+                  <option value="min">Mínimo de</option>
+                  <option value="max">Máximo de</option>
+                </select>
+                {panelDraft.metric.aggregation !== "count" && <select className="zoho-select" value={panelDraft.metric.field || numericColumns[0]?.field || "monto_devolucion"} onChange={(e) => setPanelDraft((prev) => ({ ...prev, metric: { ...prev.metric, field: e.target.value } }))}>
+                  {numericColumns.map((column) => <option key={column.field} value={column.field}>{fieldLongLabel(column.field)}</option>)}
+                </select>}
+              </div>
+            </div>
 
             {panelDraft.chartType !== "kpi" && <div className="panel-editor-block">
-              <div className="panel-editor-title-row"><strong>Agrupamiento</strong><button className="zoho-btn small" onClick={addGroupField} disabled={panelDraft.groupFields.length >= 3}>Agregar campo</button></div>
-              {panelDraft.groupFields.map((field, index) => (
-                <div className="panel-editor-row" key={`${field}-${index}`}>
-                  <select className="zoho-select" value={field} onChange={(e) => updateGroupField(index, e.target.value)}>
-                    {recordColumns.map((column) => <option key={column.field} value={column.field}>{column.label}</option>)}
-                  </select>
-                  <button className="zoho-btn danger small" onClick={() => removeGroupField(index)}>Quitar</button>
-                </div>
-              ))}
+              <div className="panel-editor-title-row"><strong>Agrupamiento</strong><button className="zoho-btn small" onClick={addGroupField} disabled={panelDraft.groupFields.length >= 6}>Agregar agrupamiento</button></div>
+              {panelDraft.groupFields.length === 0 && <div className="zoho-empty small">Sin agrupamiento: el panel mostrará un total.</div>}
+              {panelDraft.groupFields.map((group, index) => {
+                const isDate = dateColumns.some((column) => column.field === group.field);
+                return (
+                  <div className="panel-editor-row" key={group.id}>
+                    <span className="panel-index-badge">{index + 1}</span>
+                    <select className="zoho-select" value={group.field} onChange={(e) => updateGroupField(group.id, { field: e.target.value, datePart: dateColumns.some((column) => column.field === e.target.value) ? "year" : "none" })}>
+                      <optgroup label="Fechas">
+                        {dateColumns.map((column) => <option key={column.field} value={column.field}>{fieldLongLabel(column.field)}</option>)}
+                      </optgroup>
+                      <optgroup label="Dimensiones">
+                        {dimensionColumns.map((column) => <option key={column.field} value={column.field}>{fieldLongLabel(column.field)}</option>)}
+                      </optgroup>
+                    </select>
+                    {isDate && <select className="zoho-select short" value={group.datePart || "year"} onChange={(e) => updateGroupField(group.id, { datePart: e.target.value as DatePart })}>
+                      <option value="year">Por año</option>
+                      <option value="month">Por mes</option>
+                      <option value="day">Por día</option>
+                      <option value="none">Fecha completa</option>
+                    </select>}
+                    <button className="zoho-btn danger small" onClick={() => removeGroupField(group.id)}>Quitar</button>
+                  </div>
+                );
+              })}
             </div>}
 
-            <div className="panel-editor-block">
-              <div className="panel-editor-title-row"><strong>Criterios de filtro</strong><button className="zoho-btn small" onClick={addPanelFilter}>Agregar filtro</button></div>
+            <div className="panel-editor-block criteria-block">
+              <div className="panel-editor-title-row">
+                <strong>Criterios de filtro</strong>
+                <div className="criteria-actions">
+                  <select className="zoho-select short" value={panelDraft.criteriaMode} onChange={(e) => setPanelDraft((prev) => ({ ...prev, criteriaMode: e.target.value as "AND" | "OR" }))}>
+                    <option value="AND">Y</option>
+                    <option value="OR">O</option>
+                  </select>
+                  <button className="zoho-btn small" onClick={addPanelFilter}>Agregar filtro</button>
+                </div>
+              </div>
               {panelDraft.filters.length === 0 && <div className="zoho-empty small">Sin filtros propios para este panel.</div>}
-              {panelDraft.filters.map((rule) => (
-                <div className="panel-editor-row" key={rule.id}>
+              {panelDraft.filters.map((rule, index) => (
+                <div className="panel-editor-row filter-criteria-row" key={rule.id}>
+                  <span className="panel-index-badge">{index + 1}</span>
                   <select className="zoho-select" value={rule.field} onChange={(e) => updatePanelFilter(rule.id, { field: e.target.value })}>
                     {recordColumns.map((column) => <option key={column.field} value={column.field}>{column.label}</option>)}
                   </select>
-                  <select className="zoho-select short" value={rule.operator} onChange={(e) => updatePanelFilter(rule.id, { operator: e.target.value as PanelFilter["operator"] })}>
+                  <select className="zoho-select short" value={rule.operator} onChange={(e) => updatePanelFilter(rule.id, { operator: e.target.value as PanelOperator })}>
                     <option value="equals">es</option>
                     <option value="contains">contiene</option>
                     <option value="not_equals">no es</option>
+                    <option value="empty">está vacío</option>
+                    <option value="not_empty">no está vacío</option>
+                    <option value="greater_than">mayor que</option>
+                    <option value="less_than">menor que</option>
                   </select>
-                  <input className="zoho-input" value={rule.value} onChange={(e) => updatePanelFilter(rule.id, { value: e.target.value })} placeholder="Valor" />
+                  {!['empty', 'not_empty'].includes(rule.operator) && <input className="zoho-input" value={rule.value} onChange={(e) => updatePanelFilter(rule.id, { value: e.target.value })} placeholder="Valor o varios separados por coma" />}
                   <button className="zoho-btn danger small" onClick={() => removePanelFilter(rule.id)}>Eliminar</button>
+                  {index < panelDraft.filters.length - 1 && <span className="criteria-connector">{panelDraft.criteriaMode === "AND" ? "Y" : "O"}</span>}
                 </div>
               ))}
+              <div className="criteria-pattern"><strong>Patrón de criterios:</strong> {filterPattern(panelDraft.filters, panelDraft.criteriaMode)} <button className="link-button" onClick={() => setPanelDraft((prev) => ({ ...prev, criteriaMode: prev.criteriaMode === "AND" ? "OR" : "AND" }))}>Editar patrón</button></div>
             </div>
           </div>
           <div className="panel-editor-preview">
-            <CustomPanel panel={{ id: "preview", ...panelDraft }} rows={data} preview onEdit={() => undefined} onDelete={() => undefined} onOpenRecord={() => undefined} />
+            <div className="panel-preview-label">Vista previa</div>
+            <CustomPanel panel={{ id: "preview", ...panelDraft }} rows={data} preview onEdit={() => undefined} onClone={() => undefined} onDelete={() => undefined} onOpenRecord={() => undefined} />
           </div>
         </div>
         <div className="column-picker-actions">
@@ -735,12 +972,12 @@ function Ranking({ title, rows }: { title: string; rows: { name: string; count: 
   );
 }
 
-function CustomPanel({ panel, rows, preview, onEdit, onDelete, onOpenRecord }: { panel: PanelConfig; rows: RecordItem[]; preview?: boolean; onEdit: (panel: PanelConfig) => void; onDelete: (panelId: string) => void; onOpenRecord: (recordId: string) => void }) {
+function CustomPanel({ panel, rows, preview, onEdit, onClone, onDelete, onOpenRecord }: { panel: PanelConfig; rows: RecordItem[]; preview?: boolean; onEdit: (panel: PanelConfig) => void; onClone: (panel: PanelConfig) => void; onDelete: (panelId: string) => void; onOpenRecord: (recordId: string) => void }) {
   const panelRows = buildPanelRows(rows, panel);
-  const filtered = applyPanelFilters(rows, panel.filters);
-  const max = Math.max(...panelRows.map((row) => row.value), 1);
+  const filtered = applyPanelFilters(rows, panel.filters, panel.criteriaMode);
+  const max = Math.max(...panelRows.map((row) => Math.abs(row.value)), 1);
   const total = panelRows.reduce((sum, row) => sum + row.value, 0);
-  const previewRows = panelRows.slice(0, panel.chartType === "pie" ? 8 : 12);
+  const previewRows = panelRows.slice(0, panel.chartType === "pie" ? 8 : 40);
   const metricText = metricLabel(panel.metric);
 
   return (
@@ -748,35 +985,40 @@ function CustomPanel({ panel, rows, preview, onEdit, onDelete, onOpenRecord }: {
       <div className="custom-panel-header">
         <div>
           <h3>{panel.title}</h3>
-          <small>{metricText}{panel.groupFields.length ? ` por ${panel.groupFields.map(fieldLabel).join(" / ")}` : ""}</small>
+          <small>{metricText}{panel.groupFields.length ? ` por ${panel.groupFields.map((group) => fieldLabel(group.field)).join(" / ")}` : ""}</small>
         </div>
         {!preview && <div className="custom-panel-actions">
           <button className="zoho-btn small" onClick={() => onEdit(panel)}>Editar</button>
+          <button className="zoho-btn small" onClick={() => onClone(panel)}>Clonar</button>
           <button className="zoho-btn danger small" onClick={() => onDelete(panel.id)}>Eliminar</button>
         </div>}
       </div>
 
-      {panel.chartType === "kpi" && <div className="custom-kpi-big"><strong>{formatMetric(total, panel.metric)}</strong><span>{filtered.length} registros considerados</span></div>}
+      {filtered.length === 0 && <div className="zoho-empty small">Sin datos para los filtros configurados.</div>}
 
-      {panel.chartType === "bar" && <div className="custom-bar-chart">
+      {filtered.length > 0 && panel.chartType === "kpi" && <div className="custom-kpi-big"><strong>{formatMetric(total, panel.metric)}</strong><span>{filtered.length} registros considerados</span></div>}
+
+      {filtered.length > 0 && panel.chartType === "bar" && <div className="custom-bar-chart">
         {previewRows.map((row) => <div className="custom-bar-row" key={row.key}>
           <div className="custom-bar-label"><strong>{row.labels.join(" / ")}</strong><span>{formatMetric(row.value, panel.metric)}</span></div>
-          <div className="custom-bar-track"><div style={{ width: `${Math.max(4, (row.value / max) * 100)}%` }} /></div>
+          <div className="custom-bar-track"><div style={{ width: `${Math.max(4, (Math.abs(row.value) / max) * 100)}%` }} /></div>
         </div>)}
       </div>}
 
-      {panel.chartType === "pie" && <PieLikeChart rows={previewRows} metric={panel.metric} total={total} />}
+      {filtered.length > 0 && panel.chartType === "pie" && <PieLikeChart rows={previewRows} metric={panel.metric} total={total} />}
 
-      {panel.chartType === "table" && <div className="zoho-table-scroll custom-panel-table-scroll">
+      {filtered.length > 0 && panel.chartType === "table" && <div className="zoho-table-scroll custom-panel-table-scroll">
         <table className="zoho-table compact custom-panel-table">
-          <thead><tr>{panel.groupFields.map((field) => <th key={field}>{fieldLabel(field)}</th>)}<th>{metricText}</th><th>Cantidad</th></tr></thead>
+          <thead><tr>{panel.groupFields.map((group) => <th key={group.id}>{fieldLabel(group.field)}{group.datePart && group.datePart !== "none" ? ` - ${group.datePart === "year" ? "Por año" : group.datePart === "month" ? "Por mes" : "Por día"}` : ""}</th>)}<th>{metricText}</th><th>Cantidad</th></tr></thead>
           <tbody>{previewRows.map((row) => (
             <tr key={row.key}>
               {row.labels.map((label, index) => <td key={`${row.key}-${index}`}>{label}</td>)}
               <td>{formatMetric(row.value, panel.metric)}</td>
               <td>{row.count}</td>
             </tr>
-          ))}</tbody>
+          ))}
+          {previewRows.length > 1 && <tr className="custom-panel-total-row"><td colSpan={Math.max(panel.groupFields.length, 1)}>Total</td><td>{formatMetric(total, panel.metric)}</td><td>{filtered.length}</td></tr>}
+          </tbody>
         </table>
       </div>}
 
@@ -790,11 +1032,12 @@ function CustomPanel({ panel, rows, preview, onEdit, onDelete, onOpenRecord }: {
   );
 }
 
-function PieLikeChart({ rows, metric, total }: { rows: { key: string; labels: string[]; value: number; count: number }[]; metric: PanelMetric; total: number }) {
+function PieLikeChart({ rows, metric, total }: { rows: PanelRow[]; metric: PanelMetricConfig; total: number }) {
   const colors = ["#1f7ae0", "#ff6b3d", "#1fbf75", "#8b5cf6", "#f59e0b", "#06b6d4", "#ef4444", "#64748b"];
   let start = 0;
+  const safeTotal = total || rows.reduce((sum, row) => sum + Math.abs(row.value), 0) || 1;
   const gradient = rows.map((row, index) => {
-    const pct = total > 0 ? (row.value / total) * 100 : 0;
+    const pct = (Math.abs(row.value) / safeTotal) * 100;
     const segment = `${colors[index % colors.length]} ${start}% ${start + pct}%`;
     start += pct;
     return segment;

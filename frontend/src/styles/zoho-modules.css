@@ -1728,3 +1728,244 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* v32 Dashboard builder tipo Zoho */
+.dashboard-hero-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: #f5f7fb;
+}
+.dashboard-panel-editor-zoho {
+  grid-template-columns: minmax(560px, 1fr) 380px;
+  gap: 22px;
+  align-items: start;
+  max-height: 72vh;
+  overflow: auto;
+  padding-right: 8px;
+}
+.dashboard-panel-editor-zoho .panel-editor-form {
+  display: grid;
+  gap: 12px;
+}
+.dashboard-panel-editor-zoho label {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+  color: #22304a;
+}
+.panel-editor-block {
+  border: 1px solid #d9e3f2;
+  background: #fbfdff;
+  border-radius: 10px;
+  padding: 12px;
+}
+.panel-editor-title-row,
+.criteria-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.criteria-actions {
+  justify-content: flex-end;
+}
+.panel-editor-row {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+.filter-criteria-row {
+  grid-template-columns: auto minmax(150px, 1fr) 135px minmax(180px, 1fr) auto;
+  position: relative;
+}
+.panel-index-badge {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 50%;
+  background: #fff;
+  color: #334155;
+  font-weight: 700;
+}
+.criteria-connector {
+  position: absolute;
+  left: 12px;
+  top: 38px;
+  color: #0b7cff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.criteria-pattern {
+  margin-top: 14px;
+  color: #475569;
+  font-size: 13px;
+}
+.link-button {
+  border: 0;
+  background: transparent;
+  color: #0b7cff;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0 0 0 8px;
+}
+.panel-editor-preview {
+  position: sticky;
+  top: 0;
+}
+.panel-preview-label {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.custom-dashboard-panel {
+  min-height: 180px;
+  overflow: hidden;
+}
+.custom-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.custom-panel-header h3 {
+  margin: 0;
+  font-size: 15px;
+  color: #0f1f3d;
+}
+.custom-panel-header small {
+  display: block;
+  color: #64748b;
+  margin-top: 4px;
+}
+.custom-panel-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.custom-panel-table-scroll {
+  max-height: 420px;
+}
+.custom-panel-total-row td {
+  font-weight: 800;
+  border-top: 2px solid #d8e2f1;
+  background: #fbfdff;
+}
+.custom-bar-chart {
+  display: grid;
+  gap: 10px;
+}
+.custom-bar-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+.custom-bar-track {
+  height: 10px;
+  background: #e7eef8;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.custom-bar-track div {
+  height: 100%;
+  background: #0b7cff;
+  border-radius: 999px;
+}
+.custom-kpi-big {
+  min-height: 130px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+.custom-kpi-big strong {
+  font-size: 34px;
+  color: #0b1f43;
+}
+.custom-kpi-big span {
+  color: #64748b;
+}
+.custom-pie-layout {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 18px;
+  align-items: center;
+}
+.custom-pie {
+  width: 170px;
+  height: 170px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 0 0 40px rgba(255,255,255,.76);
+}
+.custom-pie span {
+  display: block;
+  max-width: 110px;
+  text-align: center;
+  font-weight: 800;
+  color: #0f1f3d;
+  font-size: 12px;
+}
+.custom-pie-legend {
+  display: grid;
+  gap: 8px;
+}
+.custom-pie-legend div {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.custom-pie-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.custom-pie-legend strong {
+  color: #0f1f3d;
+}
+.custom-panel-records {
+  margin-top: 12px;
+  border-top: 1px solid #e5edf7;
+  padding-top: 10px;
+}
+.custom-panel-records summary {
+  cursor: pointer;
+  color: #0b7cff;
+  font-weight: 700;
+}
+.custom-panel-record-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.custom-panel-record-list button {
+  border: 1px solid #cfe0f8;
+  background: #fff;
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: #0b4aa1;
+  cursor: pointer;
+}
+@media (max-width: 1100px) {
+  .dashboard-panel-editor-zoho {
+    grid-template-columns: 1fr;
+  }
+  .panel-editor-preview {
+    position: static;
+  }
+  .custom-pie-layout {
+    grid-template-columns: 1fr;
+  }
+}
