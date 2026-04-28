@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import ModuleFilterPanel from "../components/ModuleFilterPanel";
 import ZohoModal from "../components/ZohoModal";
 import { fetchJson, postJson } from "../api";
-import type { FilterFieldDefinition, FilterRule, ManagementLineAfp } from "../types";
+import type { FilterRule, ManagementLineAfp } from "../types";
 import type { RecordItem } from "../types-records";
+import { defaultRecordColumnFields, formatCellValue, getValueByPath, recordColumns, recordFilterFields } from "../utils-record-fields";
 
 type MandanteOption = {
   id: string;
@@ -111,10 +112,6 @@ const emptyForm: FormState = {
   comment: "",
 };
 
-function getValueByPath(obj: unknown, path: string) {
-  return path.split(".").reduce<any>((acc, key) => acc?.[key], obj);
-}
-
 function matchRule(value: unknown, rule: FilterRule) {
   const normalized = String(value ?? "").toLowerCase();
   const query = String(rule.value ?? "").toLowerCase();
@@ -139,19 +136,6 @@ function matchRule(value: unknown, rule: FilterRule) {
     default:
       return true;
   }
-}
-
-function formatMoney(value?: number | string | null) {
-  return new Intl.NumberFormat("es-CL", {
-    style: "currency",
-    currency: "CLP",
-    maximumFractionDigits: 0,
-  }).format(Number(value || 0));
-}
-
-function boolLabel(value?: boolean | null) {
-  if (value === undefined || value === null) return "—";
-  return value ? "Sí" : "No";
 }
 
 function normalizeMandanteText(value?: string | null) {
@@ -184,6 +168,8 @@ export default function RecordsPage() {
   const [activeRules, setActiveRules] = useState<FilterRule[]>([]);
   const [quickSearch, setQuickSearch] = useState("");
   const [activeView, setActiveView] = useState("todos");
+  const [columnModalOpen, setColumnModalOpen] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => defaultRecordColumnFields);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -279,30 +265,20 @@ export default function RecordsPage() {
     }
   }
 
-  const fields: FilterFieldDefinition[] = [
-    { field: "mandante.name", label: "Mandante", type: "text" },
-    { field: "entidad", label: "Entidad", type: "text" },
-    { field: "grupo_empresa", label: "Buscar Grupo", type: "text" },
-    { field: "confirmacion_cc", label: "Confirmación CC", type: "boolean" },
-    { field: "rut", label: "RUT", type: "text" },
-    { field: "estado_gestion", label: "Estado Gestión", type: "text" },
-    { field: "monto_devolucion", label: "Monto Devolución", type: "number" },
-    { field: "razon_social", label: "Razón Social", type: "text" },
-    { field: "numero_solicitud", label: "N° Solicitud", type: "text" },
-    { field: "mes_produccion_2026", label: "Mes de producción", type: "text" },
-    { field: "management_type", label: "Tipo", type: "select", options: [{ label: "LM", value: "LM" }, { label: "TP", value: "TP" }] },
-    { field: "lineAfp.afp_name", label: "AFP", type: "text" },
-    { field: "acceso_portal", label: "Acceso portal", type: "text" },
-    { field: "banco", label: "Banco", type: "text" },
-    { field: "tipo_cuenta", label: "Tipo de Cuenta", type: "text" },
-    { field: "numero_cuenta", label: "Número cuenta", type: "text" },
-    { field: "confirmacion_poder", label: "Confirmación Poder", type: "boolean" },
-    { field: "consulta_cen", label: "Consulta CEN", type: "text" },
-    { field: "respuesta_cen", label: "Respuesta CEN", type: "text" },
-    { field: "estado_trabajador", label: "Estado Trabajador", type: "text" },
-    { field: "facturado_cliente", label: "Facturado cliente", type: "text" },
-    { field: "facturado_finanfix", label: "Facturado Finanfix", type: "text" },
-  ];
+  const fields = recordFilterFields;
+  const selectedColumns = useMemo(() => recordColumns.filter((column) => visibleColumns.includes(column.field)), [visibleColumns]);
+
+  function toggleColumn(field: string) {
+    setVisibleColumns((prev) => prev.includes(field) ? prev.filter((item) => item !== field) : [...prev, field]);
+  }
+
+  function resetColumns() {
+    setVisibleColumns(defaultRecordColumnFields);
+  }
+
+  function selectAllColumns() {
+    setVisibleColumns(recordColumns.map((column) => column.field));
+  }
 
   const filteredRows = useMemo(() => {
     let data = [...rows];
@@ -321,18 +297,8 @@ export default function RecordsPage() {
     if (quickSearch.trim()) {
       const q = quickSearch.toLowerCase();
       data = data.filter((row) =>
-        [
-          row.mandante?.name,
-          row.entidad,
-          row.grupo_empresa,
-          row.rut,
-          row.estado_gestion,
-          row.razon_social,
-          row.numero_solicitud,
-          row.mes_produccion_2026,
-          row.company?.razon_social,
-          row.lineAfp?.afp_name,
-        ]
+        recordColumns
+          .map((column) => column.value(row))
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(q))
       );
@@ -355,6 +321,7 @@ export default function RecordsPage() {
         <div className="zoho-module-actions">
           <button className="zoho-btn">Filtrar</button>
           <button className="zoho-btn">Ordenar</button>
+          <button className="zoho-btn" onClick={() => setColumnModalOpen(true)}>Campos / columnas</button>
           <button className="zoho-btn zoho-btn-primary" onClick={() => setModalOpen(true)}>
             Crear Registro de empresa
           </button>
@@ -398,35 +365,29 @@ export default function RecordsPage() {
               <thead>
                 <tr>
                   <th><input type="checkbox" /></th>
-                  <th>Mandante</th>
-                  <th>Entidad</th>
-                  <th>Buscar Grupo</th>
-                  <th>Confirmación CC</th>
-                  <th>RUT</th>
-                  <th>Estado Gestión</th>
-                  <th>Monto Devolución</th>
-                  <th>Razón Social</th>
-                  <th>N° Solicitud</th>
-                  <th>Mes producción</th>
+                  {selectedColumns.map((column) => <th key={column.field}>{column.label}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {filteredRows.length === 0 ? (
-                  <tr><td colSpan={11}>Sin registros de empresas.</td></tr>
+                  <tr><td colSpan={selectedColumns.length + 1}>Sin registros de empresas.</td></tr>
                 ) : (
                   filteredRows.map((row) => (
                     <tr key={row.id}>
                       <td><input type="checkbox" /></td>
-                      <td>{row.mandante?.name || "—"}</td>
-                      <td className="zoho-link-cell" onClick={() => navigate(`/records/${row.id}`)}>{row.entidad || row.lineAfp?.afp_name || "—"}</td>
-                      <td>{row.grupo_empresa || row.group?.name || "—"}</td>
-                      <td>{boolLabel(row.confirmacion_cc)}</td>
-                      <td>{row.rut || row.company?.rut || "—"}</td>
-                      <td>{row.estado_gestion || "—"}</td>
-                      <td>{formatMoney(row.monto_devolucion)}</td>
-                      <td className="zoho-link-cell" onClick={() => navigate(`/records/${row.id}`)}>{row.razon_social || row.company?.razon_social || "—"}</td>
-                      <td>{row.numero_solicitud || "—"}</td>
-                      <td>{row.mes_produccion_2026 || "—"}</td>
+                      {selectedColumns.map((column) => {
+                        const value = column.value(row);
+                        const clickable = ["razon_social", "entidad", "company.razon_social", "lineAfp.afp_name"].includes(column.field);
+                        return (
+                          <td
+                            key={`${row.id}-${column.field}`}
+                            className={clickable ? "zoho-link-cell" : ""}
+                            onClick={clickable ? () => navigate(`/records/${row.id}`) : undefined}
+                          >
+                            {formatCellValue(value, column)}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))
                 )}
@@ -436,6 +397,25 @@ export default function RecordsPage() {
         </section>
       </div>
 
+      <ZohoModal title="Campos visibles en Registros de empresas" isOpen={columnModalOpen} onClose={() => setColumnModalOpen(false)}>
+        <div className="column-picker-actions">
+          <button className="zoho-btn" onClick={selectAllColumns}>Mostrar todos</button>
+          <button className="zoho-btn" onClick={resetColumns}>Vista estándar</button>
+          <button className="zoho-btn zoho-btn-primary" onClick={() => setColumnModalOpen(false)}>Aplicar</button>
+        </div>
+        <div className="column-picker-grid">
+          {recordColumns.map((column) => (
+            <label key={column.field} className="column-picker-item">
+              <input
+                type="checkbox"
+                checked={visibleColumns.includes(column.field)}
+                onChange={() => toggleColumn(column.field)}
+              />
+              <span>{column.label}</span>
+            </label>
+          ))}
+        </div>
+      </ZohoModal>
       <ZohoModal title="Crear Registro de empresa" isOpen={modalOpen} onClose={() => setModalOpen(false)}>
         <FormSection title="0. Asociación">
           <Field label="Mandante">

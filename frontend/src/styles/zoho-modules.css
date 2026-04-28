@@ -1180,3 +1180,75 @@
 /* ===== OperaFix v24: versión ejecutiva con filtros, meta mensual, portal avanzado e IA accionable ===== */
 .dashboard-filter-card{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px;margin:14px 0;box-shadow:0 10px 28px rgba(15,23,42,.05)}
 .dashboard-goal-input{display:grid;gap:5px}.dashboard-goal-input span{font-size:12px;color:#64748b;font-weight:800;text-transform:uppercase;letter-spacing:.04em}.dashboard-progress{height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin-top:5px}.dashboard-progress div{height:100%;background:linear-gradient(90deg,#16a34a,#22c55e);border-radius:999px}.dashboard-grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px;margin-bottom:18px}.portal-summary-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:16px}.portal-summary-strip div{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px;box-shadow:0 8px 22px rgba(15,23,42,.05)}.portal-summary-strip span{display:block;color:#64748b;font-size:12px;text-transform:uppercase;font-weight:800;letter-spacing:.04em}.portal-summary-strip strong{display:block;margin-top:6px;font-size:22px;color:#0f172a}.portal-progress{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}.portal-progress div{display:grid;place-items:center;gap:5px;padding:8px;border-radius:12px;background:#f1f5f9;color:#64748b;text-align:center}.portal-progress div.active{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}.portal-progress span{display:grid;place-items:center;width:22px;height:22px;border-radius:999px;background:#cbd5e1;color:#fff;font-weight:900;font-size:12px}.portal-progress div.active span{background:#2563eb}.portal-progress small{font-size:11px;font-weight:800}.portal-card-metrics-secondary div{background:#fff}.portal-documents a{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center}.portal-documents a span{background:#eef4ff;color:#1d4ed8;border-radius:999px;padding:3px 7px;font-size:11px;font-weight:800}.ai-card-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.ai-template{border-radius:12px;padding:10px 12px;margin-top:8px;background:#eff6ff;color:#1d4ed8}.ai-plan-card{margin-bottom:16px}.ai-plan-card pre{margin:0;white-space:pre-wrap;background:#0f172a;color:#e2e8f0;border-radius:12px;padding:14px;line-height:1.5;font-size:13px;max-height:420px;overflow:auto}@media(max-width:900px){.dashboard-grid-2{grid-template-columns:1fr}.portal-progress{grid-template-columns:repeat(2,1fr)}}
+
+/* v25: selector dinámico de campos y filtros avanzados */
+.column-picker-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.column-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 8px;
+  max-height: 520px;
+  overflow: auto;
+  padding: 4px;
+}
+
+.column-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d8e2f1;
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.column-picker-item:hover {
+  border-color: #2f80ed;
+  background: #f5f9ff;
+}
+
+.zoho-table-scroll {
+  width: 100%;
+  overflow: auto;
+}
+
+.zoho-table th,
+.zoho-table td {
+  white-space: nowrap;
+}
+
+.dashboard-advanced-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) 1fr;
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+
+.dashboard-filter-help {
+  border: 1px solid #d8e2f1;
+  background: #f8fbff;
+  border-radius: 12px;
+  padding: 16px;
+  color: #344563;
+  font-size: 14px;
+}
+
+.dashboard-records-card {
+  margin-top: 16px;
+}
+
+@media (max-width: 900px) {
+  .dashboard-advanced-layout {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchJson } from "../api";
+import ModuleFilterPanel from "../components/ModuleFilterPanel";
+import ZohoModal from "../components/ZohoModal";
+import type { FilterRule } from "../types";
 import type { RecordItem } from "../types-records";
+import { defaultRecordColumnFields, formatCellValue, getValueByPath, recordColumns, recordFilterFields, type RecordColumnDefinition } from "../utils-record-fields";
 
 function money(value: number) {
   return new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(value || 0);
@@ -16,6 +20,24 @@ function keyText(value: unknown, fallback = "Sin información") {
   const text = String(value || "").trim();
   return text || fallback;
 }
+
+function matchRule(value: unknown, rule: FilterRule) {
+  const normalized = String(value ?? "").toLowerCase();
+  const query = String(rule.value ?? "").toLowerCase();
+
+  switch (rule.operator) {
+    case "equals": return normalized === query;
+    case "not_equals": return normalized !== query;
+    case "contains": return normalized.includes(query);
+    case "not_contains": return !normalized.includes(query);
+    case "starts_with": return normalized.startsWith(query);
+    case "ends_with": return normalized.endsWith(query);
+    case "includes_all": return query.split(",").map((x) => x.trim()).filter(Boolean).every((part) => normalized.includes(part));
+    case "includes_any": return query.split(",").map((x) => x.trim()).filter(Boolean).some((part) => normalized.includes(part));
+    default: return true;
+  }
+}
+
 
 function daysSince(value?: string | null) {
   if (!value) return 999;
@@ -36,19 +58,9 @@ function groupSum(rows: RecordItem[], keyGetter: (row: RecordItem) => string, am
   return Array.from(map.values()).sort((a, b) => b.amount - a.amount || b.count - a.count);
 }
 
-function exportCsv(filename: string, rows: RecordItem[]) {
-  const headers = ["Mandante", "Razon Social", "RUT", "AFP", "Estado", "Monto Devolucion", "N Solicitud", "Fecha Presentacion", "Ultima Actividad"];
-  const body = rows.map((row) => [
-    row.mandante?.name || (row as any).mandante || "",
-    row.razon_social || row.company?.razon_social || "",
-    row.rut || row.company?.rut || "",
-    row.entidad || row.lineAfp?.afp_name || "",
-    row.estado_gestion || "",
-    String(numberValue(row.monto_devolucion)),
-    row.numero_solicitud || "",
-    row.fecha_presentacion_afp || "",
-    row.last_activity_at || row.updated_at || row.created_at || "",
-  ]);
+function exportCsv(filename: string, rows: RecordItem[], columns: RecordColumnDefinition[]) {
+  const headers = columns.map((column) => column.label);
+  const body = rows.map((row) => columns.map((column) => formatCellValue(column.value(row), column)));
   const csv = [headers, ...body].map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";")).join("\n");
   const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -66,6 +78,10 @@ export default function DashboardExecutivePage() {
   const [mandante, setMandante] = useState("todos");
   const [estado, setEstado] = useState("todos");
   const [tipo, setTipo] = useState("todos");
+  const [activeRules, setActiveRules] = useState<FilterRule[]>([]);
+  const [quickSearch, setQuickSearch] = useState("");
+  const [columnModalOpen, setColumnModalOpen] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => defaultRecordColumnFields);
   const [metaMensual, setMetaMensual] = useState(83000000);
 
   async function load() {
@@ -85,14 +101,45 @@ export default function DashboardExecutivePage() {
   const mandantes = useMemo(() => Array.from(new Set(rows.map((row) => keyText(row.mandante?.name || (row as any).mandante, "Sin mandante")))).sort(), [rows]);
   const estados = useMemo(() => Array.from(new Set(rows.map((row) => keyText(row.estado_gestion, "Sin estado")))).sort(), [rows]);
 
+  const selectedColumns = useMemo(() => recordColumns.filter((column) => visibleColumns.includes(column.field)), [visibleColumns]);
+
+  function toggleColumn(field: string) {
+    setVisibleColumns((prev) => prev.includes(field) ? prev.filter((item) => item !== field) : [...prev, field]);
+  }
+
+  function resetColumns() {
+    setVisibleColumns(defaultRecordColumnFields);
+  }
+
+  function selectAllColumns() {
+    setVisibleColumns(recordColumns.map((column) => column.field));
+  }
+
   const data = useMemo(() => rows.filter((row) => {
     const rowMandante = keyText(row.mandante?.name || (row as any).mandante, "Sin mandante");
     const rowEstado = keyText(row.estado_gestion, "Sin estado");
     const rowTipo = keyText(row.management_type || row.motivo_tipo_exceso, "Sin tipo");
-    return (mandante === "todos" || rowMandante === mandante)
+    const matchesTopFilters = (mandante === "todos" || rowMandante === mandante)
       && (estado === "todos" || rowEstado === estado)
       && (tipo === "todos" || rowTipo === tipo);
-  }), [rows, mandante, estado, tipo]);
+
+    if (!matchesTopFilters) return false;
+
+    if (quickSearch.trim()) {
+      const q = quickSearch.toLowerCase();
+      const matchesSearch = recordColumns
+        .map((column) => column.value(row))
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q));
+      if (!matchesSearch) return false;
+    }
+
+    if (activeRules.length) {
+      return activeRules.every((rule) => matchRule(getValueByPath(row, rule.field), rule));
+    }
+
+    return true;
+  }), [rows, mandante, estado, tipo, quickSearch, activeRules]);
 
   const totalDevolucion = data.reduce((sum, row) => sum + numberValue(row.monto_devolucion), 0);
   const totalFinanfix = data.reduce((sum, row) => sum + numberValue(row.monto_real_finanfix_solutions || row.monto_finanfix_solutions), 0);
@@ -127,7 +174,8 @@ export default function DashboardExecutivePage() {
           <p>Control de recuperación por mandante, AFP, estado, antigüedad, prioridad y meta mensual.</p>
         </div>
         <div className="zoho-module-actions">
-          <button className="zoho-btn" onClick={() => exportCsv("operafix_dashboard.csv", data)}>Exportar CSV</button>
+          <button className="zoho-btn" onClick={() => exportCsv("operafix_dashboard.csv", data, selectedColumns)}>Exportar CSV</button>
+          <button className="zoho-btn" onClick={() => setColumnModalOpen(true)}>Campos / columnas</button>
           <button className="zoho-btn" onClick={load}>Actualizar</button>
         </div>
       </div>
@@ -151,6 +199,20 @@ export default function DashboardExecutivePage() {
           <input className="zoho-input" type="number" value={metaMensual} onChange={(e) => setMetaMensual(Number(e.target.value || 0))} />
         </label>
       </section>
+
+      <div className="dashboard-advanced-layout">
+        <ModuleFilterPanel
+          title="Filtrar dashboard por cualquier campo"
+          fields={recordFilterFields}
+          onApply={(rules, search) => {
+            setActiveRules(rules);
+            setQuickSearch(search);
+          }}
+        />
+        <div className="dashboard-filter-help">
+          <strong>Campos disponibles:</strong> puedes filtrar por mandante, AFP, RUT, montos, fechas, facturación, CEN, poder, CC, estado, documentos y más.
+        </div>
+      </div>
 
       {loading ? <div className="zoho-empty">Cargando dashboard...</div> : (
         <>
@@ -204,8 +266,46 @@ export default function DashboardExecutivePage() {
               </table>
             </div>
           </section>
+
+          <section className="zoho-card dashboard-records-card">
+            <div className="zoho-card-title-row">
+              <h2>Detalle dinámico del dashboard</h2>
+              <button className="zoho-btn" onClick={() => setColumnModalOpen(true)}>Elegir campos</button>
+            </div>
+            <div className="zoho-table-scroll">
+              <table className="zoho-table compact">
+                <thead>
+                  <tr>
+                    {selectedColumns.map((column) => <th key={column.field}>{column.label}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.map((row) => (
+                    <tr key={row.id} className="clickable-row" onClick={() => navigate(`/records/${row.id}`)}>
+                      {selectedColumns.map((column) => <td key={`${row.id}-${column.field}`}>{formatCellValue(column.value(row), column)}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </>
       )}
+      <ZohoModal title="Campos visibles del dashboard" isOpen={columnModalOpen} onClose={() => setColumnModalOpen(false)}>
+        <div className="column-picker-actions">
+          <button className="zoho-btn" onClick={selectAllColumns}>Mostrar todos</button>
+          <button className="zoho-btn" onClick={resetColumns}>Vista estándar</button>
+          <button className="zoho-btn zoho-btn-primary" onClick={() => setColumnModalOpen(false)}>Aplicar</button>
+        </div>
+        <div className="column-picker-grid">
+          {recordColumns.map((column) => (
+            <label key={column.field} className="column-picker-item">
+              <input type="checkbox" checked={visibleColumns.includes(column.field)} onChange={() => toggleColumn(column.field)} />
+              <span>{column.label}</span>
+            </label>
+          ))}
+        </div>
+      </ZohoModal>
     </div>
   );
 }
