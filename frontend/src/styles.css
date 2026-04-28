@@ -203,3 +203,14 @@ button { cursor: pointer; }
 .hierarchy-company-item span, .hierarchy-company-item small { color:#64748b; }
 .empty-inline { color:#94a3b8; font-size:13px; }
 .card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:16px; }
+
+/* V26 - fallback global horizontal scroll */
+.zoho-table-horizontal-scroll { width: 100%; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
+.zoho-table-wide { min-width: max-content; width: max-content; }
+.zoho-table-wide th, .zoho-table-wide td { min-width: 140px; white-space: nowrap; }
+.column-order-controls { display: inline-flex; align-items: center; gap: 5px; }
+.mini-order-btn { width: 28px; height: 26px; border: 1px solid #b9d3f5; border-radius: 7px; background: #fff; color: #0b63ce; cursor: pointer; font-weight: 800; }
+.mini-order-btn:disabled { opacity: .35; cursor: not-allowed; }
+.column-position { min-width: 28px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: #eaf2ff; color: #0b4e9c; font-weight: 700; font-size: 12px; }
+.column-picker-order-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.column-order-help { margin: 10px 0 12px; padding: 10px 12px; background: #f4f8ff; border: 1px solid #d7e7ff; border-radius: 10px; color: #24415f; font-size: 13px; }

@@ -169,7 +169,18 @@ export default function RecordsPage() {
   const [quickSearch, setQuickSearch] = useState("");
   const [activeView, setActiveView] = useState("todos");
   const [columnModalOpen, setColumnModalOpen] = useState(false);
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => defaultRecordColumnFields);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("operafix_records_visible_columns_v26");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length) {
+          return parsed.filter((field) => recordColumns.some((column) => column.field === field));
+        }
+      }
+    } catch {}
+    return defaultRecordColumnFields;
+  });
 
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -213,6 +224,10 @@ export default function RecordsPage() {
     loadMandantes();
     loadAfps();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("operafix_records_visible_columns_v26", JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
 
   function updateForm(field: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -266,10 +281,26 @@ export default function RecordsPage() {
   }
 
   const fields = recordFilterFields;
-  const selectedColumns = useMemo(() => recordColumns.filter((column) => visibleColumns.includes(column.field)), [visibleColumns]);
+  const selectedColumns = useMemo(() => {
+    return visibleColumns
+      .map((field) => recordColumns.find((column) => column.field === field))
+      .filter(Boolean) as typeof recordColumns;
+  }, [visibleColumns]);
 
   function toggleColumn(field: string) {
     setVisibleColumns((prev) => prev.includes(field) ? prev.filter((item) => item !== field) : [...prev, field]);
+  }
+
+  function moveColumn(field: string, direction: "left" | "right") {
+    setVisibleColumns((prev) => {
+      const index = prev.indexOf(field);
+      if (index === -1) return prev;
+      const targetIndex = direction === "left" ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+      return next;
+    });
   }
 
   function resetColumns() {
@@ -352,7 +383,7 @@ export default function RecordsPage() {
           }}
         />
 
-        <section className="zoho-table-wrap">
+        <section className="zoho-table-wrap zoho-table-wrap-scroll">
           <div className="zoho-table-toolbar">
             <span>Registros totales {filteredRows.length}</span>
             <span className="zoho-table-range">1 a {Math.min(filteredRows.length, 100)}</span>
@@ -361,7 +392,8 @@ export default function RecordsPage() {
           {loading ? (
             <div className="zoho-empty">Cargando registros...</div>
           ) : (
-            <table className="zoho-table">
+            <div className="zoho-table-horizontal-scroll">
+            <table className="zoho-table zoho-table-wide">
               <thead>
                 <tr>
                   <th><input type="checkbox" /></th>
@@ -393,6 +425,7 @@ export default function RecordsPage() {
                 )}
               </tbody>
             </table>
+            </div>
           )}
         </section>
       </div>
@@ -403,17 +436,31 @@ export default function RecordsPage() {
           <button className="zoho-btn" onClick={resetColumns}>Vista estándar</button>
           <button className="zoho-btn zoho-btn-primary" onClick={() => setColumnModalOpen(false)}>Aplicar</button>
         </div>
-        <div className="column-picker-grid">
-          {recordColumns.map((column) => (
-            <label key={column.field} className="column-picker-item">
-              <input
-                type="checkbox"
-                checked={visibleColumns.includes(column.field)}
-                onChange={() => toggleColumn(column.field)}
-              />
-              <span>{column.label}</span>
-            </label>
-          ))}
+        <div className="column-order-help">
+          Marca los campos que quieres ver y usa ← / → para definir el orden en la tabla.
+        </div>
+        <div className="column-picker-grid column-picker-grid-orderable">
+          {recordColumns.map((column) => {
+            const isVisible = visibleColumns.includes(column.field);
+            const position = visibleColumns.indexOf(column.field);
+            return (
+              <div key={column.field} className={"column-picker-item column-picker-order-item " + (isVisible ? "active" : "")}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={isVisible}
+                    onChange={() => toggleColumn(column.field)}
+                  />
+                  <span>{column.label}</span>
+                </label>
+                <div className="column-order-controls">
+                  <span className="column-position">{isVisible ? position + 1 : "—"}</span>
+                  <button className="mini-order-btn" type="button" disabled={!isVisible || position <= 0} onClick={() => moveColumn(column.field, "left")}>←</button>
+                  <button className="mini-order-btn" type="button" disabled={!isVisible || position === visibleColumns.length - 1} onClick={() => moveColumn(column.field, "right")}>→</button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </ZohoModal>
       <ZohoModal title="Crear Registro de empresa" isOpen={modalOpen} onClose={() => setModalOpen(false)}>

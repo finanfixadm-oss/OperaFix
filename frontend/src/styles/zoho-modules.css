@@ -1252,3 +1252,131 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* V26 - tablas dinámicas con scroll horizontal y orden de columnas */
+.zoho-table-wrap-scroll {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.zoho-table-horizontal-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  border-top: 1px solid #e5eef9;
+}
+
+.zoho-table-wide {
+  min-width: max-content;
+  width: max-content;
+}
+
+.zoho-table-wide th,
+.zoho-table-wide td,
+.zoho-table-scroll .zoho-table th,
+.zoho-table-scroll .zoho-table td {
+  min-width: 140px;
+  white-space: nowrap;
+}
+
+.zoho-table-wide th:first-child,
+.zoho-table-wide td:first-child {
+  min-width: 44px;
+  width: 44px;
+  position: sticky;
+  left: 0;
+  background: #fff;
+  z-index: 2;
+}
+
+.zoho-table-wide thead th:first-child {
+  background: #f8fbff;
+  z-index: 3;
+}
+
+.column-order-help {
+  margin: 10px 0 12px;
+  padding: 10px 12px;
+  background: #f4f8ff;
+  border: 1px solid #d7e7ff;
+  border-radius: 10px;
+  color: #24415f;
+  font-size: 13px;
+}
+
+.column-picker-grid-orderable {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+  max-height: 60vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.column-picker-order-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #e3ecf7;
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: #fff;
+}
+
+.column-picker-order-item.active {
+  border-color: #1f7ae0;
+  background: #f4f9ff;
+}
+
+.column-picker-order-item label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  font-size: 13px;
+}
+
+.column-picker-order-item label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.column-order-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.column-position {
+  min-width: 28px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #eaf2ff;
+  color: #0b4e9c;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.mini-order-btn {
+  width: 28px;
+  height: 26px;
+  border: 1px solid #b9d3f5;
+  border-radius: 7px;
+  background: #fff;
+  color: #0b63ce;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.mini-order-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
