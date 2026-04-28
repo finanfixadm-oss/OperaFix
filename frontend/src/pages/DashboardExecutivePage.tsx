@@ -71,6 +71,46 @@ function exportCsv(filename: string, rows: RecordItem[], columns: RecordColumnDe
   URL.revokeObjectURL(url);
 }
 
+type DashboardScopedSettings = {
+  activeRules: FilterRule[];
+  quickSearch: string;
+  visibleColumns: string[];
+};
+
+function dashboardScopedKey(mandante: string) {
+  return `operafix_dashboard_scoped_settings_v27_${mandante || "todos"}`;
+}
+
+function cleanDashboardColumns(fields: unknown) {
+  if (!Array.isArray(fields)) return defaultRecordColumnFields;
+  const clean = fields.filter((field) => typeof field === "string" && recordColumns.some((column) => column.field === field));
+  return clean.length ? clean : defaultRecordColumnFields;
+}
+
+function readDashboardScopedSettings(mandante: string): DashboardScopedSettings {
+  try {
+    const saved = localStorage.getItem(dashboardScopedKey(mandante));
+    if (!saved) return { activeRules: [], quickSearch: "", visibleColumns: defaultRecordColumnFields };
+    const parsed = JSON.parse(saved);
+    return {
+      activeRules: Array.isArray(parsed?.activeRules) ? parsed.activeRules : [],
+      quickSearch: typeof parsed?.quickSearch === "string" ? parsed.quickSearch : "",
+      visibleColumns: cleanDashboardColumns(parsed?.visibleColumns),
+    };
+  } catch {
+    return { activeRules: [], quickSearch: "", visibleColumns: defaultRecordColumnFields };
+  }
+}
+
+function saveDashboardScopedSettings(mandante: string, settings: DashboardScopedSettings) {
+  localStorage.setItem(dashboardScopedKey(mandante), JSON.stringify({
+    activeRules: settings.activeRules || [],
+    quickSearch: settings.quickSearch || "",
+    visibleColumns: cleanDashboardColumns(settings.visibleColumns),
+  }));
+}
+
+
 export default function DashboardExecutivePage() {
   const navigate = useNavigate();
   const [rows, setRows] = useState<RecordItem[]>([]);
@@ -81,18 +121,7 @@ export default function DashboardExecutivePage() {
   const [activeRules, setActiveRules] = useState<FilterRule[]>([]);
   const [quickSearch, setQuickSearch] = useState("");
   const [columnModalOpen, setColumnModalOpen] = useState(false);
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem("operafix_dashboard_visible_columns_v26");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length) {
-          return parsed.filter((field) => recordColumns.some((column) => column.field === field));
-        }
-      }
-    } catch {}
-    return defaultRecordColumnFields;
-  });
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => readDashboardScopedSettings("todos").visibleColumns);
   const [metaMensual, setMetaMensual] = useState(83000000);
 
   async function load() {
@@ -110,8 +139,17 @@ export default function DashboardExecutivePage() {
   useEffect(() => { load(); }, []);
 
   useEffect(() => {
-    localStorage.setItem("operafix_dashboard_visible_columns_v26", JSON.stringify(visibleColumns));
-  }, [visibleColumns]);
+    saveDashboardScopedSettings(mandante, { activeRules, quickSearch, visibleColumns });
+  }, [mandante, activeRules, quickSearch, visibleColumns]);
+
+  function switchMandante(nextMandante: string) {
+    saveDashboardScopedSettings(mandante, { activeRules, quickSearch, visibleColumns });
+    const nextSettings = readDashboardScopedSettings(nextMandante);
+    setActiveRules(nextSettings.activeRules);
+    setQuickSearch(nextSettings.quickSearch);
+    setVisibleColumns(nextSettings.visibleColumns);
+    setMandante(nextMandante);
+  }
 
   const mandantes = useMemo(() => Array.from(new Set(rows.map((row) => keyText(row.mandante?.name || (row as any).mandante, "Sin mandante")))).sort(), [rows]);
   const estados = useMemo(() => Array.from(new Set(rows.map((row) => keyText(row.estado_gestion, "Sin estado")))).sort(), [rows]);
@@ -212,7 +250,7 @@ export default function DashboardExecutivePage() {
       </div>
 
       <section className="dashboard-filter-card">
-        <select className="zoho-select" value={mandante} onChange={(e) => setMandante(e.target.value)}>
+        <select className="zoho-select" value={mandante} onChange={(e) => switchMandante(e.target.value)}>
           <option value="todos">Todos los mandantes</option>
           {mandantes.map((name) => <option key={name} value={name}>{name}</option>)}
         </select>
@@ -230,6 +268,8 @@ export default function DashboardExecutivePage() {
           <input className="zoho-input" type="number" value={metaMensual} onChange={(e) => setMetaMensual(Number(e.target.value || 0))} />
         </label>
       </section>
+
+      <div className="zoho-scope-hint">Los filtros avanzados y columnas del dashboard se guardan por mandante seleccionado.</div>
 
       <div className="dashboard-advanced-layout">
         <ModuleFilterPanel

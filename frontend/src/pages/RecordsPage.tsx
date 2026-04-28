@@ -157,6 +157,46 @@ function rowMatchesMandante(row: RecordItem, mandante: MandanteOption) {
   return possibleNames.includes(targetName);
 }
 
+type RecordsScopedSettings = {
+  activeRules: FilterRule[];
+  quickSearch: string;
+  visibleColumns: string[];
+};
+
+function recordsScopedKey(view: string) {
+  return `operafix_records_scoped_settings_v27_${view || "todos"}`;
+}
+
+function cleanRecordColumns(fields: unknown) {
+  if (!Array.isArray(fields)) return defaultRecordColumnFields;
+  const clean = fields.filter((field) => typeof field === "string" && recordColumns.some((column) => column.field === field));
+  return clean.length ? clean : defaultRecordColumnFields;
+}
+
+function readRecordsScopedSettings(view: string): RecordsScopedSettings {
+  try {
+    const saved = localStorage.getItem(recordsScopedKey(view));
+    if (!saved) return { activeRules: [], quickSearch: "", visibleColumns: defaultRecordColumnFields };
+    const parsed = JSON.parse(saved);
+    return {
+      activeRules: Array.isArray(parsed?.activeRules) ? parsed.activeRules : [],
+      quickSearch: typeof parsed?.quickSearch === "string" ? parsed.quickSearch : "",
+      visibleColumns: cleanRecordColumns(parsed?.visibleColumns),
+    };
+  } catch {
+    return { activeRules: [], quickSearch: "", visibleColumns: defaultRecordColumnFields };
+  }
+}
+
+function saveRecordsScopedSettings(view: string, settings: RecordsScopedSettings) {
+  localStorage.setItem(recordsScopedKey(view), JSON.stringify({
+    activeRules: settings.activeRules || [],
+    quickSearch: settings.quickSearch || "",
+    visibleColumns: cleanRecordColumns(settings.visibleColumns),
+  }));
+}
+
+
 export default function RecordsPage() {
   const navigate = useNavigate();
 
@@ -169,18 +209,7 @@ export default function RecordsPage() {
   const [quickSearch, setQuickSearch] = useState("");
   const [activeView, setActiveView] = useState("todos");
   const [columnModalOpen, setColumnModalOpen] = useState(false);
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem("operafix_records_visible_columns_v26");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length) {
-          return parsed.filter((field) => recordColumns.some((column) => column.field === field));
-        }
-      }
-    } catch {}
-    return defaultRecordColumnFields;
-  });
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => readRecordsScopedSettings("todos").visibleColumns);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -226,8 +255,17 @@ export default function RecordsPage() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("operafix_records_visible_columns_v26", JSON.stringify(visibleColumns));
-  }, [visibleColumns]);
+    saveRecordsScopedSettings(activeView, { activeRules, quickSearch, visibleColumns });
+  }, [activeView, activeRules, quickSearch, visibleColumns]);
+
+  function switchActiveView(nextView: string) {
+    saveRecordsScopedSettings(activeView, { activeRules, quickSearch, visibleColumns });
+    const nextSettings = readRecordsScopedSettings(nextView);
+    setActiveRules(nextSettings.activeRules);
+    setQuickSearch(nextSettings.quickSearch);
+    setVisibleColumns(nextSettings.visibleColumns);
+    setActiveView(nextView);
+  }
 
   function updateForm(field: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -364,14 +402,16 @@ export default function RecordsPage() {
           <button
             key={mandante.id}
             className={activeView === mandante.id ? "active" : ""}
-            onClick={() => setActiveView(mandante.id)}
+            onClick={() => switchActiveView(mandante.id)}
           >
             {mandante.name}
           </button>
         ))}
-        <button className={activeView === "mis" ? "active" : ""} onClick={() => setActiveView("mis")}>Mis Registros</button>
-        <button className={activeView === "todos" ? "active" : ""} onClick={() => setActiveView("todos")}>Todos los registros</button>
+        <button className={activeView === "mis" ? "active" : ""} onClick={() => switchActiveView("mis")}>Mis Registros</button>
+        <button className={activeView === "todos" ? "active" : ""} onClick={() => switchActiveView("todos")}>Todos los registros</button>
       </div>
+
+      <div className="zoho-scope-hint">Los filtros, columnas visibles y orden de columnas quedan guardados solo para la vista seleccionada.</div>
 
       <div className="zoho-module-layout">
         <ModuleFilterPanel
