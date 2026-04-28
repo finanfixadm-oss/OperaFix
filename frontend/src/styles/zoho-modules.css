@@ -1450,3 +1450,281 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* v30 - Constructor de paneles tipo Zoho */
+.dashboard-builder-section {
+  margin: 18px 0;
+}
+
+.dashboard-builder-title {
+  margin-bottom: 10px;
+}
+
+.dashboard-builder-title p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.dashboard-custom-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.custom-dashboard-panel {
+  min-height: 220px;
+  overflow: hidden;
+}
+
+.custom-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #e5edf7;
+  padding-bottom: 10px;
+}
+
+.custom-panel-header h3 {
+  margin: 0;
+  color: #0f2544;
+  font-size: 16px;
+}
+
+.custom-panel-header small {
+  color: #60708a;
+}
+
+.custom-panel-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.zoho-btn.small {
+  padding: 5px 9px;
+  font-size: 12px;
+}
+
+.zoho-btn.danger {
+  border-color: #fecaca;
+  color: #b91c1c;
+  background: #fff5f5;
+}
+
+.custom-kpi-big {
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  color: #0f2544;
+}
+
+.custom-kpi-big strong {
+  font-size: 34px;
+}
+
+.custom-kpi-big span {
+  color: #64748b;
+}
+
+.custom-bar-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.custom-bar-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #0f2544;
+  font-size: 13px;
+}
+
+.custom-bar-label span {
+  color: #1f7ae0;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.custom-bar-track {
+  height: 12px;
+  border-radius: 999px;
+  background: #e7eef8;
+  overflow: hidden;
+}
+
+.custom-bar-track div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #1f7ae0, #58c4e6);
+}
+
+.custom-pie-layout {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 18px;
+  align-items: center;
+}
+
+.custom-pie {
+  width: 170px;
+  height: 170px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  position: relative;
+  margin: auto;
+}
+
+.custom-pie::after {
+  content: "";
+  position: absolute;
+  width: 92px;
+  height: 92px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px #e5edf7;
+}
+
+.custom-pie span {
+  position: relative;
+  z-index: 1;
+  max-width: 84px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #0f2544;
+}
+
+.custom-pie-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.custom-pie-legend div {
+  display: grid;
+  grid-template-columns: 12px 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.custom-pie-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.custom-pie-legend strong {
+  color: #0f4fb3;
+}
+
+.custom-panel-table-scroll {
+  max-height: 260px;
+}
+
+.custom-panel-records {
+  margin-top: 12px;
+  border-top: 1px solid #e5edf7;
+  padding-top: 10px;
+}
+
+.custom-panel-records summary {
+  cursor: pointer;
+  color: #0f4fb3;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.custom-panel-record-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.custom-panel-record-list button {
+  border: 1px solid #cfe1ff;
+  color: #0f4fb3;
+  background: #f6fbff;
+  border-radius: 999px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.dashboard-panel-editor {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.9fr) minmax(360px, 1.1fr);
+  gap: 18px;
+  max-height: 65vh;
+  overflow: auto;
+  padding-right: 6px;
+}
+
+.panel-editor-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.panel-editor-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f2544;
+}
+
+.panel-editor-block {
+  border: 1px solid #d9e8fb;
+  border-radius: 12px;
+  padding: 12px;
+  background: #f8fbff;
+}
+
+.panel-editor-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.panel-editor-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(90px, .5fr) minmax(120px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.panel-editor-block .panel-editor-row:has(.zoho-btn.danger):not(:has(input)) {
+  grid-template-columns: minmax(180px, 1fr) auto;
+}
+
+.zoho-select.short {
+  min-width: 90px;
+}
+
+.panel-editor-preview {
+  min-width: 0;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-custom-grid,
+  .dashboard-panel-editor {
+    grid-template-columns: 1fr;
+  }
+
+  .custom-pie-layout {
+    grid-template-columns: 1fr;
+  }
+}
