@@ -157,11 +157,19 @@ function rowMatchesMandante(row: RecordItem, mandante: MandanteOption) {
   return possibleNames.includes(targetName);
 }
 
+type SortDirection = "asc" | "desc";
+
+type RecordsSortState = {
+  field: string;
+  direction: SortDirection;
+};
+
 type RecordsScopedSettings = {
   activeRules: FilterRule[];
   quickSearch: string;
   visibleColumns: string[];
   columnOrder: string[];
+  sort: RecordsSortState;
 };
 
 function recordsScopedKey(view: string) {
@@ -172,6 +180,37 @@ function cleanRecordColumns(fields: unknown) {
   if (!Array.isArray(fields)) return defaultRecordColumnFields;
   const clean = fields.filter((field) => typeof field === "string" && recordColumns.some((column) => column.field === field));
   return clean.length ? clean : defaultRecordColumnFields;
+}
+
+function defaultRecordSort(): RecordsSortState {
+  return { field: "updated_at", direction: "desc" };
+}
+
+function cleanRecordSort(sort: unknown): RecordsSortState {
+  const parsed = sort as Partial<RecordsSortState> | null | undefined;
+  const field = typeof parsed?.field === "string" && recordColumns.some((column) => column.field === parsed.field)
+    ? parsed.field
+    : defaultRecordSort().field;
+  const direction: SortDirection = parsed?.direction === "asc" ? "asc" : "desc";
+  return { field, direction };
+}
+
+function getRecordFieldValue(row: RecordItem, field: string) {
+  const column = recordColumns.find((item) => item.field === field);
+  if (column) return column.value(row);
+  return getValueByPath(row, field);
+}
+
+function compareRecordValues(a: unknown, b: unknown, field: string) {
+  const column = recordColumns.find((item) => item.field === field);
+  if (column?.type === "number") return Number(a || 0) - Number(b || 0);
+  if (column?.type === "date") {
+    const at = a ? new Date(String(a)).getTime() : 0;
+    const bt = b ? new Date(String(b)).getTime() : 0;
+    return (Number.isFinite(at) ? at : 0) - (Number.isFinite(bt) ? bt : 0);
+  }
+  if (typeof a === "boolean" || typeof b === "boolean") return Number(Boolean(a)) - Number(Boolean(b));
+  return String(a ?? "").localeCompare(String(b ?? ""), "es", { numeric: true, sensitivity: "base" });
 }
 
 function cleanRecordColumnOrder(fields: unknown) {
@@ -185,16 +224,17 @@ function cleanRecordColumnOrder(fields: unknown) {
 function readRecordsScopedSettings(view: string): RecordsScopedSettings {
   try {
     const saved = localStorage.getItem(recordsScopedKey(view));
-    if (!saved) return { activeRules: [], quickSearch: "", visibleColumns: defaultRecordColumnFields, columnOrder: cleanRecordColumnOrder(null) };
+    if (!saved) return { activeRules: [], quickSearch: "", visibleColumns: defaultRecordColumnFields, columnOrder: cleanRecordColumnOrder(null), sort: defaultRecordSort() };
     const parsed = JSON.parse(saved);
     return {
       activeRules: Array.isArray(parsed?.activeRules) ? parsed.activeRules : [],
       quickSearch: typeof parsed?.quickSearch === "string" ? parsed.quickSearch : "",
       visibleColumns: cleanRecordColumns(parsed?.visibleColumns),
       columnOrder: cleanRecordColumnOrder(parsed?.columnOrder),
+      sort: cleanRecordSort(parsed?.sort),
     };
   } catch {
-    return { activeRules: [], quickSearch: "", visibleColumns: defaultRecordColumnFields, columnOrder: cleanRecordColumnOrder(null) };
+    return { activeRules: [], quickSearch: "", visibleColumns: defaultRecordColumnFields, columnOrder: cleanRecordColumnOrder(null), sort: defaultRecordSort() };
   }
 }
 
@@ -204,6 +244,7 @@ function saveRecordsScopedSettings(view: string, settings: RecordsScopedSettings
     quickSearch: settings.quickSearch || "",
     visibleColumns: cleanRecordColumns(settings.visibleColumns),
     columnOrder: cleanRecordColumnOrder(settings.columnOrder),
+    sort: cleanRecordSort(settings.sort),
   }));
 }
 
@@ -220,9 +261,12 @@ export default function RecordsPage() {
   const [quickSearch, setQuickSearch] = useState("");
   const [activeView, setActiveView] = useState("todos");
   const [columnModalOpen, setColumnModalOpen] = useState(false);
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
+  const [sortModalOpen, setSortModalOpen] = useState(false);
   const initialRecordsSettings = readRecordsScopedSettings("todos");
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => initialRecordsSettings.visibleColumns);
   const [columnOrder, setColumnOrder] = useState<string[]>(() => initialRecordsSettings.columnOrder);
+  const [sort, setSort] = useState<RecordsSortState>(() => initialRecordsSettings.sort);
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -269,16 +313,17 @@ export default function RecordsPage() {
   }, []);
 
   useEffect(() => {
-    saveRecordsScopedSettings(activeView, { activeRules, quickSearch, visibleColumns, columnOrder });
-  }, [activeView, activeRules, quickSearch, visibleColumns, columnOrder]);
+    saveRecordsScopedSettings(activeView, { activeRules, quickSearch, visibleColumns, columnOrder, sort });
+  }, [activeView, activeRules, quickSearch, visibleColumns, columnOrder, sort]);
 
   function switchActiveView(nextView: string) {
-    saveRecordsScopedSettings(activeView, { activeRules, quickSearch, visibleColumns, columnOrder });
+    saveRecordsScopedSettings(activeView, { activeRules, quickSearch, visibleColumns, columnOrder, sort });
     const nextSettings = readRecordsScopedSettings(nextView);
     setActiveRules(nextSettings.activeRules);
     setQuickSearch(nextSettings.quickSearch);
     setVisibleColumns(nextSettings.visibleColumns);
     setColumnOrder(nextSettings.columnOrder);
+    setSort(nextSettings.sort);
     setActiveView(nextView);
   }
 
@@ -413,11 +458,36 @@ export default function RecordsPage() {
     }
 
     if (activeRules.length) {
-      data = data.filter((row) => activeRules.every((rule) => matchRule(getValueByPath(row, rule.field), rule)));
+      data = data.filter((row) => activeRules.every((rule) => matchRule(getRecordFieldValue(row, rule.field), rule)));
     }
 
     return data;
   }, [rows, activeRules, quickSearch, activeView, mandantes]);
+
+  const sortedRows = useMemo(() => {
+    const selectedSort = cleanRecordSort(sort);
+    const directionMultiplier = selectedSort.direction === "asc" ? 1 : -1;
+    return [...filteredRows].sort((a, b) => {
+      const result = compareRecordValues(
+        getRecordFieldValue(a, selectedSort.field),
+        getRecordFieldValue(b, selectedSort.field),
+        selectedSort.field
+      );
+      return result * directionMultiplier;
+    });
+  }, [filteredRows, sort]);
+
+  const currentSortLabel = recordColumns.find((column) => column.field === sort.field)?.label || "Fecha actualización";
+
+  function clearAdvancedFilters() {
+    setActiveRules([]);
+    setQuickSearch("");
+  }
+
+  function applyStandardSort() {
+    setSort(defaultRecordSort());
+    setSortModalOpen(false);
+  }
 
   return (
     <div className="zoho-module-page">
@@ -427,8 +497,8 @@ export default function RecordsPage() {
           <p>Lista de líneas/casos de gestión por empresa, AFP y mandante</p>
         </div>
         <div className="zoho-module-actions">
-          <button className="zoho-btn">Filtrar</button>
-          <button className="zoho-btn">Ordenar</button>
+          <button className="zoho-btn" onClick={() => setFilterModalOpen(true)}>Filtrar</button>
+          <button className="zoho-btn" onClick={() => setSortModalOpen(true)}>Ordenar</button>
           <button className="zoho-btn" onClick={() => setColumnModalOpen(true)}>Campos / columnas</button>
           <button className="zoho-btn zoho-btn-primary" onClick={() => setModalOpen(true)}>
             Crear Registro de empresa
@@ -464,8 +534,8 @@ export default function RecordsPage() {
 
         <section className="zoho-table-wrap zoho-table-wrap-scroll">
           <div className="zoho-table-toolbar">
-            <span>Registros totales {filteredRows.length}</span>
-            <span className="zoho-table-range">1 a {Math.min(filteredRows.length, 100)}</span>
+            <span>Registros totales {sortedRows.length}</span>
+            <span className="zoho-table-range">Orden: {currentSortLabel} · {sort.direction === "asc" ? "Asc" : "Desc"} · 1 a {Math.min(sortedRows.length, 100)}</span>
           </div>
 
           {loading ? (
@@ -480,10 +550,10 @@ export default function RecordsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredRows.length === 0 ? (
+                {sortedRows.length === 0 ? (
                   <tr><td colSpan={selectedColumns.length + 1}>Sin registros de empresas.</td></tr>
                 ) : (
-                  filteredRows.map((row) => (
+                  sortedRows.map((row) => (
                     <tr key={row.id}>
                       <td><input type="checkbox" /></td>
                       {selectedColumns.map((column) => {
@@ -508,6 +578,48 @@ export default function RecordsPage() {
           )}
         </section>
       </div>
+
+      <ZohoModal title="Filtrar registros" isOpen={filterModalOpen} onClose={() => setFilterModalOpen(false)}>
+        <div className="modal-helper-text">
+          Aplica filtros solo para la vista actual: <strong>{activeView === "todos" ? "Todos los registros" : activeView === "mis" ? "Mis Registros" : mandantes.find((m) => m.id === activeView)?.name || "Mandante"}</strong>.
+        </div>
+        <ModuleFilterPanel
+          title="Filtros avanzados"
+          fields={fields}
+          onApply={(rules, search) => {
+            setActiveRules(rules);
+            setQuickSearch(search);
+            setFilterModalOpen(false);
+          }}
+        />
+        <div className="zoho-form-actions">
+          <button className="zoho-btn" onClick={clearAdvancedFilters}>Limpiar filtros</button>
+          <button className="zoho-btn zoho-btn-primary" onClick={() => setFilterModalOpen(false)}>Cerrar</button>
+        </div>
+      </ZohoModal>
+
+      <ZohoModal title="Ordenar registros" isOpen={sortModalOpen} onClose={() => setSortModalOpen(false)}>
+        <div className="sort-panel-grid">
+          <Field label="Campo para ordenar">
+            <select className="zoho-select" value={sort.field} onChange={(e) => setSort((prev) => ({ ...prev, field: e.target.value }))}>
+              {recordColumns.map((column) => <option key={column.field} value={column.field}>{column.label}</option>)}
+            </select>
+          </Field>
+          <Field label="Dirección">
+            <select className="zoho-select" value={sort.direction} onChange={(e) => setSort((prev) => ({ ...prev, direction: e.target.value as SortDirection }))}>
+              <option value="asc">Ascendente</option>
+              <option value="desc">Descendente</option>
+            </select>
+          </Field>
+        </div>
+        <div className="sort-preview-box">
+          Orden actual: <strong>{currentSortLabel}</strong> · <strong>{sort.direction === "asc" ? "Ascendente" : "Descendente"}</strong>
+        </div>
+        <div className="zoho-form-actions">
+          <button className="zoho-btn" onClick={applyStandardSort}>Orden estándar</button>
+          <button className="zoho-btn zoho-btn-primary" onClick={() => setSortModalOpen(false)}>Aplicar</button>
+        </div>
+      </ZohoModal>
 
       <ZohoModal title="Campos visibles en Registros de empresas" isOpen={columnModalOpen} onClose={() => setColumnModalOpen(false)}>
         <div className="column-picker-actions">

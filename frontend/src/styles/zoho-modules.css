@@ -1425,3 +1425,28 @@
 .column-picker-grid-orderable {
   align-items: start;
 }
+
+/* V29 filtros y orden reales */
+.modal-helper-text,
+.sort-preview-box {
+  border: 1px solid #d7e6fb;
+  background: #f5f9ff;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  color: #14345c;
+  font-size: 14px;
+}
+
+.sort-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 720px) {
+  .sort-panel-grid {
+    grid-template-columns: 1fr;
+  }
+}
