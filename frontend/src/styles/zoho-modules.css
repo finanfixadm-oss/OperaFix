@@ -1386,3 +1386,42 @@
   color: #476079;
   font-size: 12px;
 }
+
+/* V28 - ordenar campos con drag & drop */
+.draggable-column-item {
+  cursor: grab;
+  user-select: none;
+}
+
+.draggable-column-item:active {
+  cursor: grabbing;
+}
+
+.draggable-column-item.dragging {
+  opacity: 0.55;
+  transform: scale(0.985);
+  border-style: dashed;
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.14);
+}
+
+.drag-handle {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #eaf2ff;
+  color: #0b63ce;
+  font-weight: 900;
+  flex-shrink: 0;
+  cursor: grab;
+}
+
+.draggable-column-item:hover .drag-handle {
+  background: #dbeafe;
+}
+
+.column-picker-grid-orderable {
+  align-items: start;
+}

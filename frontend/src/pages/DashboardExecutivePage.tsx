@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchJson } from "../api";
 import ModuleFilterPanel from "../components/ModuleFilterPanel";
@@ -75,6 +75,7 @@ type DashboardScopedSettings = {
   activeRules: FilterRule[];
   quickSearch: string;
   visibleColumns: string[];
+  columnOrder: string[];
 };
 
 function dashboardScopedKey(mandante: string) {
@@ -87,18 +88,27 @@ function cleanDashboardColumns(fields: unknown) {
   return clean.length ? clean : defaultRecordColumnFields;
 }
 
+function cleanDashboardColumnOrder(fields: unknown) {
+  const allFields = recordColumns.map((column) => column.field);
+  if (!Array.isArray(fields)) return allFields;
+  const clean = fields.filter((field) => typeof field === "string" && allFields.includes(field));
+  const missing = allFields.filter((field) => !clean.includes(field));
+  return [...clean, ...missing];
+}
+
 function readDashboardScopedSettings(mandante: string): DashboardScopedSettings {
   try {
     const saved = localStorage.getItem(dashboardScopedKey(mandante));
-    if (!saved) return { activeRules: [], quickSearch: "", visibleColumns: defaultRecordColumnFields };
+    if (!saved) return { activeRules: [], quickSearch: "", visibleColumns: defaultRecordColumnFields, columnOrder: cleanDashboardColumnOrder(null) };
     const parsed = JSON.parse(saved);
     return {
       activeRules: Array.isArray(parsed?.activeRules) ? parsed.activeRules : [],
       quickSearch: typeof parsed?.quickSearch === "string" ? parsed.quickSearch : "",
       visibleColumns: cleanDashboardColumns(parsed?.visibleColumns),
+      columnOrder: cleanDashboardColumnOrder(parsed?.columnOrder),
     };
   } catch {
-    return { activeRules: [], quickSearch: "", visibleColumns: defaultRecordColumnFields };
+    return { activeRules: [], quickSearch: "", visibleColumns: defaultRecordColumnFields, columnOrder: cleanDashboardColumnOrder(null) };
   }
 }
 
@@ -107,6 +117,7 @@ function saveDashboardScopedSettings(mandante: string, settings: DashboardScoped
     activeRules: settings.activeRules || [],
     quickSearch: settings.quickSearch || "",
     visibleColumns: cleanDashboardColumns(settings.visibleColumns),
+    columnOrder: cleanDashboardColumnOrder(settings.columnOrder),
   }));
 }
 
@@ -121,7 +132,10 @@ export default function DashboardExecutivePage() {
   const [activeRules, setActiveRules] = useState<FilterRule[]>([]);
   const [quickSearch, setQuickSearch] = useState("");
   const [columnModalOpen, setColumnModalOpen] = useState(false);
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => readDashboardScopedSettings("todos").visibleColumns);
+  const initialDashboardSettings = readDashboardScopedSettings("todos");
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => initialDashboardSettings.visibleColumns);
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => initialDashboardSettings.columnOrder);
+  const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [metaMensual, setMetaMensual] = useState(83000000);
 
   async function load() {
@@ -139,15 +153,16 @@ export default function DashboardExecutivePage() {
   useEffect(() => { load(); }, []);
 
   useEffect(() => {
-    saveDashboardScopedSettings(mandante, { activeRules, quickSearch, visibleColumns });
-  }, [mandante, activeRules, quickSearch, visibleColumns]);
+    saveDashboardScopedSettings(mandante, { activeRules, quickSearch, visibleColumns, columnOrder });
+  }, [mandante, activeRules, quickSearch, visibleColumns, columnOrder]);
 
   function switchMandante(nextMandante: string) {
-    saveDashboardScopedSettings(mandante, { activeRules, quickSearch, visibleColumns });
+    saveDashboardScopedSettings(mandante, { activeRules, quickSearch, visibleColumns, columnOrder });
     const nextSettings = readDashboardScopedSettings(nextMandante);
     setActiveRules(nextSettings.activeRules);
     setQuickSearch(nextSettings.quickSearch);
     setVisibleColumns(nextSettings.visibleColumns);
+    setColumnOrder(nextSettings.columnOrder);
     setMandante(nextMandante);
   }
 
@@ -155,33 +170,57 @@ export default function DashboardExecutivePage() {
   const estados = useMemo(() => Array.from(new Set(rows.map((row) => keyText(row.estado_gestion, "Sin estado")))).sort(), [rows]);
 
   const selectedColumns = useMemo(() => {
-    return visibleColumns
+    return columnOrder
+      .filter((field) => visibleColumns.includes(field))
       .map((field) => recordColumns.find((column) => column.field === field))
       .filter(Boolean) as RecordColumnDefinition[];
-  }, [visibleColumns]);
+  }, [visibleColumns, columnOrder]);
 
   function toggleColumn(field: string) {
     setVisibleColumns((prev) => prev.includes(field) ? prev.filter((item) => item !== field) : [...prev, field]);
   }
 
-  function moveColumn(field: string, direction: "left" | "right") {
-    setVisibleColumns((prev) => {
-      const index = prev.indexOf(field);
-      if (index === -1) return prev;
-      const targetIndex = direction === "left" ? index - 1 : index + 1;
-      if (targetIndex < 0 || targetIndex >= prev.length) return prev;
-      const next = [...prev];
-      [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+  const orderedRecordColumns = useMemo(() => {
+    return columnOrder
+      .map((field) => recordColumns.find((column) => column.field === field))
+      .filter(Boolean) as RecordColumnDefinition[];
+  }, [columnOrder]);
+
+  function reorderColumn(activeField: string, overField: string) {
+    if (!activeField || !overField || activeField === overField) return;
+    setColumnOrder((prev) => {
+      const current = cleanDashboardColumnOrder(prev);
+      const fromIndex = current.indexOf(activeField);
+      const toIndex = current.indexOf(overField);
+      if (fromIndex === -1 || toIndex === -1) return current;
+      const next = [...current];
+      const [removed] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, removed);
       return next;
     });
   }
 
+  function handleColumnDragStart(field: string) {
+    setDraggedColumn(field);
+  }
+
+  function handleColumnDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+  }
+
+  function handleColumnDrop(targetField: string) {
+    if (draggedColumn) reorderColumn(draggedColumn, targetField);
+    setDraggedColumn(null);
+  }
+
   function resetColumns() {
     setVisibleColumns(defaultRecordColumnFields);
+    setColumnOrder(cleanDashboardColumnOrder(null));
   }
 
   function selectAllColumns() {
     setVisibleColumns(recordColumns.map((column) => column.field));
+    setColumnOrder(cleanDashboardColumnOrder(columnOrder));
   }
 
   const data = useMemo(() => rows.filter((row) => {
@@ -369,22 +408,30 @@ export default function DashboardExecutivePage() {
           <button className="zoho-btn zoho-btn-primary" onClick={() => setColumnModalOpen(false)}>Aplicar</button>
         </div>
         <div className="column-order-help">
-          Marca los campos que quieres ver y usa ← / → para definir el orden en la tabla.
+          Marca los campos que quieres ver y arrastra cada cuadro para definir el orden en la tabla.
         </div>
         <div className="column-picker-grid column-picker-grid-orderable">
-          {recordColumns.map((column) => {
+          {orderedRecordColumns.map((column) => {
             const isVisible = visibleColumns.includes(column.field);
-            const position = visibleColumns.indexOf(column.field);
+            const visiblePosition = columnOrder.filter((field) => visibleColumns.includes(field)).indexOf(column.field);
             return (
-              <div key={column.field} className={"column-picker-item column-picker-order-item " + (isVisible ? "active" : "")}>
+              <div
+                key={column.field}
+                className={"column-picker-item column-picker-order-item draggable-column-item " + (isVisible ? "active" : "") + (draggedColumn === column.field ? " dragging" : "")}
+                draggable
+                onDragStart={() => handleColumnDragStart(column.field)}
+                onDragOver={handleColumnDragOver}
+                onDrop={() => handleColumnDrop(column.field)}
+                onDragEnd={() => setDraggedColumn(null)}
+                title="Arrastra este campo para cambiar su posición"
+              >
+                <span className="drag-handle" aria-hidden="true">☰</span>
                 <label>
                   <input type="checkbox" checked={isVisible} onChange={() => toggleColumn(column.field)} />
                   <span>{column.label}</span>
                 </label>
                 <div className="column-order-controls">
-                  <span className="column-position">{isVisible ? position + 1 : "—"}</span>
-                  <button className="mini-order-btn" type="button" disabled={!isVisible || position <= 0} onClick={() => moveColumn(column.field, "left")}>←</button>
-                  <button className="mini-order-btn" type="button" disabled={!isVisible || position === visibleColumns.length - 1} onClick={() => moveColumn(column.field, "right")}>→</button>
+                  <span className="column-position">{isVisible ? visiblePosition + 1 : "—"}</span>
                 </div>
               </div>
             );
