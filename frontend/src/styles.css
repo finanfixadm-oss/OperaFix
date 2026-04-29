@@ -214,3 +214,27 @@ button { cursor: pointer; }
 .column-position { min-width: 28px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: #eaf2ff; color: #0b4e9c; font-weight: 700; font-size: 12px; }
 .column-picker-order-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .column-order-help { margin: 10px 0 12px; padding: 10px 12px; background: #f4f8ff; border: 1px solid #d7e7ff; border-radius: 10px; color: #24415f; font-size: 13px; }
+
+.role-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #e8f0ff;
+  color: #1f4f9a;
+  border: 1px solid #cddcff;
+}
+
+.role-chip.soft {
+  background: #fff7dd;
+  color: #7a5300;
+  border-color: #ffe3a3;
+}
+
+.crm-brand {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}

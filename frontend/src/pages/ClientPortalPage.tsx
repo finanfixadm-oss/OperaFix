@@ -58,7 +58,7 @@ export default function ClientPortalPage() {
   async function load() {
     setLoading(true);
     try {
-      setRows(await fetchJson<RecordItem[]>("/records"));
+      setRows(await fetchJson<RecordItem[]>("/portal/records"));
     } catch (error) {
       console.error(error);
       alert("No se pudo cargar el portal cliente.");
@@ -98,7 +98,7 @@ export default function ClientPortalPage() {
           <p>Vista consultiva para revisar estado, documentos, pagos, avance y trazabilidad visible por mandante.</p>
         </div>
         <div className="portal-hero-actions">
-          <select className="zoho-select" value={selectedMandante} onChange={(e) => setSelectedMandante(e.target.value)}>
+          <select className="zoho-select" value={selectedMandante} onChange={(e) => setSelectedMandante(e.target.value)} disabled={Boolean(JSON.parse(localStorage.getItem("user") || "null")?.role === "cliente")}>
             <option value="todos">Todos los mandantes</option>
             {mandantes.map((name) => <option key={name} value={name}>{name}</option>)}
           </select>

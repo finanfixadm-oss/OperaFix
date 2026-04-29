@@ -2274,3 +2274,29 @@
 .import-confirm-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .import-checkbox { display: flex; gap: 10px; align-items: center; color: #334155; }
 @media (max-width: 1100px) { .import-kpi-grid { grid-template-columns: repeat(2, 1fr); } .import-two-columns { grid-template-columns: 1fr; } .import-confirm-card, .import-table-toolbar { flex-direction: column; align-items: stretch; } }
+
+/* v55 usuarios + informes */
+.crm-user-box { display:flex; align-items:center; gap:10px; font-size:13px; color:#334155; }
+.zoho-alert { background:#eff6ff; color:#1e3a8a; border:1px solid #bfdbfe; border-radius:10px; padding:12px 14px; margin:12px 0; }
+.zoho-alert.danger { background:#fef2f2; color:#991b1b; border-color:#fecaca; }
+.zoho-card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.05); padding:18px; margin-bottom:16px; }
+.zoho-chip { display:inline-flex; align-items:center; padding:8px 12px; border-radius:999px; background:#f1f5f9; color:#334155; font-size:13px; }
+.reports-grid { display:grid; grid-template-columns:minmax(320px, 1fr) minmax(320px, 1fr); gap:16px; align-items:start; }
+.report-form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; align-items:end; }
+.report-form-grid label, .zoho-card label { display:flex; flex-direction:column; gap:6px; font-size:13px; color:#475569; }
+.report-form-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+.report-form-actions.compact { justify-content:flex-start; margin-bottom:12px; }
+.report-field-list { display:grid; gap:8px; max-height:560px; overflow:auto; padding-right:4px; }
+.report-field-card { display:grid; grid-template-columns:auto 1fr auto auto; gap:8px; align-items:center; padding:10px; border:1px solid #e5e7eb; border-radius:10px; background:#fff; cursor:pointer; }
+.report-field-card.selected { border-color:#2563eb; background:#eff6ff; }
+.report-field-card small { color:#64748b; text-transform:uppercase; font-size:10px; }
+.report-field-order { display:flex; gap:4px; }
+.report-field-order button { border:1px solid #cbd5e1; background:#fff; border-radius:6px; cursor:pointer; }
+.report-filter-list { display:grid; gap:10px; margin:12px 0; }
+.report-filter-row { display:grid; grid-template-columns:minmax(170px,1.4fr) minmax(120px,.9fr) minmax(120px,1fr) minmax(120px,1fr) auto; gap:8px; align-items:center; }
+.zoho-table-scroll { overflow:auto; max-width:100%; border:1px solid #e5e7eb; border-radius:12px; }
+.zoho-table { width:100%; border-collapse:collapse; min-width:780px; }
+.zoho-table th { background:#f8fafc; color:#475569; text-align:left; font-size:12px; padding:10px; border-bottom:1px solid #e5e7eb; white-space:nowrap; }
+.zoho-table td { padding:10px; border-bottom:1px solid #f1f5f9; font-size:13px; color:#334155; white-space:nowrap; }
+.report-preview-table td, .report-preview-table th { max-width:260px; overflow:hidden; text-overflow:ellipsis; }
+@media (max-width: 1100px) { .reports-grid { grid-template-columns:1fr; } .report-filter-row { grid-template-columns:1fr; } }

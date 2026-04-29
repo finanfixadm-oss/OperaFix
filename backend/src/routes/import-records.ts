@@ -4,7 +4,7 @@ import * as XLSX from "xlsx";
 import { prisma } from "../config/prisma.js";
 
 const importRecordsRouter = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 type ManagementType = "LM" | "TP";
 
@@ -57,6 +57,8 @@ type ImportSession = {
   fileName: string;
   rows: NormalizedImportRow[];
   headers: string[];
+  mappedColumns: Array<{ header: string; field: string }>;
+  unmappedHeaders: string[];
 };
 
 const importSessions = new Map<string, ImportSession>();
@@ -71,35 +73,53 @@ function cleanupSessions() {
 
 const headerAliases: Record<string, keyof NormalizedImportRow> = {
   mandante: "mandante",
+  cliente: "mandante",
+  "cliente mandante": "mandante",
+  "nombre mandante": "mandante",
   "estado contrato con cliente": "estado_contrato_cliente",
   "motivo (tipo de exceso)": "motivo_tipo_exceso",
+  "tipo de exceso": "motivo_tipo_exceso",
   motivo: "motivo_tipo_exceso",
   entidad: "entidad",
   afp: "entidad",
+  "entidad afp": "entidad",
   "entidad / afp": "entidad",
+  institucion: "entidad",
+  institucionafp: "entidad",
   "envio afp": "envio_afp",
-  "envío afp": "envio_afp",
   "estado gestion": "estado_gestion",
-  "estado gestión": "estado_gestion",
+  estado: "estado_gestion",
   "fecha presentacion afp": "fecha_presentacion_afp",
-  "fecha presentación afp": "fecha_presentacion_afp",
   "fecha pago afp": "fecha_pago_afp",
   "n solicitud": "numero_solicitud",
+  "n solicitud ": "numero_solicitud",
   "n° solicitud": "numero_solicitud",
   "numero solicitud": "numero_solicitud",
   "nro solicitud": "numero_solicitud",
+  solicitud: "numero_solicitud",
+  ticket: "numero_solicitud",
+  caso: "numero_solicitud",
   "grupo de empresa": "grupo_empresa",
   "buscar grupo": "grupo_empresa",
   "grupo empresa": "grupo_empresa",
+  grupo: "grupo_empresa",
+  "nombre grupo": "grupo_empresa",
   "razon social": "razon_social",
-  "razón social": "razon_social",
+  empresa: "razon_social",
+  "nombre empresa": "razon_social",
+  rs: "razon_social",
   rut: "rut",
+  "rut empresa": "rut",
+  "rut rs": "rut",
   "monto devolucion": "monto_devolucion",
-  "monto devolución": "monto_devolucion",
+  "monto de devolucion": "monto_devolucion",
+  "monto recuperacion": "monto_devolucion",
+  "monto recuperar": "monto_devolucion",
+  devolucion: "monto_devolucion",
+  monto: "monto_devolucion",
   "monto pagado": "monto_pagado",
   "monto real pagado": "monto_pagado",
   "monto cliente": "monto_cliente",
-  "monto  cliente": "monto_cliente",
   fee: "fee",
   "monto finanfix solutions": "monto_finanfix_solutions",
   "monto finanfix": "monto_finanfix_solutions",
@@ -107,20 +127,25 @@ const headerAliases: Record<string, keyof NormalizedImportRow> = {
   "tipo de cuenta": "tipo_cuenta",
   "tipo cuenta": "tipo_cuenta",
   "numero cuenta": "numero_cuenta",
-  "número cuenta": "numero_cuenta",
+  "n cuenta": "numero_cuenta",
+  cuenta: "numero_cuenta",
   "confirmacion cc": "confirmacion_cc",
-  "confirmación cc": "confirmacion_cc",
+  cc: "confirmacion_cc",
   "confirmacion poder": "confirmacion_poder",
-  "confirmación poder": "confirmacion_poder",
+  poder: "confirmacion_poder",
   "acceso portal": "acceso_portal",
+  portal: "acceso_portal",
   "facturado finanfix": "facturado_finanfix",
   "facturado cliente": "facturado_cliente",
   "fecha factura finanfix": "fecha_factura_finanfix",
   "fecha pago factura finanfix": "fecha_pago_factura_finanfix",
   "n factura": "numero_factura",
   "n° factura": "numero_factura",
+  factura: "numero_factura",
   "n oc": "numero_oc",
   "n° oc": "numero_oc",
+  oc: "numero_oc",
+  "orden compra": "numero_oc",
   "consulta cen": "consulta_cen",
   "contenido cen": "contenido_cen",
   "respuesta cen": "respuesta_cen",
@@ -131,9 +156,41 @@ function normHeader(value: unknown) {
   return String(value || "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[º°#]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
+}
+
+function detectHeaderAlias(header: string): keyof NormalizedImportRow | undefined {
+  const normalized = normHeader(header);
+  const direct = headerAliases[normalized];
+  if (direct) return direct;
+  const compact = normalized.replace(/\s/g, "");
+  if (headerAliases[compact]) return headerAliases[compact];
+  const tokenMatches: Array<[string[], keyof NormalizedImportRow]> = [
+    [["razon", "social"], "razon_social"],
+    [["rut"], "rut"],
+    [["mandante"], "mandante"],
+    [["cliente"], "mandante"],
+    [["estado", "gestion"], "estado_gestion"],
+    [["monto", "devolucion"], "monto_devolucion"],
+    [["monto", "recuperacion"], "monto_devolucion"],
+    [["numero", "solicitud"], "numero_solicitud"],
+    [["nro", "solicitud"], "numero_solicitud"],
+    [["entidad"], "entidad"],
+    [["afp"], "entidad"],
+    [["grupo"], "grupo_empresa"],
+    [["confirmacion", "cc"], "confirmacion_cc"],
+    [["confirmacion", "poder"], "confirmacion_poder"],
+    [["fecha", "pago", "afp"], "fecha_pago_afp"],
+    [["fecha", "presentacion", "afp"], "fecha_presentacion_afp"],
+  ];
+  for (const [tokens, key] of tokenMatches) {
+    if (tokens.every((token) => normalized.includes(token))) return key;
+  }
+  return undefined;
 }
 
 function stringValue(value: unknown) {
@@ -157,7 +214,7 @@ function numberValue(value: unknown) {
 
 function boolValue(value: unknown) {
   const text = String(value ?? "").trim().toLowerCase();
-  return ["si", "sí", "true", "1", "x", "ok", "yes"].includes(text);
+  return ["si", "sí", "true", "1", "x", "ok", "yes", "y"].includes(text);
 }
 
 function excelDateToIso(value: unknown) {
@@ -182,10 +239,33 @@ function excelDateToIso(value: unknown) {
   return null;
 }
 
-function rutValue(value: unknown) {
+function normalizeRutWithHyphen(value: unknown) {
   const text = stringValue(value);
   if (!text) return null;
-  return text.replace(/\./g, "").replace(/\s/g, "").toUpperCase();
+  const cleaned = text.replace(/[^0-9Kk]/g, "").toUpperCase();
+  if (cleaned.length < 2) return text.replace(/\./g, "").replace(/\s/g, "").toUpperCase();
+  return `${cleaned.slice(0, -1)}-${cleaned.slice(-1)}`;
+}
+
+function rutValue(value: unknown) {
+  return normalizeRutWithHyphen(value);
+}
+
+function validateRutDv(rut: string) {
+  const cleaned = rut.replace(/[^0-9K]/gi, "").toUpperCase();
+  if (cleaned.length < 2) return false;
+  const body = cleaned.slice(0, -1);
+  const dv = cleaned.slice(-1);
+  if (!/^\d+$/.test(body)) return false;
+  let sum = 0;
+  let factor = 2;
+  for (let i = body.length - 1; i >= 0; i--) {
+    sum += Number(body[i]) * factor;
+    factor = factor === 7 ? 2 : factor + 1;
+  }
+  const res = 11 - (sum % 11);
+  const expected = res === 11 ? "0" : res === 10 ? "K" : String(res);
+  return expected === dv;
 }
 
 function detectType(motivo: string | null): ManagementType {
@@ -200,6 +280,12 @@ function makeKey(row: Pick<NormalizedImportRow, "mandante" | "rut" | "entidad" |
     .toUpperCase();
 }
 
+function chunkArray<T>(items: T[], size: number) {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks;
+}
+
 function validate(row: NormalizedImportRow) {
   const messages: string[] = [];
   if (!row.mandante) messages.push("Falta Mandante");
@@ -207,7 +293,8 @@ function validate(row: NormalizedImportRow) {
   if (!row.rut) messages.push("Falta RUT");
   if (!row.entidad && row.management_type === "LM") messages.push("Falta Entidad / AFP");
   if (row.monto_devolucion === null) messages.push("Monto Devolución vacío o inválido");
-  if (row.rut && !/^\d{6,9}-?[0-9K]$/i.test(row.rut)) messages.push("RUT con formato no estándar");
+  if (row.rut && !/^\d{6,9}-[0-9K]$/i.test(row.rut)) messages.push("RUT normalizado con formato no estándar");
+  if (row.rut && /^\d{6,9}-[0-9K]$/i.test(row.rut) && !validateRutDv(row.rut)) messages.push("RUT con dígito verificador inválido");
   row.validation_messages = messages;
   row.validation_status = messages.some((m) => m.includes("Falta RUT") || m.includes("Falta Mandante") || m.includes("Falta Razón"))
     ? "ERROR"
@@ -216,7 +303,7 @@ function validate(row: NormalizedImportRow) {
       : "OK";
 }
 
-function normalizeRow(raw: any, rowNumber: number, headerMap: Record<string, keyof NormalizedImportRow>): NormalizedImportRow {
+function normalizeRow(raw: Record<string, unknown>, rowNumber: number, headerMap: Record<string, keyof NormalizedImportRow>): NormalizedImportRow {
   const target: Record<string, unknown> = {};
   for (const [header, value] of Object.entries(raw)) {
     const key = headerMap[normHeader(header)];
@@ -279,10 +366,19 @@ function parseWorkbook(buffer: Buffer) {
   const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: true }) as Record<string, unknown>[];
   const headers = Object.keys(rawRows[0] || {});
   const headerMap: Record<string, keyof NormalizedImportRow> = {};
+  const mappedColumns: Array<{ header: string; field: string }> = [];
+  const unmappedHeaders: string[] = [];
+
   for (const header of headers) {
-    const alias = headerAliases[normHeader(header)];
-    if (alias) headerMap[normHeader(header)] = alias;
+    const alias = detectHeaderAlias(header);
+    if (alias) {
+      headerMap[normHeader(header)] = alias;
+      mappedColumns.push({ header, field: String(alias) });
+    } else {
+      unmappedHeaders.push(header);
+    }
   }
+
   const rows = rawRows.map((raw, index) => normalizeRow(raw, index + 2, headerMap));
   const seen = new Map<string, number>();
   for (const row of rows) {
@@ -294,7 +390,7 @@ function parseWorkbook(buffer: Buffer) {
       if (row.validation_status === "OK") row.validation_status = "ADVERTENCIA";
     }
   }
-  return { sheetName, headers, rows };
+  return { sheetName, headers, rows, mappedColumns, unmappedHeaders };
 }
 
 async function markDatabaseDuplicates(rows: NormalizedImportRow[]) {
@@ -302,21 +398,28 @@ async function markDatabaseDuplicates(rows: NormalizedImportRow[]) {
   if (!candidates.length) return;
   const rutList = [...new Set(candidates.map((r) => r.rut).filter(Boolean))] as string[];
   const requestList = [...new Set(candidates.map((r) => r.numero_solicitud).filter(Boolean))] as string[];
-  const [lm, tp] = await Promise.all([
-    prisma.lmRecord.findMany({
-      where: { OR: [{ rut: { in: rutList } }, { request_number: { in: requestList } }] },
-      select: { rut: true, request_number: true, entity: true, mandante: true },
-      take: 5000,
-    }),
-    prisma.tpRecord.findMany({
-      where: { OR: [{ rut: { in: rutList } }, { request_number: { in: requestList } }] },
-      select: { rut: true, request_number: true, entity: true, mandante: true },
-      take: 5000,
-    }),
-  ]);
   const existing = new Set<string>();
-  for (const row of lm) existing.add(makeKey({ management_type: "LM", mandante: row.mandante || null, rut: row.rut || null, entidad: row.entity || null, numero_solicitud: row.request_number || null }));
-  for (const row of tp) existing.add(makeKey({ management_type: "TP", mandante: row.mandante || null, rut: row.rut || null, entidad: row.entity || null, numero_solicitud: row.request_number || null }));
+
+  for (const rutChunk of chunkArray(rutList, 500)) {
+    if (!rutChunk.length) continue;
+    const [lm, tp] = await Promise.all([
+      prisma.lmRecord.findMany({ where: { rut: { in: rutChunk } }, select: { rut: true, request_number: true, entity: true, mandante: true }, take: 10000 }),
+      prisma.tpRecord.findMany({ where: { rut: { in: rutChunk } }, select: { rut: true, request_number: true, entity: true, mandante: true }, take: 10000 }),
+    ]);
+    for (const row of lm) existing.add(makeKey({ management_type: "LM", mandante: row.mandante || null, rut: rutValue(row.rut), entidad: row.entity || null, numero_solicitud: row.request_number || null }));
+    for (const row of tp) existing.add(makeKey({ management_type: "TP", mandante: row.mandante || null, rut: rutValue(row.rut), entidad: row.entity || null, numero_solicitud: row.request_number || null }));
+  }
+
+  for (const reqChunk of chunkArray(requestList, 500)) {
+    if (!reqChunk.length) continue;
+    const [lm, tp] = await Promise.all([
+      prisma.lmRecord.findMany({ where: { request_number: { in: reqChunk } }, select: { rut: true, request_number: true, entity: true, mandante: true }, take: 10000 }),
+      prisma.tpRecord.findMany({ where: { request_number: { in: reqChunk } }, select: { rut: true, request_number: true, entity: true, mandante: true }, take: 10000 }),
+    ]);
+    for (const row of lm) existing.add(makeKey({ management_type: "LM", mandante: row.mandante || null, rut: rutValue(row.rut), entidad: row.entity || null, numero_solicitud: row.request_number || null }));
+    for (const row of tp) existing.add(makeKey({ management_type: "TP", mandante: row.mandante || null, rut: rutValue(row.rut), entidad: row.entity || null, numero_solicitud: row.request_number || null }));
+  }
+
   for (const row of rows) {
     if (existing.has(row.duplicate_key)) {
       row.exists_in_database = true;
@@ -347,7 +450,7 @@ function stats(rows: NormalizedImportRow[]) {
   return { total, ok, warnings, errors, duplicatesInFile, duplicatesInDb, monto, byMandante, byEstado };
 }
 
-async function buildAiReview(rows: NormalizedImportRow[], headers: string[]) {
+async function buildAiReview(rows: NormalizedImportRow[], headers: string[], mappedColumns: Array<{ header: string; field: string }>, unmappedHeaders: string[]) {
   if (!process.env.OPENAI_API_KEY) {
     return "IA no ejecutada: falta OPENAI_API_KEY. La validación técnica sí fue realizada.";
   }
@@ -365,31 +468,18 @@ async function buildAiReview(rows: NormalizedImportRow[], headers: string[]) {
     }));
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
       body: JSON.stringify({
         model: "gpt-5.5",
         reasoning: { effort: "low" },
         text: { verbosity: "low" },
         input: [
-          {
-            role: "system",
-            content:
-              "Eres un analista de carga masiva para un CRM de recuperaciones previsionales en Chile. Debes entregar una revisión breve, concreta y accionable. No inventes datos.",
-          },
-          {
-            role: "user",
-            content: JSON.stringify({ headers, stats: stats(rows), sample }, null, 2),
-          },
+          { role: "system", content: "Eres un analista de carga masiva para un CRM de recuperaciones previsionales en Chile. Entrega una revisión breve, concreta y accionable. No inventes datos." },
+          { role: "user", content: JSON.stringify({ headers, mappedColumns, unmappedHeaders, stats: stats(rows), sample }, null, 2) },
         ],
       }),
     });
-    if (!response.ok) {
-      const detail = await response.text();
-      throw new Error(`OpenAI error ${response.status}: ${detail}`);
-    }
+    if (!response.ok) throw new Error(`OpenAI error ${response.status}: ${await response.text()}`);
     const data: any = await response.json();
     return data.output_text || data.output?.flatMap((item: any) => item.content || []).map((part: any) => part.text || "").join("\n") || "IA ejecutada sin observaciones adicionales.";
   } catch (error: any) {
@@ -397,41 +487,67 @@ async function buildAiReview(rows: NormalizedImportRow[], headers: string[]) {
   }
 }
 
+const mandanteCache = new Map<string, any>();
+const groupCache = new Map<string, any>();
+const companyCache = new Map<string, any>();
+const lineCache = new Map<string, any>();
+const afpCache = new Map<string, any>();
+
 async function ensureContext(row: NormalizedImportRow) {
   const mandanteName = row.mandante || "Sin mandante";
-  const mandante = await prisma.mandante.upsert({
-    where: { name: mandanteName },
-    update: {},
-    create: { name: mandanteName },
-  });
-  const groupName = row.grupo_empresa || "Grupo general";
-  const group = await prisma.companyGroup.upsert({
-    where: { mandante_id_group_type_name: { mandante_id: mandante.id, group_type: row.management_type as any, name: groupName } },
-    update: {},
-    create: { mandante_id: mandante.id, group_type: row.management_type as any, name: groupName },
-  });
-  const rut = row.rut || `TEMP-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const company = await prisma.company.upsert({
-    where: { rut },
-    update: { mandante_id: mandante.id, group_id: group.id, razon_social: row.razon_social || "Empresa sin razón social" },
-    create: { mandante_id: mandante.id, group_id: group.id, rut, razon_social: row.razon_social || "Empresa sin razón social" },
-  });
-  let line = await prisma.managementLine.findFirst({
-    where: { mandante_id: mandante.id, group_id: group.id, company_id: company.id, line_type: row.management_type as any },
-  });
-  if (!line) {
-    line = await prisma.managementLine.create({
-      data: { mandante_id: mandante.id, group_id: group.id, company_id: company.id, line_type: row.management_type as any, name: `${company.razon_social} - ${row.management_type}` },
-    });
+  let mandante = mandanteCache.get(mandanteName);
+  if (!mandante) {
+    mandante = await prisma.mandante.upsert({ where: { name: mandanteName }, update: {}, create: { name: mandanteName } });
+    mandanteCache.set(mandanteName, mandante);
   }
+
+  const groupName = row.grupo_empresa || "Grupo general";
+  const groupKey = `${mandante.id}|${row.management_type}|${groupName}`;
+  let group = groupCache.get(groupKey);
+  if (!group) {
+    group = await prisma.companyGroup.upsert({
+      where: { mandante_id_group_type_name: { mandante_id: mandante.id, group_type: row.management_type as any, name: groupName } },
+      update: {},
+      create: { mandante_id: mandante.id, group_type: row.management_type as any, name: groupName },
+    });
+    groupCache.set(groupKey, group);
+  }
+
+  const rut = row.rut || `TEMP-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  let company = companyCache.get(rut);
+  if (!company) {
+    company = await prisma.company.upsert({
+      where: { rut },
+      update: { mandante_id: mandante.id, group_id: group.id, razon_social: row.razon_social || "Empresa sin razón social" },
+      create: { mandante_id: mandante.id, group_id: group.id, rut, razon_social: row.razon_social || "Empresa sin razón social" },
+    });
+    companyCache.set(rut, company);
+  }
+
+  const lineKey = `${mandante.id}|${group.id}|${company.id}|${row.management_type}`;
+  let line = lineCache.get(lineKey);
+  if (!line) {
+    line = await prisma.managementLine.findFirst({ where: { mandante_id: mandante.id, group_id: group.id, company_id: company.id, line_type: row.management_type as any } });
+    if (!line) {
+      line = await prisma.managementLine.create({ data: { mandante_id: mandante.id, group_id: group.id, company_id: company.id, line_type: row.management_type as any, name: `${company.razon_social} - ${row.management_type}` } });
+    }
+    lineCache.set(lineKey, line);
+  }
+
   let lineAfp = null;
   if (row.entidad) {
-    lineAfp = await prisma.managementLineAfp.upsert({
-      where: { line_id_afp_name: { line_id: line.id, afp_name: row.entidad } },
-      update: { current_status: row.estado_gestion || undefined },
-      create: { line_id: line.id, afp_name: row.entidad, current_status: row.estado_gestion || "Pendiente Gestión" },
-    });
+    const afpKey = `${line.id}|${row.entidad}`;
+    lineAfp = afpCache.get(afpKey);
+    if (!lineAfp) {
+      lineAfp = await prisma.managementLineAfp.upsert({
+        where: { line_id_afp_name: { line_id: line.id, afp_name: row.entidad } },
+        update: { current_status: row.estado_gestion || undefined },
+        create: { line_id: line.id, afp_name: row.entidad, current_status: row.estado_gestion || "Pendiente Gestión" },
+      });
+      afpCache.set(afpKey, lineAfp);
+    }
   }
+
   return { mandante, group, company, line, lineAfp };
 }
 
@@ -486,14 +602,14 @@ async function createManagement(row: NormalizedImportRow, context: Awaited<Retur
         last_activity_at: new Date(),
       } as any,
     });
-  } catch (error) {
+  } catch {
     return null;
   }
 }
 
 async function insertRow(row: NormalizedImportRow, skipDuplicates: boolean) {
-  if (row.validation_status === "ERROR") return { status: "skipped", reason: "Fila con error crítico" };
-  if (skipDuplicates && (row.is_duplicate_in_file || row.exists_in_database)) return { status: "skipped", reason: "Duplicado omitido" };
+  if (row.validation_status === "ERROR") return { status: "skipped", rowNumber: row.rowNumber, reason: "Fila con error crítico" };
+  if (skipDuplicates && (row.is_duplicate_in_file || row.exists_in_database)) return { status: "skipped", rowNumber: row.rowNumber, reason: "Duplicado omitido" };
 
   const context = await ensureContext(row);
   const management = await createManagement(row, context);
@@ -514,7 +630,7 @@ async function insertRow(row: NormalizedImportRow, skipDuplicates: boolean) {
     bank_name: row.banco,
     account_number: row.numero_cuenta,
     account_type: row.tipo_cuenta,
-    comment: "Creado por carga masiva inteligente v53",
+    comment: "Creado por carga masiva inteligente v54",
     mandante: row.mandante,
     portal_access: row.acceso_portal,
     estado_contrato_cliente: row.estado_contrato_cliente,
@@ -565,8 +681,7 @@ async function insertRow(row: NormalizedImportRow, skipDuplicates: boolean) {
       },
     }).catch(() => null);
   }
-
-  return { status: "created", id: management?.id || null };
+  return { status: "created", rowNumber: row.rowNumber, id: management?.id || null };
 }
 
 importRecordsRouter.post("/records/preview", upload.single("file"), async (req, res) => {
@@ -576,13 +691,15 @@ importRecordsRouter.post("/records/preview", upload.single("file"), async (req, 
     const parsed = parseWorkbook(req.file.buffer);
     await markDatabaseDuplicates(parsed.rows);
     const id = `imp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-    importSessions.set(id, { id, createdAt: Date.now(), fileName: req.file.originalname, rows: parsed.rows, headers: parsed.headers });
-    const aiReview = await buildAiReview(parsed.rows, parsed.headers);
+    importSessions.set(id, { id, createdAt: Date.now(), fileName: req.file.originalname, rows: parsed.rows, headers: parsed.headers, mappedColumns: parsed.mappedColumns, unmappedHeaders: parsed.unmappedHeaders });
+    const aiReview = await buildAiReview(parsed.rows, parsed.headers, parsed.mappedColumns, parsed.unmappedHeaders);
     res.json({
       importId: id,
       fileName: req.file.originalname,
       sheetName: parsed.sheetName,
       headers: parsed.headers,
+      mappedColumns: parsed.mappedColumns,
+      unmappedHeaders: parsed.unmappedHeaders,
       stats: stats(parsed.rows),
       aiReview,
       rows: parsed.rows.slice(0, 100),
@@ -599,21 +716,25 @@ importRecordsRouter.post("/records/commit", async (req, res) => {
   try {
     const importId = String(req.body.importId || "");
     const skipDuplicates = req.body.skipDuplicates !== false;
+    const batchSize = Math.max(1, Math.min(Number(req.body.batchSize || 25), 100));
     const session = importSessions.get(importId);
     if (!session) return res.status(404).json({ message: "La vista previa expiró. Vuelve a cargar el archivo." });
     const results: any[] = [];
-    for (const row of session.rows) {
-      try {
-        results.push(await insertRow(row, skipDuplicates));
-      } catch (error: any) {
-        results.push({ status: "error", rowNumber: row.rowNumber, reason: error?.message || String(error) });
-      }
+    for (const batch of chunkArray(session.rows, batchSize)) {
+      const batchResults = await Promise.all(batch.map(async (row) => {
+        try {
+          return await insertRow(row, skipDuplicates);
+        } catch (error: any) {
+          return { status: "error", rowNumber: row.rowNumber, reason: error?.message || String(error) };
+        }
+      }));
+      results.push(...batchResults);
     }
     importSessions.delete(importId);
     const created = results.filter((r) => r.status === "created").length;
     const skipped = results.filter((r) => r.status === "skipped").length;
     const errors = results.filter((r) => r.status === "error").length;
-    res.json({ ok: errors === 0, created, skipped, errors, results: results.slice(0, 100) });
+    res.json({ ok: errors === 0, created, skipped, errors, batchSize, results: results.slice(0, 100) });
   } catch (error: any) {
     console.error("Error commit carga masiva:", error);
     res.status(500).json({ message: "No se pudo confirmar la carga masiva.", detail: error?.message || String(error) });

@@ -33,6 +33,8 @@ type PreviewResponse = {
   fileName: string;
   sheetName: string;
   headers: string[];
+  mappedColumns: Array<{ header: string; field: string }>;
+  unmappedHeaders: string[];
   stats: ImportStats;
   aiReview: string;
   rows: ImportRow[];
@@ -106,7 +108,7 @@ export default function MassImportPage() {
     try {
       const result = await fetchJson<CommitResponse>("/imports/records/commit", {
         method: "POST",
-        body: JSON.stringify({ importId: preview.importId, skipDuplicates }),
+        body: JSON.stringify({ importId: preview.importId, skipDuplicates, batchSize: 25 }),
       });
       setCommitResult(result);
     } catch (err: any) {
@@ -169,6 +171,20 @@ export default function MassImportPage() {
             <section className="zoho-card">
               <div className="zoho-section-title">Revisión IA / Validación</div>
               <p className="import-ai-review">{preview.aiReview}</p>
+            </section>
+            <section className="zoho-card">
+              <div className="zoho-section-title">Mapeo automático de columnas</div>
+              <div className="import-summary-list">
+                {(preview.mappedColumns || []).map((item) => (
+                  <div key={`${item.header}-${item.field}`}><span>{item.header}</span><strong>{item.field}</strong></div>
+                ))}
+              </div>
+              {(preview.unmappedHeaders || []).length > 0 && (
+                <>
+                  <div className="zoho-section-title import-state-title">Columnas no usadas</div>
+                  <p className="zoho-muted">{preview.unmappedHeaders.join(" · ")}</p>
+                </>
+              )}
             </section>
             <section className="zoho-card">
               <div className="zoho-section-title">Resumen por mandante</div>

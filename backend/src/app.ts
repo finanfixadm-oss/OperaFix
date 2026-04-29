@@ -14,6 +14,12 @@ import managementDocumentsRouter from "./routes/management-documents.js";
 import recordsRouter from "./routes/records.js";
 import aiActionsRouter from "./routes/ai-actions.js";
 import importRecordsRouter from "./routes/import-records.js";
+import authRouter from "./routes/auth.js";
+import usersRouter from "./routes/users.js";
+import portalRouter from "./routes/portal.js";
+import reportBuilderRouter from "./routes/report-builder.js";
+import auditRouter from "./routes/audit.js";
+import { requireAuth, requireRoles } from "./middleware/security.js";
 
 const app = express();
 
@@ -40,21 +46,30 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-app.use("/api/companies", companiesRouter);
-app.use("/api/documents", documentsRouter);
-app.use("/api/analytics", analyticsRouter);
-app.use("/api/mandantes", mandantesRouter);
-app.use("/api/company-groups", companyGroupsRouter);
-app.use("/api/management-lines", managementLinesRouter);
-app.use("/api/management-line-afps", managementLineAfpsRouter);
-app.use("/api/managements", managementsRouter);
-app.use("/api/management-documents", managementDocumentsRouter);
-app.use("/api/records", recordsRouter);
-app.use("/api/ai", aiActionsRouter);
-app.use("/api/imports", importRecordsRouter);
+// Público: login y sesión.
+app.use("/api/auth", authRouter);
+
+// Seguridad por módulos.
+app.use("/api/portal", requireAuth, portalRouter);
+app.use("/api/report-builder", requireAuth, reportBuilderRouter);
+
+app.use("/api/analytics", requireAuth, requireRoles(["admin", "interno", "kam"]), analyticsRouter);
+app.use("/api/companies", requireAuth, requireRoles(["admin", "interno", "kam"]), companiesRouter);
+app.use("/api/documents", requireAuth, requireRoles(["admin", "interno", "kam"]), documentsRouter);
+app.use("/api/mandantes", requireAuth, requireRoles(["admin", "interno"]), mandantesRouter);
+app.use("/api/company-groups", requireAuth, requireRoles(["admin", "interno", "kam"]), companyGroupsRouter);
+app.use("/api/management-lines", requireAuth, requireRoles(["admin", "interno", "kam"]), managementLinesRouter);
+app.use("/api/management-line-afps", requireAuth, requireRoles(["admin", "interno", "kam"]), managementLineAfpsRouter);
+app.use("/api/managements", requireAuth, requireRoles(["admin", "interno", "kam"]), managementsRouter);
+app.use("/api/management-documents", requireAuth, requireRoles(["admin", "interno", "kam"]), managementDocumentsRouter);
+app.use("/api/records", requireAuth, requireRoles(["admin", "interno", "kam"]), recordsRouter);
+app.use("/api/ai", requireAuth, requireRoles(["admin", "interno", "kam"]), aiActionsRouter);
+app.use("/api/imports", requireAuth, requireRoles(["admin", "interno"]), importRecordsRouter);
+app.use("/api/users", requireAuth, requireRoles(["admin", "interno"]), usersRouter);
+app.use("/api/audit", requireAuth, requireRoles(["admin", "interno"]), auditRouter);
 
 // Compatibilidad temporal para pantallas antiguas que puedan llamar sin /api.
-app.use("/managements", managementsRouter);
-app.use("/records", recordsRouter);
+app.use("/managements", requireAuth, requireRoles(["admin", "interno", "kam"]), managementsRouter);
+app.use("/records", requireAuth, requireRoles(["admin", "interno", "kam"]), recordsRouter);
 
 export default app;
