@@ -239,6 +239,28 @@ function normalizeForMatch(value: string) {
     .trim();
 }
 
+function normalizeBusinessPrompt(value: string) {
+  const normalized = normalizeForMatch(value);
+  const replacements: Array<[RegExp, string]> = [
+    [/\bplata\b/g, " monto devolucion dinero recuperable "],
+    [/\blucas\b/g, " monto devolucion dinero recuperable "],
+    [/\bpega\b/g, " gestion seguimiento tarea "],
+    [/\bsaca\b/g, " crea genera muestra "],
+    [/\bmandame\b/g, " genera envia "],
+    [/\bmandante\b/g, " mandante cliente "],
+    [/\bafp\b/g, " entidad afp "],
+    [/\bmodelo\b/g, " modelo afp modelo "],
+    [/\bcapital\b/g, " capital afp capital "],
+  ];
+  return replacements.reduce((acc, [pattern, replacement]) => acc.replace(pattern, replacement), normalized);
+}
+
+function extractUserProfile(body: any) {
+  const name = text(body?.user_name || body?.userName || body?.profile?.name || body?.profile?.nombre).trim();
+  const role = text(body?.user_role || body?.userRole || body?.profile?.role || body?.profile?.rol).trim();
+  return { name, role };
+}
+
 function getRecordValue(row: any, key: string) {
   if (key === "mandante") return row.mandante?.name || row.mandante_name || row.mandante || "";
   if (key === "razon_social") return row.razon_social || row.company?.razon_social || row.business_name || "";
@@ -286,7 +308,7 @@ function requestedColumnsFromPrompt(prompt: string) {
 }
 
 function applyPromptFilters(prompt: string, records: any[]) {
-  const q = normalizeForMatch(prompt);
+  const q = normalizeBusinessPrompt(prompt);
   const filters: string[] = [];
   let rows = [...records];
 
@@ -297,7 +319,7 @@ function applyPromptFilters(prompt: string, records: any[]) {
     filters.push(`Mandante = ${mandanteMention}`);
   }
 
-  const entidadHints = ["modelo", "capital", "provida", "habitat", "hábitat", "cuprum", "planvital", "uno"];
+  const entidadHints = ["modelo", "capital", "provida", "habitat", "hábitat", "cuprum", "planvital", "uno", "afp modelo", "afp capital", "afp provida", "afp habitat", "afp cuprum"];
   const entidadMention = entidadHints.find((name) => q.includes(normalizeForMatch(name)));
   if (entidadMention) {
     rows = rows.filter((r) => normalizeForMatch(String(getRecordValue(r, "entidad"))).includes(normalizeForMatch(entidadMention)));
@@ -345,8 +367,8 @@ function formatReportCell(value: unknown, column: ReportColumn) {
 }
 
 function buildAiReport(prompt: string, records: any[]): AiReport | null {
-  const q = normalizeForMatch(prompt);
-  const wantsReport = /informe|reporte|tabla|listado|export|csv|columnas|campos/.test(q);
+  const q = normalizeBusinessPrompt(prompt);
+  const wantsReport = /informe|reporte|tabla|listado|export|csv|excel|xlsx|descargar|archivo|planilla|columnas|campos/.test(q);
   if (!wantsReport) return null;
 
   const columns = requestedColumnsFromPrompt(prompt);
@@ -718,7 +740,7 @@ function buildLocalAnswer(prompt: string, records: any[]) {
 }
 
 function matchRecordsFromPrompt(prompt: string, records: any[]) {
-  const q = normalizeForMatch(prompt);
+  const q = normalizeBusinessPrompt(prompt);
   const rutMatch = prompt.match(/\b\d{1,2}\.?\d{3}\.?\d{3}-?[\dkK]\b/);
   const rutNeedle = rutMatch ? normalizeForMatch(rutMatch[0]) : "";
 
@@ -750,7 +772,7 @@ function matchRecordsFromPrompt(prompt: string, records: any[]) {
 }
 
 function inferStatusFromPrompt(prompt: string) {
-  const q = normalizeForMatch(prompt);
+  const q = normalizeBusinessPrompt(prompt);
   if (q.includes("pagado") || q.includes("pagada") || q.includes("pago realizado")) return "Pagado";
   if (q.includes("rechazo") || q.includes("rechazado") || q.includes("rechazada")) return "Rechazo";
   if (q.includes("pendiente")) return "Pendiente Gestión";
@@ -768,7 +790,7 @@ function extractQuotedOrAfter(prompt: string, keywords: string[]) {
 }
 
 function buildRuleActions(prompt: string, records: any[]): AiAction[] {
-  const q = normalizeForMatch(prompt);
+  const q = normalizeBusinessPrompt(prompt);
   const actions: AiAction[] = [];
   const selected = matchRecordsFromPrompt(prompt, records);
   const limited = selected.length ? selected : records.slice(0, 8);
@@ -887,11 +909,15 @@ function buildRuleActions(prompt: string, records: any[]): AiAction[] {
   return [...unique.values()].slice(0, 12).map((action, index) => ({ ...action, id: `${action.type}-${action.recordId}-${index}` }));
 }
 
-async function callOpenAI(prompt: string, records: any[]) {
+async function callOpenAI(prompt: string, records: any[], userProfile?: { name?: string; role?: string }) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
 
-  const compact = records.map(compactRecord).slice(0, 80);
+  const compact = records.map(compactRecord).slice(0, 100);
+  const userIdentity = userProfile?.name
+    ? `Usuario identificado: ${userProfile.name}${userProfile.role ? ` (${userProfile.role})` : ""}.`
+    : "Usuario no identificado todavía. Si la solicitud es amplia, ambigua o pide ejecutar acciones, pregunta primero: ¿quién eres y qué rol tienes en la operación?";
+
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -899,15 +925,23 @@ async function callOpenAI(prompt: string, records: any[]) {
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-      temperature: 0.2,
+      model: process.env.OPENAI_MODEL || "gpt-5.5",
+      temperature: 0.15,
       messages: [
         {
           role: "system",
           content:
-            "Eres la IA operativa de Operafix/Finanfix. Analiza gestiones de recuperación LM/TP. Responde en español de Chile, con foco ejecutivo, operativo y accionable. No inventes datos: usa solo el contexto entregado. Si recomiendas acciones, hazlas concretas.",
+            `Eres la IA estratégica y operativa de OperaFix/Finanfix. ${userIdentity}
+` +
+            "Trabajas con recuperaciones LM/TP, AFP, mandantes, montos de devolución, poder, CC, estados y solicitudes. " +
+            "Entiende español informal/chileno, errores de tipeo y solicitudes poco formales. Ejemplos: 'sácame', 'dame la pega', 'plata', 'lucas', 'mundo previsional', 'modelo'. " +
+            "No inventes datos. Usa solo el JSON entregado. Si el usuario pide un informe descargable o columnas, responde breve y deja que el sistema entregue la tabla/archivo; NO expliques cómo crear Excel manualmente. " +
+            "Si faltan columnas o filtros, pregunta una aclaración concreta. Si recomiendas acciones, deben ser específicas, operativas y seguras.",
         },
-        { role: "user", content: `Pregunta: ${prompt}\n\nRegistros disponibles en JSON:\n${JSON.stringify(compact)}` },
+        { role: "user", content: `Solicitud del usuario: ${prompt}
+
+Registros disponibles en JSON:
+${JSON.stringify(compact)}` },
       ],
     }),
   });
@@ -979,33 +1013,26 @@ aiActionsRouter.post("/chat", async (req, res) => {
   try {
     const prompt = text(req.body?.message || req.body?.prompt).trim();
     const mandanteId = text(req.body?.mandante_id || req.body?.mandanteId).trim() || null;
+    const userProfile = extractUserProfile(req.body);
     if (!prompt) return res.status(400).json({ message: "Debes enviar una pregunta para la IA." });
 
-    const records = await loadRecords(mandanteId, 160);
+    const records = await loadRecords(mandanteId, 180);
     const report = buildAiReport(prompt, records);
     let answer: string | null = null;
     let source: "openai" | "local" = "local";
 
-    try {
-      answer = await callOpenAI(prompt, records);
-      if (answer) source = "openai";
-    } catch (aiError: any) {
-      console.warn("IA externa no disponible, se usa análisis local:", aiError?.message || aiError);
-    }
-
+    // Para informes descargables, el sistema genera la tabla de forma determinística para evitar respuestas genéricas.
     if (report) {
-      const reportSummary = reportToMarkdown(report);
-      answer = answer
-        ? `${answer}
+      answer = `${reportToMarkdown(report)}
 
----
-
-${reportSummary}
-
-Puedes pedirme otro informe indicando las columnas exactas que quieres usar, por ejemplo: RUT, Razón Social, Entidad, Estado Gestión, Monto Devolución y N° Solicitud.`
-        : `${reportSummary}
-
-Puedes pedirme otro informe indicando las columnas exactas que quieres usar, por ejemplo: RUT, Razón Social, Entidad, Estado Gestión, Monto Devolución y N° Solicitud.`;
+Informe listo. Puedes copiar la tabla o descargarla desde el botón del chat. Puedes pedirme otro informe con otras columnas, filtros o mandante.`;
+    } else {
+      try {
+        answer = await callOpenAI(prompt, records, userProfile);
+        if (answer) source = "openai";
+      } catch (aiError: any) {
+        console.warn("IA externa no disponible, se usa análisis local:", aiError?.message || aiError);
+      }
     }
 
     if (!answer) answer = buildLocalAnswer(prompt, records);

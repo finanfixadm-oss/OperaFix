@@ -44,17 +44,17 @@ type ChatMessage = {
 };
 
 const quickPrompts = [
-  "Dame un informe ejecutivo del mandante seleccionado",
-  "Crea un informe con columnas RUT, Razón Social, Entidad, Estado Gestión, Monto Devolución y N° Solicitud",
+  "Quién eres y qué puedes hacer por mí",
+  "Sácame un Excel de Mundo Previsional con Razón Social, RUT, Entidad, Estado Gestión, Monto Devolución y N° Solicitud",
   "Qué informes puedo pedir y qué columnas puedo usar",
+  "Dónde está la plata: detecta oportunidades de mayor monto",
   "Qué gestiones debo priorizar esta semana",
   "Detecta casos sin poder o sin confirmación CC",
   "Prepara acciones para gestiones de alto monto",
   "Genera borradores de correo para seguimiento a entidad",
   "Crea tarea de seguimiento para casos sin poder",
-  "Cambia a Pendiente Gestión las gestiones detenidas",
   "Agrega nota: pendiente respuesta de la entidad",
-  "Qué gestiones están detenidas o requieren seguimiento",
+  "Dame la pega ordenada para hoy",
 ];
 
 function actionTypeLabel(type: AiAction["type"]) {
@@ -79,12 +79,14 @@ export default function AiGestionesPage() {
   const navigate = useNavigate();
   const [mandantes, setMandantes] = useState<MandanteOption[]>([]);
   const [mandanteId, setMandanteId] = useState("");
+  const [userName, setUserName] = useState(() => localStorage.getItem("operafix_ai_user_name") || "");
+  const [userRole, setUserRole] = useState(() => localStorage.getItem("operafix_ai_user_role") || "");
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
       role: "assistant",
       content:
-        "Hola Gabriel. Soy la IA operativa de Operafix. Puedo analizar gestiones, generar informes por columnas y proponer acciones reales. Las acciones se ejecutan solo cuando las confirmas.",
+        "Hola. Soy la IA estratégica de OperaFix. Antes de ejecutar acciones amplias, dime quién eres y qué rol tienes. Puedo entender pedidos poco formales, detectar oportunidades de plata, generar informes por columnas y proponer acciones con confirmación.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -98,6 +100,11 @@ export default function AiGestionesPage() {
       .then(setMandantes)
       .catch((error) => console.error("No se pudieron cargar mandantes", error));
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("operafix_ai_user_name", userName);
+    localStorage.setItem("operafix_ai_user_role", userRole);
+  }, [userName, userRole]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -118,6 +125,8 @@ export default function AiGestionesPage() {
       const response = await postJson<AiChatResponse>("/ai/chat", {
         message: prompt,
         mandante_id: mandanteId || null,
+        user_name: userName || null,
+        user_role: userRole || null,
       });
 
       const assistantMessage: ChatMessage = {
@@ -172,17 +181,20 @@ export default function AiGestionesPage() {
     await navigator.clipboard.writeText(content);
   }
 
-  function downloadReportCsv(report: AiReport) {
-    const headers = report.columns.map((column) => column.label);
-    const rows = report.rows.map((row) => report.columns.map((column) => String(row[column.key] ?? "")));
-    const csv = [headers, ...rows]
-      .map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";"))
-      .join("\n");
-    const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8;" });
+  function downloadReportExcel(report: AiReport) {
+    const escapeHtml = (value: unknown) => String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+    const header = report.columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("");
+    const body = report.rows.map((row) => `<tr>${report.columns.map((column) => `<td>${escapeHtml(row[column.key] ?? "")}</td>`).join("")}</tr>`).join("");
+    const html = `<!doctype html><html><head><meta charset="utf-8" /></head><body><table border="1"><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table></body></html>`;
+    const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${report.title || "informe-ia"}.csv`.replace(/[^a-z0-9áéíóúñ._-]+/gi, "_");
+    link.download = `${report.title || "informe-ia"}.xls`.replace(/[^a-z0-9áéíóúñ._-]+/gi, "_");
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -217,6 +229,15 @@ export default function AiGestionesPage() {
         <span> · Las acciones requieren confirmación antes de afectar la ficha.</span>
       </section>
 
+      <section className="ai-identity-card">
+        <div>
+          <strong>¿Quién eres?</strong>
+          <span> Esto ayuda a la IA a responder según tu rol y a cuidar las acciones que propone.</span>
+        </div>
+        <input className="zoho-input" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Tu nombre, ej: Gabriel" />
+        <input className="zoho-input" value={userRole} onChange={(e) => setUserRole(e.target.value)} placeholder="Tu rol, ej: Producción / Gerencia / KAM" />
+      </section>
+
       <section className="ai-quick-prompts">
         {quickPrompts.map((prompt) => (
           <button key={prompt} className="zoho-btn light" onClick={() => sendPrompt(prompt)} disabled={loading}>{prompt}</button>
@@ -247,7 +268,7 @@ export default function AiGestionesPage() {
                       </div>
                       <div className="ai-report-actions">
                         <button className="zoho-btn light" onClick={() => copyReportCsv(msg.report!)}>Copiar tabla</button>
-                        <button className="zoho-btn" onClick={() => downloadReportCsv(msg.report!)}>Descargar CSV</button>
+                        <button className="zoho-btn" onClick={() => downloadReportExcel(msg.report!)}>Descargar Excel</button>
                       </div>
                     </div>
                     {!!msg.report.filtersApplied.length && (

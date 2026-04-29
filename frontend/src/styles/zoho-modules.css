@@ -2221,3 +2221,25 @@
   font-weight: 700;
   z-index: 1;
 }
+
+/* v47 IA estratégica */
+.ai-identity-card {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(180px, 260px) minmax(220px, 320px);
+  gap: 10px;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #d7e3f8;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 12px 0;
+}
+.ai-identity-card span {
+  color: #52617a;
+  margin-left: 4px;
+}
+@media (max-width: 900px) {
+  .ai-identity-card {
+    grid-template-columns: 1fr;
+  }
+}
