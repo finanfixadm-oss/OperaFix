@@ -6,6 +6,7 @@ import MandantesPage from "./pages/MandantesPage";
 import DashboardExecutivePage from "./pages/DashboardExecutivePage";
 import ClientPortalPage from "./pages/ClientPortalPage";
 import AiGestionesPage from "./pages/AiGestionesPage";
+import MassImportPage from "./pages/MassImportPage";
 import "./styles/zoho-modules.css";
 
 export default function App() {
@@ -19,6 +20,7 @@ export default function App() {
           <Route path="/records/:id" element={<RecordDetailPage />} />
           <Route path="/portal-cliente" element={<ClientPortalPage />} />
           <Route path="/ia-gestiones" element={<AiGestionesPage />} />
+          <Route path="/carga-masiva" element={<MassImportPage />} />
           <Route path="/mandantes" element={<MandantesPage />} />
 
           <Route path="/company-records" element={<Navigate to="/records" replace />} />

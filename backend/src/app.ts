@@ -13,6 +13,7 @@ import managementsRouter from "./routes/managements.js";
 import managementDocumentsRouter from "./routes/management-documents.js";
 import recordsRouter from "./routes/records.js";
 import aiActionsRouter from "./routes/ai-actions.js";
+import importRecordsRouter from "./routes/import-records.js";
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.use("/api/managements", managementsRouter);
 app.use("/api/management-documents", managementDocumentsRouter);
 app.use("/api/records", recordsRouter);
 app.use("/api/ai", aiActionsRouter);
+app.use("/api/imports", importRecordsRouter);
 
 // Compatibilidad temporal para pantallas antiguas que puedan llamar sin /api.
 app.use("/managements", managementsRouter);

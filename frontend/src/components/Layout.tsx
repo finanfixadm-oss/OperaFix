@@ -12,6 +12,7 @@ export default function Layout({ children }: PropsWithChildren) {
             <NavLink to="/records">Registros</NavLink>
             <NavLink to="/portal-cliente">Portal cliente</NavLink>
             <NavLink to="/ia-gestiones">IA gestiones</NavLink>
+            <NavLink to="/carga-masiva">Carga masiva</NavLink>
             <NavLink to="/mandantes">Mandantes</NavLink>
           </nav>
         </div>
@@ -28,6 +29,7 @@ export default function Layout({ children }: PropsWithChildren) {
             <NavLink to="/records">Registros de empresas</NavLink>
             <NavLink to="/portal-cliente">Portal cliente</NavLink>
             <NavLink to="/ia-gestiones">IA para gestiones</NavLink>
+            <NavLink to="/carga-masiva">Carga masiva inteligente</NavLink>
             <NavLink to="/mandantes">Mandantes</NavLink>
           </nav>
         </aside>
