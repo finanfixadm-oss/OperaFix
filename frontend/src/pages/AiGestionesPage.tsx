@@ -51,6 +51,9 @@ const quickPrompts = [
   "Detecta casos sin poder o sin confirmación CC",
   "Prepara acciones para gestiones de alto monto",
   "Genera borradores de correo para seguimiento a entidad",
+  "Crea tarea de seguimiento para casos sin poder",
+  "Cambia a Pendiente Gestión las gestiones detenidas",
+  "Agrega nota: pendiente respuesta de la entidad",
   "Qué gestiones están detenidas o requieren seguimiento",
 ];
 
@@ -81,7 +84,7 @@ export default function AiGestionesPage() {
       id: "welcome",
       role: "assistant",
       content:
-        "Hola Gabriel. Soy la IA operativa de Operafix. Puedo analizar gestiones, generar informes y proponer acciones. Las acciones se ejecutan solo cuando las confirmas.",
+        "Hola Gabriel. Soy la IA operativa de Operafix. Puedo analizar gestiones, generar informes por columnas y proponer acciones reales. Las acciones se ejecutan solo cuando las confirmas.",
     },
   ]);
   const [input, setInput] = useState("");

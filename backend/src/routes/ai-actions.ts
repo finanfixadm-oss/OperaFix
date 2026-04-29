@@ -717,67 +717,174 @@ function buildLocalAnswer(prompt: string, records: any[]) {
   return lines.join("\n");
 }
 
+function matchRecordsFromPrompt(prompt: string, records: any[]) {
+  const q = normalizeForMatch(prompt);
+  const rutMatch = prompt.match(/\b\d{1,2}\.?\d{3}\.?\d{3}-?[\dkK]\b/);
+  const rutNeedle = rutMatch ? normalizeForMatch(rutMatch[0]) : "";
+
+  let rows = [...records];
+
+  if (rutNeedle) {
+    rows = rows.filter((r) => normalizeForMatch(String(getRecordValue(r, "rut"))).replace(/\s/g, "").includes(rutNeedle.replace(/\s/g, "")));
+  }
+
+  const knownMandantes = [...new Set(records.map((r) => String(getRecordValue(r, "mandante") || "").trim()).filter(Boolean))];
+  const mandanteMention = knownMandantes.find((name) => q.includes(normalizeForMatch(name)));
+  if (mandanteMention) rows = rows.filter((r) => normalizeForMatch(String(getRecordValue(r, "mandante"))) === normalizeForMatch(mandanteMention));
+
+  const knownEntities = [...new Set(records.map((r) => String(getRecordValue(r, "entidad") || "").trim()).filter(Boolean))];
+  const entityMention = knownEntities.find((name) => q.includes(normalizeForMatch(name)));
+  if (entityMention) rows = rows.filter((r) => normalizeForMatch(String(getRecordValue(r, "entidad"))).includes(normalizeForMatch(entityMention)));
+
+  const razonMention = records.find((r) => {
+    const razon = normalizeForMatch(String(getRecordValue(r, "razon_social")));
+    return razon.length > 4 && q.includes(razon);
+  });
+  if (razonMention) rows = rows.filter((r) => r.id === razonMention.id);
+
+  if (q.includes("sin poder")) rows = rows.filter((r) => !r.confirmacion_poder);
+  if (q.includes("sin cc") || q.includes("sin confirmacion cc") || q.includes("sin confirmación cc")) rows = rows.filter((r) => !r.confirmacion_cc);
+  if (q.includes("alto monto") || q.includes("mayor monto") || q.includes("montos altos")) rows = rows.sort((a, b) => toNumber(getRecordValue(b, "monto_devolucion")) - toNumber(getRecordValue(a, "monto_devolucion")));
+
+  return rows.slice(0, 10);
+}
+
+function inferStatusFromPrompt(prompt: string) {
+  const q = normalizeForMatch(prompt);
+  if (q.includes("pagado") || q.includes("pagada") || q.includes("pago realizado")) return "Pagado";
+  if (q.includes("rechazo") || q.includes("rechazado") || q.includes("rechazada")) return "Rechazo";
+  if (q.includes("pendiente")) return "Pendiente Gestión";
+  if (q.includes("ingreso por parte") || q.includes("n solicitud") || q.includes("numero solicitud") || q.includes("número solicitud")) return "Ingreso por parte de entidad";
+  if (q.includes("ingreso solicitud") || q.includes("ingresada a entidad") || q.includes("ingresado a entidad")) return "Ingreso solicitud a entidad";
+  if (q.includes("gestionado") || q.includes("gestionada")) return "Gestionado";
+  return null;
+}
+
+function extractQuotedOrAfter(prompt: string, keywords: string[]) {
+  const quoted = prompt.match(/["“”']([^"“”']{3,500})["“”']/)?.[1];
+  if (quoted) return quoted.trim();
+  const pattern = new RegExp(`(?:${keywords.join("|")})\\s*:?\\s*(.{3,500})`, "i");
+  return prompt.match(pattern)?.[1]?.trim() || "";
+}
+
 function buildRuleActions(prompt: string, records: any[]): AiAction[] {
-  const q = prompt.toLowerCase();
+  const q = normalizeForMatch(prompt);
   const actions: AiAction[] = [];
+  const selected = matchRecordsFromPrompt(prompt, records);
+  const limited = selected.length ? selected : records.slice(0, 8);
 
-  const selected = records
-    .filter((r) => {
-      if (q.includes("rechaz")) return /rechaz/i.test(text(r.estado_gestion));
-      if (q.includes("pag")) return /pag/i.test(text(r.estado_gestion));
-      if (q.includes("poder")) return !r.confirmacion_poder;
-      if (q.includes("cc") || q.includes("cuenta")) return !r.confirmacion_cc;
-      if (q.includes("afp modelo")) return /modelo/i.test(`${r.entidad} ${r.lineAfp?.afp_name}`);
-      if (q.includes("afp capital")) return /capital/i.test(`${r.entidad} ${r.lineAfp?.afp_name}`);
-      return toNumber(r.monto_devolucion) >= 500000 || !r.confirmacion_poder || !r.confirmacion_cc;
-    })
-    .slice(0, 8);
-
-  for (const r of selected) {
-    if (!r.confirmacion_poder) {
-      actions.push({
-        type: "CREATE_TASK",
-        recordId: r.id,
-        label: `Crear tarea: solicitar poder para ${recordTitle(r)}`,
-        payload: { title: "Solicitar poder", description: `Solicitar/validar poder para ${recordTitle(r)} (${r.rut || r.company?.rut || "Sin RUT"}).` },
-      });
-    }
-    if (!r.confirmacion_cc) {
-      actions.push({
-        type: "CREATE_TASK",
-        recordId: r.id,
-        label: `Crear tarea: validar cuenta corriente para ${recordTitle(r)}`,
-        payload: { title: "Validar CC", description: `Validar datos bancarios para ${recordTitle(r)} antes de pago/devolución.` },
-      });
-    }
-    if (/ingreso|present|enviad/i.test(text(r.estado_gestion))) {
-      actions.push({
-        type: "ADD_NOTE",
-        recordId: r.id,
-        label: `Agregar nota de seguimiento a ${recordTitle(r)}`,
-        payload: { content: "IA sugiere seguimiento con entidad por gestión ingresada/presentada sin cierre visible." },
-      });
-    }
-    if (q.includes("cambiar") && q.includes("seguimiento")) {
+  const wantsUpdateStatus = /(cambia|cambiar|marca|marcar|actualiza|actualizar).*(estado|gestion|gestión)|como\s+(pagado|rechazo|pendiente|gestionado)/i.test(prompt);
+  const inferredStatus = inferStatusFromPrompt(prompt);
+  if (wantsUpdateStatus && inferredStatus) {
+    for (const r of limited.slice(0, 8)) {
       actions.push({
         type: "UPDATE_STATUS",
         recordId: r.id,
-        label: `Cambiar estado a Seguimiento entidad: ${recordTitle(r)}`,
-        payload: { estado_gestion: "Seguimiento entidad" },
+        label: `Cambiar estado de ${recordTitle(r)} a ${inferredStatus}`,
+        payload: { estado_gestion: inferredStatus },
       });
     }
-    actions.push({
-      type: "CREATE_EMAIL_DRAFT",
-      recordId: r.id,
-      label: `Preparar borrador de correo para ${recordTitle(r)}`,
-      payload: {
-        subject: `Seguimiento gestión ${r.numero_solicitud || r.rut || ""}`.trim(),
-        body: `Estimados, junto con saludar, solicitamos actualización de la gestión asociada a ${recordTitle(r)}, RUT ${r.rut || r.company?.rut || ""}, entidad ${r.entidad || r.lineAfp?.afp_name || ""}. Quedamos atentos.`,
-      },
-    });
   }
 
-  return actions.slice(0, 12).map((action, index) => ({ ...action, id: `${action.type}-${action.recordId}-${index}` }));
+  const wantsNote = /(agrega|agregar|crea|crear|deja|registrar).*(nota|comentario)/i.test(prompt);
+  if (wantsNote) {
+    const content = extractQuotedOrAfter(prompt, ["nota", "comentario", "observacion", "observación"]) || "Nota creada por IA operativa.";
+    for (const r of limited.slice(0, 8)) {
+      actions.push({
+        type: "ADD_NOTE",
+        recordId: r.id,
+        label: `Agregar nota en ${recordTitle(r)}`,
+        payload: { content },
+      });
+    }
+  }
+
+  const wantsTask = /(crea|crear|agenda|agendar|programa|programar).*(tarea|seguimiento|recordatorio)/i.test(prompt);
+  if (wantsTask) {
+    const description = extractQuotedOrAfter(prompt, ["tarea", "seguimiento", "recordatorio"]) || "Seguimiento creado por IA operativa.";
+    for (const r of limited.slice(0, 8)) {
+      actions.push({
+        type: "CREATE_TASK",
+        recordId: r.id,
+        label: `Crear tarea de seguimiento para ${recordTitle(r)}`,
+        payload: { title: "Seguimiento IA", description },
+      });
+    }
+  }
+
+  const wantsConfirm = /(marca|marcar|actualiza|actualizar|confirma|confirmar).*(poder|cc|cuenta corriente)/i.test(prompt);
+  if (wantsConfirm) {
+    const payload: Record<string, boolean> = {};
+    if (q.includes("poder")) payload.confirmacion_poder = !(q.includes("sin poder") || q.includes("no poder"));
+    if (q.includes("cc") || q.includes("cuenta corriente")) payload.confirmacion_cc = !(q.includes("sin cc") || q.includes("sin cuenta"));
+    if (Object.keys(payload).length) {
+      for (const r of limited.slice(0, 8)) {
+        actions.push({
+          type: "MARK_CONFIRMATION",
+          recordId: r.id,
+          label: `Actualizar confirmación en ${recordTitle(r)}`,
+          payload,
+        });
+      }
+    }
+  }
+
+  const wantsEmail = /(correo|email|mail|borrador|seguimiento a entidad)/i.test(prompt);
+  if (wantsEmail) {
+    for (const r of limited.slice(0, 8)) {
+      actions.push({
+        type: "CREATE_EMAIL_DRAFT",
+        recordId: r.id,
+        label: `Preparar borrador de correo para ${recordTitle(r)}`,
+        payload: {
+          subject: `Seguimiento gestión ${r.numero_solicitud || r.rut || ""}`.trim(),
+          body: `Estimados, junto con saludar, solicitamos actualización de la gestión asociada a ${recordTitle(r)}, RUT ${r.rut || r.company?.rut || ""}, entidad ${r.entidad || r.lineAfp?.afp_name || ""}. Quedamos atentos.`,
+        },
+      });
+    }
+  }
+
+  if (!actions.length && /(accion|acciones|priorizar|prioridad|alto monto|sin poder|sin cc|detenid|seguimiento)/i.test(prompt)) {
+    const suggested = limited
+      .filter((r) => toNumber(r.monto_devolucion) >= 500000 || !r.confirmacion_poder || !r.confirmacion_cc || /pendiente/i.test(text(r.estado_gestion)))
+      .slice(0, 8);
+
+    for (const r of suggested) {
+      if (!r.confirmacion_poder) {
+        actions.push({
+          type: "CREATE_TASK",
+          recordId: r.id,
+          label: `Crear tarea: solicitar poder para ${recordTitle(r)}`,
+          payload: { title: "Solicitar poder", description: `Solicitar poder vigente para ${recordTitle(r)}, RUT ${r.rut || r.company?.rut || ""}.` },
+        });
+      }
+      if (!r.confirmacion_cc) {
+        actions.push({
+          type: "CREATE_TASK",
+          recordId: r.id,
+          label: `Crear tarea: confirmar CC para ${recordTitle(r)}`,
+          payload: { title: "Confirmar cuenta corriente", description: `Confirmar datos bancarios/CC para ${recordTitle(r)}.` },
+        });
+      }
+      actions.push({
+        type: "CREATE_EMAIL_DRAFT",
+        recordId: r.id,
+        label: `Preparar correo de seguimiento para ${recordTitle(r)}`,
+        payload: {
+          subject: `Seguimiento gestión ${r.numero_solicitud || r.rut || ""}`.trim(),
+          body: `Estimados, solicitamos actualización del estado de la gestión de ${recordTitle(r)}, RUT ${r.rut || r.company?.rut || ""}.`,
+        },
+      });
+    }
+  }
+
+  const unique = new Map<string, AiAction>();
+  for (const action of actions) {
+    const key = `${action.type}-${action.recordId}-${JSON.stringify(action.payload || {})}`;
+    if (!unique.has(key)) unique.set(key, action);
+  }
+
+  return [...unique.values()].slice(0, 12).map((action, index) => ({ ...action, id: `${action.type}-${action.recordId}-${index}` }));
 }
 
 async function callOpenAI(prompt: string, records: any[]) {

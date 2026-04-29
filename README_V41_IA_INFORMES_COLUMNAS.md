@@ -59,7 +59,7 @@ Incluye estilos para:
 En Railway/backend:
 
 ```env
-OPENAI_API_KEY=sk-xxxx
+OPENAI_API_KEY=tu_api_key_de_railway
 OPENAI_MODEL=gpt-4o-mini
 ```
 
