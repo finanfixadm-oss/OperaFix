@@ -710,103 +710,106 @@ export default function DashboardExecutivePage() {
 
       <div className="zoho-scope-hint">Los filtros, columnas y paneles personalizados se guardan por mandante seleccionado. Registros base encontrados: <strong>{data.length}</strong>.</div>
 
-      <div className="dashboard-advanced-layout">
+      <div className="dashboard-advanced-layout dashboard-dashboard-layout-fixed">
         <ModuleFilterPanel
           title="Filtrar dashboard por cualquier campo"
           fields={recordFilterFields}
           onApply={(rules, search) => { setActiveRules(rules); setQuickSearch(search); }}
         />
-        <div className="dashboard-filter-help">
-          <strong>Constructor de paneles:</strong> crea componentes como los de Zoho seleccionando el módulo, una medida, varios agrupamientos y filtros con patrón <strong>{"((1 y 2) y 3)"}</strong>.
+
+        <div className="dashboard-main-workspace">
+          <div className="dashboard-filter-help">
+            <strong>Constructor de paneles:</strong> crea componentes como los de Zoho seleccionando el módulo, una medida, varios agrupamientos y filtros con patrón <strong>{"((1 y 2) y 3)"}</strong>.
+          </div>
+
+          {loading ? <div className="zoho-empty">Cargando dashboard...</div> : (
+            <>
+              <section className="dashboard-kpi-grid">
+                <Kpi title="Total devolución" value={money(totalDevolucion)} helper="Monto total estimado/gestionado" />
+                <Kpi title="Avance meta" value={`${avanceMeta.toFixed(1)}%`} helper={`${money(totalDevolucion)} de ${money(metaMensual)}`} progress={avanceMeta} />
+                <Kpi title="Finanfix" value={money(totalFinanfix)} helper="Monto real/estimado Finanfix" />
+                <Kpi title="Cliente" value={money(totalCliente)} helper="Monto real/estimado cliente" />
+                <Kpi title="Pendientes" value={String(pendientes)} helper="Gestiones abiertas" />
+                <Kpi title="Pagadas/Cerradas" value={String(pagadas)} helper="Gestiones con cierre positivo" />
+                <Kpi title="Rechazadas" value={String(rechazadas)} helper="Gestiones rechazadas" />
+              </section>
+
+              <section className="dashboard-builder-section">
+                <div className="zoho-card-title-row dashboard-builder-title">
+                  <div>
+                    <h2>Paneles personalizados</h2>
+                    <p>Crea tablas, gráficos circulares, barras o KPI con agrupamientos y filtros propios.</p>
+                  </div>
+                  <button className="zoho-btn zoho-btn-primary" onClick={openNewPanel}>Agregar componente</button>
+                </div>
+                {panels.length === 0 ? <div className="zoho-empty">No tienes paneles creados para esta vista.</div> : (
+                  <div className="dashboard-custom-grid">
+                    {panels.map((panel) => <CustomPanel key={panel.id} panel={panel} rows={data} onEdit={editPanel} onClone={clonePanel} onDelete={deletePanel} onOpenRecord={(id) => navigate(`/records/${id}`)} />)}
+                  </div>
+                )}
+              </section>
+
+              <section className="dashboard-grid-3">
+                <Ranking title="Monto por mandante" rows={byMandante.slice(0, 8)} />
+                <Ranking title="Monto por AFP / entidad" rows={byEntidad.slice(0, 8)} />
+                <Ranking title="Estados de gestión" rows={byEstado.slice(0, 8)} />
+                <Ranking title="Antigüedad operacional" rows={byAging} />
+              </section>
+
+              <section className="dashboard-grid-2">
+                <div className="zoho-card">
+                  <div className="zoho-card-title-row"><h2>Gestiones prioritarias</h2><button className="zoho-btn" onClick={() => navigate("/ia-gestiones")}>Ver IA</button></div>
+                  <table className="zoho-table compact">
+                    <thead><tr><th>Empresa</th><th>AFP</th><th>Estado</th><th>Monto</th><th>Alerta</th></tr></thead>
+                    <tbody>{highPriority.map((row) => (
+                      <tr key={row.id} onClick={() => navigate(`/records/${row.id}`)} className="clickable-row">
+                        <td>{row.razon_social || row.company?.razon_social || "—"}</td>
+                        <td>{row.entidad || row.lineAfp?.afp_name || "—"}</td>
+                        <td><span className="status-pill">{row.estado_gestion || "—"}</span></td>
+                        <td>{money(numberValue(row.monto_devolucion))}</td>
+                        <td>{row.confirmacion_poder === false ? "Poder" : row.confirmacion_cc === false ? "CC" : daysSince(row.fecha_presentacion_afp || row.updated_at || row.created_at) > 20 ? "+20 días" : "Monto alto"}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+
+                <div className="zoho-card">
+                  <div className="zoho-card-title-row"><h2>Últimas gestiones actualizadas</h2></div>
+                  <table className="zoho-table compact">
+                    <thead><tr><th>Mandante</th><th>Razón Social</th><th>AFP</th><th>Estado</th><th>Monto</th></tr></thead>
+                    <tbody>{recent.map((row) => (
+                      <tr key={row.id} onClick={() => navigate(`/records/${row.id}`)} className="clickable-row">
+                        <td>{row.mandante?.name || (row as any).mandante || "—"}</td>
+                        <td>{row.razon_social || row.company?.razon_social || "—"}</td>
+                        <td>{row.entidad || row.lineAfp?.afp_name || "—"}</td>
+                        <td><span className="status-pill">{row.estado_gestion || "—"}</span></td>
+                        <td>{money(numberValue(row.monto_devolucion))}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section className="zoho-card dashboard-records-card">
+                <div className="zoho-card-title-row">
+                  <h2>Detalle dinámico del dashboard</h2>
+                  <button className="zoho-btn" onClick={() => setColumnModalOpen(true)}>Elegir campos</button>
+                </div>
+                <div className="zoho-table-scroll">
+                  <table className="zoho-table compact">
+                    <thead><tr>{selectedColumns.map((column) => <th key={column.field}>{column.label}</th>)}</tr></thead>
+                    <tbody>{data.map((row) => (
+                      <tr key={row.id} className="clickable-row" onClick={() => navigate(`/records/${row.id}`)}>
+                        {selectedColumns.map((column) => <td key={`${row.id}-${column.field}`}>{formatCellValue(column.value(row), column)}</td>)}
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              </section>
+            </>
+          )}
         </div>
       </div>
-
-      {loading ? <div className="zoho-empty">Cargando dashboard...</div> : (
-        <>
-          <section className="dashboard-kpi-grid">
-            <Kpi title="Total devolución" value={money(totalDevolucion)} helper="Monto total estimado/gestionado" />
-            <Kpi title="Avance meta" value={`${avanceMeta.toFixed(1)}%`} helper={`${money(totalDevolucion)} de ${money(metaMensual)}`} progress={avanceMeta} />
-            <Kpi title="Finanfix" value={money(totalFinanfix)} helper="Monto real/estimado Finanfix" />
-            <Kpi title="Cliente" value={money(totalCliente)} helper="Monto real/estimado cliente" />
-            <Kpi title="Pendientes" value={String(pendientes)} helper="Gestiones abiertas" />
-            <Kpi title="Pagadas/Cerradas" value={String(pagadas)} helper="Gestiones con cierre positivo" />
-            <Kpi title="Rechazadas" value={String(rechazadas)} helper="Gestiones rechazadas" />
-          </section>
-
-          <section className="dashboard-builder-section">
-            <div className="zoho-card-title-row dashboard-builder-title">
-              <div>
-                <h2>Paneles personalizados</h2>
-                <p>Crea tablas, gráficos circulares, barras o KPI con agrupamientos y filtros propios.</p>
-              </div>
-              <button className="zoho-btn zoho-btn-primary" onClick={openNewPanel}>Agregar componente</button>
-            </div>
-            {panels.length === 0 ? <div className="zoho-empty">No tienes paneles creados para esta vista.</div> : (
-              <div className="dashboard-custom-grid">
-                {panels.map((panel) => <CustomPanel key={panel.id} panel={panel} rows={data} onEdit={editPanel} onClone={clonePanel} onDelete={deletePanel} onOpenRecord={(id) => navigate(`/records/${id}`)} />)}
-              </div>
-            )}
-          </section>
-
-          <section className="dashboard-grid-3">
-            <Ranking title="Monto por mandante" rows={byMandante.slice(0, 8)} />
-            <Ranking title="Monto por AFP / entidad" rows={byEntidad.slice(0, 8)} />
-            <Ranking title="Estados de gestión" rows={byEstado.slice(0, 8)} />
-            <Ranking title="Antigüedad operacional" rows={byAging} />
-          </section>
-
-          <section className="dashboard-grid-2">
-            <div className="zoho-card">
-              <div className="zoho-card-title-row"><h2>Gestiones prioritarias</h2><button className="zoho-btn" onClick={() => navigate("/ia-gestiones")}>Ver IA</button></div>
-              <table className="zoho-table compact">
-                <thead><tr><th>Empresa</th><th>AFP</th><th>Estado</th><th>Monto</th><th>Alerta</th></tr></thead>
-                <tbody>{highPriority.map((row) => (
-                  <tr key={row.id} onClick={() => navigate(`/records/${row.id}`)} className="clickable-row">
-                    <td>{row.razon_social || row.company?.razon_social || "—"}</td>
-                    <td>{row.entidad || row.lineAfp?.afp_name || "—"}</td>
-                    <td><span className="status-pill">{row.estado_gestion || "—"}</span></td>
-                    <td>{money(numberValue(row.monto_devolucion))}</td>
-                    <td>{row.confirmacion_poder === false ? "Poder" : row.confirmacion_cc === false ? "CC" : daysSince(row.fecha_presentacion_afp || row.updated_at || row.created_at) > 20 ? "+20 días" : "Monto alto"}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-
-            <div className="zoho-card">
-              <div className="zoho-card-title-row"><h2>Últimas gestiones actualizadas</h2></div>
-              <table className="zoho-table compact">
-                <thead><tr><th>Mandante</th><th>Razón Social</th><th>AFP</th><th>Estado</th><th>Monto</th></tr></thead>
-                <tbody>{recent.map((row) => (
-                  <tr key={row.id} onClick={() => navigate(`/records/${row.id}`)} className="clickable-row">
-                    <td>{row.mandante?.name || (row as any).mandante || "—"}</td>
-                    <td>{row.razon_social || row.company?.razon_social || "—"}</td>
-                    <td>{row.entidad || row.lineAfp?.afp_name || "—"}</td>
-                    <td><span className="status-pill">{row.estado_gestion || "—"}</span></td>
-                    <td>{money(numberValue(row.monto_devolucion))}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-          </section>
-
-          <section className="zoho-card dashboard-records-card">
-            <div className="zoho-card-title-row">
-              <h2>Detalle dinámico del dashboard</h2>
-              <button className="zoho-btn" onClick={() => setColumnModalOpen(true)}>Elegir campos</button>
-            </div>
-            <div className="zoho-table-scroll">
-              <table className="zoho-table compact">
-                <thead><tr>{selectedColumns.map((column) => <th key={column.field}>{column.label}</th>)}</tr></thead>
-                <tbody>{data.map((row) => (
-                  <tr key={row.id} className="clickable-row" onClick={() => navigate(`/records/${row.id}`)}>
-                    {selectedColumns.map((column) => <td key={`${row.id}-${column.field}`}>{formatCellValue(column.value(row), column)}</td>)}
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-          </section>
-        </>
-      )}
 
       <ZohoModal title={editingPanelId ? "Editar gráfico" : "Crear panel de información"} isOpen={panelModalOpen} onClose={() => setPanelModalOpen(false)}>
         <div className="dashboard-panel-editor dashboard-panel-editor-zoho">

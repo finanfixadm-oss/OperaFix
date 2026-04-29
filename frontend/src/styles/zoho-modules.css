@@ -1969,3 +1969,149 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* v33 - corrección de descuadre en cabecera del dashboard */
+.crm-body,
+.crm-content,
+.zoho-module-page,
+.dashboard-page {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.crm-content,
+.dashboard-page {
+  overflow-x: hidden;
+}
+
+.dashboard-page .dashboard-hero-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+  width: 100%;
+  max-width: 100%;
+  padding: 12px 12px 14px;
+  margin: -4px 0 0;
+  box-sizing: border-box;
+  background: #f5f7fb;
+  border-bottom: 1px solid #dbe5f1;
+}
+
+.dashboard-page .dashboard-hero-header > div:first-child {
+  min-width: 0;
+}
+
+.dashboard-page .dashboard-hero-header h1,
+.dashboard-page .dashboard-hero-header p {
+  overflow-wrap: anywhere;
+}
+
+.dashboard-page .dashboard-hero-header .zoho-module-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  max-width: min(100%, 620px);
+  min-width: 0;
+}
+
+.dashboard-page .dashboard-hero-header .zoho-module-actions .zoho-btn {
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.dashboard-page .dashboard-filter-card {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.dashboard-page .dashboard-advanced-layout,
+.dashboard-page .dashboard-custom-grid,
+.dashboard-page .dashboard-grid-2,
+.dashboard-page .dashboard-grid-3 {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dashboard-page .zoho-card,
+.dashboard-page .custom-dashboard-panel {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1180px) {
+  .dashboard-page .dashboard-hero-header {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-page .dashboard-hero-header .zoho-module-actions {
+    justify-content: flex-start;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 680px) {
+  .dashboard-page .dashboard-hero-header .zoho-module-actions .zoho-btn {
+    flex: 1 1 calc(50% - 8px);
+  }
+}
+
+/* v34 - Dashboard: paneles visibles dentro del área principal, no debajo del filtro lateral */
+.dashboard-dashboard-layout-fixed {
+  display: grid;
+  grid-template-columns: minmax(260px, 330px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.dashboard-main-workspace {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dashboard-main-workspace .dashboard-kpi-grid,
+.dashboard-main-workspace .dashboard-builder-section,
+.dashboard-main-workspace .dashboard-grid-2,
+.dashboard-main-workspace .dashboard-grid-3,
+.dashboard-main-workspace .dashboard-records-card {
+  margin-top: 0;
+}
+
+.dashboard-main-workspace .dashboard-builder-section {
+  background: #fff;
+  border: 1px solid #dbe7f5;
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.dashboard-main-workspace .dashboard-custom-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.custom-dashboard-panel {
+  display: block;
+  min-height: 160px;
+}
+
+.custom-panel-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-dashboard-layout-fixed {
+    grid-template-columns: 1fr;
+  }
+}
