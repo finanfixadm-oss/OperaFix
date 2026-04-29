@@ -28,6 +28,8 @@ export default function UsersPage() {
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [seedMessage, setSeedMessage] = useState("");
   const [error, setError] = useState("");
 
   const session = useMemo(() => {
@@ -84,6 +86,29 @@ export default function UsersPage() {
     }
   }
 
+
+  async function createDefaultUsers() {
+    const password = prompt(
+      "Contraseña temporal para los usuarios base:",
+      "OperaFix2026!"
+    );
+    if (!password) return;
+    if (!confirm("Esto creará o actualizará los usuarios base con la contraseña indicada. ¿Continuar?")) return;
+
+    setSeeding(true);
+    setSeedMessage("");
+    setError("");
+    try {
+      const result = await postJson<{ message: string; default_password: string }>("/users/seed-defaults", { password });
+      setSeedMessage(result.message || "Usuarios base creados/actualizados correctamente.");
+      await load();
+    } catch (err: any) {
+      setError(err.message || "No se pudieron crear los usuarios base.");
+    } finally {
+      setSeeding(false);
+    }
+  }
+
   return (
     <div className="zoho-module-page">
       <div className="zoho-page-header">
@@ -92,10 +117,22 @@ export default function UsersPage() {
           <h1>Control de usuarios</h1>
           <p>Administra usuarios internos y clientes. Los usuarios cliente quedan asociados a un mandante y solo ven sus gestiones en el portal.</p>
         </div>
-        <div className="zoho-chip">Sesión: {session?.full_name || session?.email || "sin sesión"}</div>
+        <div className="users-header-actions"><div className="zoho-chip">Sesión: {session?.full_name || session?.email || "sin sesión"}</div><button className="zoho-btn primary" type="button" onClick={createDefaultUsers} disabled={seeding}>{seeding ? "Creando usuarios..." : "Crear usuarios base"}</button></div>
       </div>
 
       {error && <div className="zoho-alert danger">{error}</div>}
+      {seedMessage && <div className="zoho-alert success">{seedMessage}</div>}
+
+
+      <section className="zoho-card users-default-card">
+        <h2>Usuarios base solicitados</h2>
+        <p>Usa el botón <strong>Crear usuarios base</strong> para dejar listos estos accesos con una contraseña temporal.</p>
+        <div className="default-users-grid">
+          <div><strong>Clientes</strong><span>mandante@mundoprevisional.cl → Mundo Previsional</span><span>mandante@optmizaco.cl → Optimiza Consulting</span></div>
+          <div><strong>KAM</strong><span>smendoza@finanfix.cl</span></div>
+          <div><strong>Admin</strong><span>gmendoza@finanfix.cl</span><span>lmendoza@finanfix.cl</span><span>egabriaguez@finanfix.cl</span></div>
+        </div>
+      </section>
 
       <section className="zoho-card">
         <h2>Crear usuario</h2>

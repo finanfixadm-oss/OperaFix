@@ -7,6 +7,69 @@ import { ensureUsersTable, normalizeRole } from "./auth.js";
 
 const usersRouter = Router();
 
+const DEFAULT_PASSWORD = "OperaFix2026!";
+
+const DEFAULT_USERS = [
+  {
+    email: "gmendoza@finanfix.cl",
+    full_name: "Gabriel Mendoza",
+    role: "admin",
+    mandante_name: null,
+  },
+  {
+    email: "lmendoza@finanfix.cl",
+    full_name: "Luis Mendoza",
+    role: "admin",
+    mandante_name: null,
+  },
+  {
+    email: "egabriaguez@finanfix.cl",
+    full_name: "Emmanuel Gabríaguez",
+    role: "admin",
+    mandante_name: null,
+  },
+  {
+    email: "smendoza@finanfix.cl",
+    full_name: "S. Mendoza",
+    role: "kam",
+    mandante_name: null,
+  },
+  {
+    email: "mandante@mundoprevisional.cl",
+    full_name: "Mandante Mundo Previsional",
+    role: "cliente",
+    mandante_name: "Mundo Previsional",
+  },
+  {
+    email: "mandante@optmizaco.cl",
+    full_name: "Mandante Optimiza Consulting",
+    role: "cliente",
+    mandante_name: "Optimiza Consulting",
+  },
+];
+
+async function findMandanteByName(name: string | null) {
+  if (!name) return null;
+  try {
+    const rows = await prisma.$queryRawUnsafe<{ id: string; name: string }[]>(
+      `select id, name from mandantes where lower(name) = lower($1) limit 1`,
+      name
+    );
+    return rows[0] || null;
+  } catch {
+    try {
+      const rows = await prisma.$queryRawUnsafe<{ id: string; name: string }[]>(
+        `select id, name from mandante where lower(name) = lower($1) limit 1`,
+        name
+      );
+      return rows[0] || null;
+    } catch {
+      return null;
+    }
+  }
+}
+
+
 function getSession(req: any) {
   const token = req.headers.authorization?.replace("Bearer ", "");
   if (!token) return null;
@@ -125,6 +188,79 @@ usersRouter.delete("/:id", async (req, res) => {
   if (!session) return;
   await prisma.$executeRawUnsafe(`update operafix_users set active = false, updated_at = now() where id = $1`, req.params.id);
   res.json({ ok: true });
+});
+
+
+usersRouter.post("/seed-defaults", async (req, res) => {
+  try {
+    await ensureUsersTable();
+    const session = requireAdmin(req, res);
+    if (!session) return;
+
+    const password = String(req.body.password || DEFAULT_PASSWORD);
+    if (password.length < 8) {
+      return res.status(400).json({ message: "La contraseña debe tener al menos 8 caracteres." });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const results: any[] = [];
+
+    for (const item of DEFAULT_USERS) {
+      const mandante = await findMandanteByName(item.mandante_name);
+      const mandanteId = mandante?.id || null;
+      const mandanteName = mandante?.name || item.mandante_name || null;
+      const existing = await prisma.$queryRawUnsafe<any[]>(
+        `select id from operafix_users where lower(email) = lower($1) limit 1`,
+        item.email
+      );
+
+      if (existing[0]?.id) {
+        const updated = await prisma.$queryRawUnsafe<any[]>(
+          `update operafix_users set
+            password_hash = $2,
+            full_name = $3,
+            role = $4,
+            mandante_id = $5,
+            mandante_name = $6,
+            active = true,
+            updated_at = now()
+           where id = $1
+           returning id, email, full_name, role, mandante_id, mandante_name, active, updated_at`,
+          existing[0].id,
+          passwordHash,
+          item.full_name,
+          item.role,
+          mandanteId,
+          mandanteName
+        );
+        results.push({ ...updated[0], action: "updated" });
+      } else {
+        const created = await prisma.$queryRawUnsafe<any[]>(
+          `insert into operafix_users (id, email, password_hash, full_name, role, mandante_id, mandante_name, active)
+           values ($1, $2, $3, $4, $5, $6, $7, true)
+           returning id, email, full_name, role, mandante_id, mandante_name, active, created_at`,
+          `usr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          item.email,
+          passwordHash,
+          item.full_name,
+          item.role,
+          mandanteId,
+          mandanteName
+        );
+        results.push({ ...created[0], action: "created" });
+      }
+    }
+
+    res.json({
+      ok: true,
+      default_password: password,
+      users: results,
+      message: `Usuarios base creados/actualizados correctamente. Contraseña temporal: ${password}`,
+    });
+  } catch (error: any) {
+    console.error("Seed default users error:", error);
+    res.status(500).json({ message: "No se pudieron crear los usuarios base.", detail: error?.message });
+  }
 });
 
 export default usersRouter;
