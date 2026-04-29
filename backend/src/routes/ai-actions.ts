@@ -942,9 +942,196 @@ function extractResponsesText(data: any) {
   return chunks.join("\n").trim();
 }
 
-async function callOpenAI(prompt: string, records: any[], userProfile?: { name?: string; role?: string }, report?: AiReport | null) {
+type OpenAIToolResult = {
+  answer: string;
+  report?: AiReport | null;
+};
+
+function parseBooleanArg(value: any) {
+  return value === true || value === "true" || value === "1" || value === "si" || value === "sí";
+}
+
+function columnsFromToolArgs(columnsArg: any) {
+  const requested = Array.isArray(columnsArg) ? columnsArg : [];
+  const selected: ReportColumn[] = [];
+  for (const raw of requested) {
+    const col = findReportColumnByText(String(raw || ""));
+    if (col) selected.push(col);
+  }
+  const unique = new Map<string, ReportColumn>();
+  for (const col of selected) unique.set(col.key, col);
+  if (!unique.size) {
+    ["mandante", "razon_social", "rut", "entidad", "estado_gestion", "monto_devolucion", "numero_solicitud"].forEach((key) => {
+      const col = REPORT_COLUMNS.find((c) => c.key === key);
+      if (col) unique.set(col.key, col);
+    });
+  }
+  return [...unique.values()].slice(0, 18);
+}
+
+function filterRecordsByToolArgs(records: any[], args: any) {
+  let rows = [...records];
+  const filters: string[] = [];
+
+  const mandante = text(args?.mandante).trim();
+  if (mandante) {
+    rows = rows.filter((r) => normalizeForMatch(String(getRecordValue(r, "mandante"))).includes(normalizeForMatch(mandante)));
+    filters.push(`Mandante contiene ${mandante}`);
+  }
+
+  const entidad = text(args?.entidad).trim();
+  if (entidad) {
+    rows = rows.filter((r) => normalizeForMatch(String(getRecordValue(r, "entidad"))).includes(normalizeForMatch(entidad)));
+    filters.push(`Entidad contiene ${entidad}`);
+  }
+
+  const estado = text(args?.estado_gestion).trim();
+  if (estado) {
+    rows = rows.filter((r) => normalizeForMatch(String(getRecordValue(r, "estado_gestion"))).includes(normalizeForMatch(estado)));
+    filters.push(`Estado contiene ${estado}`);
+  }
+
+  const rut = text(args?.rut).trim();
+  if (rut) {
+    rows = rows.filter((r) => normalizeForMatch(String(getRecordValue(r, "rut"))).replace(/\s/g, "").includes(normalizeForMatch(rut).replace(/\s/g, "")));
+    filters.push(`RUT contiene ${rut}`);
+  }
+
+  const razon = text(args?.razon_social).trim();
+  if (razon) {
+    rows = rows.filter((r) => normalizeForMatch(String(getRecordValue(r, "razon_social"))).includes(normalizeForMatch(razon)));
+    filters.push(`Razón Social contiene ${razon}`);
+  }
+
+  if (parseBooleanArg(args?.sin_poder)) {
+    rows = rows.filter((r) => !r.confirmacion_poder);
+    filters.push("Sin confirmación de poder");
+  }
+  if (parseBooleanArg(args?.sin_cc)) {
+    rows = rows.filter((r) => !r.confirmacion_cc);
+    filters.push("Sin confirmación CC");
+  }
+
+  const minMonto = Number(args?.monto_minimo ?? "");
+  if (Number.isFinite(minMonto) && minMonto > 0) {
+    rows = rows.filter((r) => toNumber(getRecordValue(r, "monto_devolucion")) >= minMonto);
+    filters.push(`Monto Devolución >= ${money(minMonto)}`);
+  }
+
+  const orden = normalizeForMatch(text(args?.orden).trim());
+  if (orden.includes("monto") || orden.includes("mayor") || orden.includes("desc")) {
+    rows = rows.sort((a, b) => toNumber(getRecordValue(b, "monto_devolucion")) - toNumber(getRecordValue(a, "monto_devolucion")));
+    filters.push("Ordenado por mayor monto");
+  }
+
+  const limit = Math.min(Math.max(Number(args?.limite || 50), 1), 300);
+  return { rows: rows.slice(0, limit), totalRows: rows.length, filters };
+}
+
+function makeReportFromToolArgs(args: any, records: any[]): AiReport {
+  const columns = columnsFromToolArgs(args?.columnas);
+  const filtered = filterRecordsByToolArgs(records, args);
+  const rows = filtered.rows.map((record) => {
+    const row: Record<string, unknown> = {};
+    for (const column of columns) row[column.key] = formatReportCell(getRecordValue(record, column.key), column);
+    return row;
+  });
+  const title = text(args?.titulo).trim() || "Informe generado por IA";
+  return {
+    title,
+    columns,
+    rows,
+    totalRows: filtered.totalRows,
+    filtersApplied: filtered.filters,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+function buildToolDefinitions() {
+  return [
+    {
+      type: "function",
+      name: "crm_buscar_gestiones",
+      description: "Busca gestiones reales del CRM usando filtros de mandante, AFP/entidad, estado, RUT, razón social, falta de poder o falta de confirmación CC. Úsala cuando el usuario pida ver, listar, contar, separar o analizar gestiones.",
+      strict: false,
+      parameters: {
+        type: "object",
+        properties: {
+          mandante: { type: ["string", "null"], description: "Nombre del mandante/cliente, por ejemplo Mundo Previsional u Optimiza Consulting." },
+          entidad: { type: ["string", "null"], description: "AFP o entidad, por ejemplo Modelo, Capital, Provida." },
+          estado_gestion: { type: ["string", "null"], description: "Estado de gestión solicitado." },
+          rut: { type: ["string", "null"], description: "RUT a buscar." },
+          razon_social: { type: ["string", "null"], description: "Razón social o parte del nombre de empresa." },
+          sin_poder: { type: ["boolean", "null"], description: "true si se solicitan gestiones sin confirmación de poder." },
+          sin_cc: { type: ["boolean", "null"], description: "true si se solicitan gestiones sin confirmación CC." },
+          monto_minimo: { type: ["number", "null"], description: "Monto Devolución mínimo en pesos chilenos." },
+          orden: { type: ["string", "null"], description: "Orden solicitado, por ejemplo mayor monto." },
+          limite: { type: ["number", "null"], description: "Cantidad máxima de registros." }
+        },
+        additionalProperties: false,
+      },
+    },
+    {
+      type: "function",
+      name: "crm_crear_informe_excel",
+      description: "Crea un informe descargable desde el chat con columnas exactas y filtros. Úsala cuando el usuario pida Excel, CSV, planilla, tabla, informe descargable o columnas específicas.",
+      strict: false,
+      parameters: {
+        type: "object",
+        properties: {
+          titulo: { type: ["string", "null"], description: "Título del informe." },
+          columnas: { type: "array", items: { type: "string" }, description: "Columnas solicitadas por el usuario, con nombres naturales como RUT, Razón Social, Entidad / AFP, Estado Gestión, Monto Devolución." },
+          mandante: { type: ["string", "null"], description: "Filtro de mandante/cliente." },
+          entidad: { type: ["string", "null"], description: "Filtro de AFP/entidad." },
+          estado_gestion: { type: ["string", "null"], description: "Filtro de estado." },
+          rut: { type: ["string", "null"], description: "Filtro de RUT." },
+          razon_social: { type: ["string", "null"], description: "Filtro de razón social." },
+          sin_poder: { type: ["boolean", "null"], description: "Filtrar sin confirmación de poder." },
+          sin_cc: { type: ["boolean", "null"], description: "Filtrar sin confirmación CC." },
+          monto_minimo: { type: ["number", "null"], description: "Monto mínimo." },
+          orden: { type: ["string", "null"], description: "Orden solicitado." },
+          limite: { type: ["number", "null"], description: "Cantidad máxima de registros." },
+          separar_por_mandante: { type: ["boolean", "null"], description: "true si el usuario pide separar o distribuir por mandante." }
+        },
+        additionalProperties: false,
+      },
+    },
+    {
+      type: "function",
+      name: "crm_detectar_oportunidades",
+      description: "Detecta oportunidades de dinero recuperable, priorizando monto alto, falta de poder, falta de CC, estado pendiente y ausencia de respuesta. Úsala cuando el usuario diga plata, lucas, oportunidades, priorizar o meta mensual.",
+      strict: false,
+      parameters: {
+        type: "object",
+        properties: {
+          mandante: { type: ["string", "null"], description: "Filtro de mandante." },
+          entidad: { type: ["string", "null"], description: "Filtro de AFP/entidad." },
+          limite: { type: ["number", "null"], description: "Cantidad máxima de oportunidades." }
+        },
+        additionalProperties: false,
+      },
+    },
+    {
+      type: "function",
+      name: "crm_preparar_acciones",
+      description: "Prepara acciones seguras con confirmación: cambiar estado, agregar nota, crear tarea o borrador de correo. Úsala cuando el usuario pida hacer, cambiar, marcar, crear tarea, dejar nota o preparar correo.",
+      strict: false,
+      parameters: {
+        type: "object",
+        properties: {
+          instruccion: { type: "string", description: "Instrucción completa del usuario para convertirla en acciones confirmables." }
+        },
+        required: ["instruccion"],
+        additionalProperties: false,
+      },
+    },
+  ];
+}
+
+async function callOpenAI(prompt: string, records: any[], userProfile?: { name?: string; role?: string }, report?: AiReport | null): Promise<OpenAIToolResult> {
   const apiKey = getRequiredOpenAIApiKey();
   const model = getOpenAIModel();
+  let toolReport: AiReport | null = null;
 
   const compact = records.map(compactRecord).slice(0, 160);
   const userIdentity = userProfile?.name
@@ -952,56 +1139,133 @@ async function callOpenAI(prompt: string, records: any[], userProfile?: { name?:
     : "Usuario no identificado todavía. Si la solicitud es amplia, ambigua o pide ejecutar acciones, pregunta primero: ¿quién eres y qué rol tienes en la operación?";
 
   const reportContext = report
-    ? `
-
-El sistema ya construyó un informe determinístico desde la base real. Resumen del informe:
-${reportToMarkdown(report)}
-
-No expliques pasos para crear Excel. Indica que el informe está listo para copiar/descargar y agrega una lectura ejecutiva breve.`
+    ? `\n\nEl sistema ya construyó un informe determinístico desde la base real. Resumen del informe:\n${reportToMarkdown(report)}\n\nNo expliques pasos para crear Excel. Indica que el informe está listo para copiar/descargar y agrega una lectura ejecutiva breve.`
     : "";
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+  const baseInput: any[] = [
+    {
+      role: "developer",
+      content:
+        `Eres la IA estratégica y operativa de OperaFix/Finanfix. ${userIdentity}\n` +
+        "Trabajas con recuperaciones LM/TP, AFP, mandantes, montos de devolución, poder, CC, estados y solicitudes. " +
+        "Usa SIEMPRE herramientas CRM cuando el usuario pida datos, informes, columnas, Excel, filtros, acciones o prioridades. " +
+        "Entiende español informal/chileno, errores de tipeo y solicitudes poco formales: sácame, dame la pega, plata, lucas, mundo previsional, modelo. " +
+        "No inventes datos. Usa solo resultados de herramientas o el JSON entregado. Respeta filtros: mandante, AFP, estado, sin CC, sin poder. " +
+        "Si el usuario pide columnas específicas, respeta esas columnas. Si pide separar por mandante, presenta secciones por mandante. " +
+        "Nunca digas que el usuario debe abrir Excel manualmente: el CRM entrega tabla/descarga cuando corresponde. " +
+        "Las acciones siempre se proponen para confirmación; no digas que ya se ejecutaron si solo fueron preparadas.",
     },
-    body: JSON.stringify({
-      model,
-      input: [
-        {
-          role: "developer",
-          content:
-            `Eres la IA estratégica y operativa de OperaFix/Finanfix. ${userIdentity}
-` +
-            "Trabajas con recuperaciones LM/TP, AFP, mandantes, montos de devolución, poder, CC, estados y solicitudes. " +
-            "Entiende español informal/chileno, errores de tipeo y solicitudes poco formales. Ejemplos: 'sácame', 'dame la pega', 'plata', 'lucas', 'mundo previsional', 'modelo'. " +
-            "No inventes datos. Usa solo el JSON entregado y respeta filtros del usuario como mandante, AFP, estado, sin CC o sin poder. " +
-            "Si el usuario pide columnas específicas, respeta esas columnas. Si pide separar por mandante, presenta secciones por mandante. " +
-            "Si faltan datos, dilo claramente. Si recomiendas acciones, deben ser específicas, operativas y seguras. " +
-            "Nunca digas que el usuario debe abrir Excel manualmente: el CRM entrega tabla/descarga cuando corresponde.",
-        },
-        {
-          role: "user",
-          content: `Solicitud del usuario: ${prompt}
-${reportContext}
+    {
+      role: "user",
+      content: `Solicitud del usuario: ${prompt}${reportContext}\n\nRegistros reales disponibles como respaldo JSON:\n${JSON.stringify(compact)}`,
+    },
+  ];
 
-Registros reales disponibles en JSON:
-${JSON.stringify(compact)}`,
-        },
-      ],
-    }),
-  });
+  const tools = buildToolDefinitions();
+  let input = [...baseInput];
+  let lastData: any = null;
 
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`OpenAI ${model} error ${response.status}: ${detail}`);
+  for (let step = 0; step < 4; step++) {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        reasoning: { effort: "medium" },
+        text: { verbosity: "medium" },
+        tools,
+        tool_choice: "auto",
+        parallel_tool_calls: false,
+        input,
+      }),
+    });
+
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(`OpenAI ${model} error ${response.status}: ${detail}`);
+    }
+
+    lastData = await response.json();
+    const output = Array.isArray(lastData?.output) ? lastData.output : [];
+    const calls = output.filter((item: any) => item?.type === "function_call");
+
+    if (!calls.length) {
+      const answer = extractResponsesText(lastData);
+      if (!answer) throw new Error(`OpenAI ${model} no devolvió texto utilizable.`);
+      return { answer, report: toolReport };
+    }
+
+    input = [...input, ...output];
+
+    for (const call of calls) {
+      let args: any = {};
+      try {
+        args = call.arguments ? JSON.parse(call.arguments) : {};
+      } catch {
+        args = {};
+      }
+
+      let result: any;
+      if (call.name === "crm_buscar_gestiones") {
+        const filtered = filterRecordsByToolArgs(records, args);
+        result = {
+          total: filtered.totalRows,
+          filtros: filtered.filters,
+          registros: filtered.rows.map(compactRecord).slice(0, 80),
+        };
+      } else if (call.name === "crm_crear_informe_excel") {
+        toolReport = makeReportFromToolArgs(args, records);
+        result = {
+          informe_listo: true,
+          titulo: toolReport.title,
+          total_registros: toolReport.totalRows,
+          registros_mostrados: toolReport.rows.length,
+          filtros: toolReport.filtersApplied,
+          columnas: toolReport.columns.map((c) => c.label),
+          vista_previa_markdown: reportToMarkdown(toolReport),
+        };
+      } else if (call.name === "crm_detectar_oportunidades") {
+        const filtered = filterRecordsByToolArgs(records, { ...args, orden: "mayor monto", limite: args?.limite || 20 });
+        const oportunidades = filtered.rows.map((r) => ({
+          id: r.id,
+          mandante: getRecordValue(r, "mandante"),
+          razon_social: getRecordValue(r, "razon_social"),
+          rut: getRecordValue(r, "rut"),
+          entidad: getRecordValue(r, "entidad"),
+          estado_gestion: getRecordValue(r, "estado_gestion"),
+          monto_devolucion: toNumber(getRecordValue(r, "monto_devolucion")),
+          sin_poder: !r.confirmacion_poder,
+          sin_cc: !r.confirmacion_cc,
+        }));
+        result = {
+          total_oportunidades: filtered.totalRows,
+          monto_total_top: oportunidades.reduce((acc, r) => acc + r.monto_devolucion, 0),
+          filtros: filtered.filters,
+          oportunidades,
+        };
+      } else if (call.name === "crm_preparar_acciones") {
+        result = {
+          acciones_preparadas: buildRuleActions(text(args?.instruccion || prompt), records),
+          requiere_confirmacion: true,
+        };
+      } else {
+        result = { error: `Herramienta no soportada: ${call.name}` };
+      }
+
+      input.push({
+        type: "function_call_output",
+        call_id: call.call_id,
+        output: JSON.stringify(result).slice(0, 18000),
+      });
+    }
   }
 
-  const data: any = await response.json();
-  const answer = extractResponsesText(data);
-  if (!answer) throw new Error(`OpenAI ${model} no devolvió texto utilizable.`);
-  return answer;
+  const answer = lastData ? extractResponsesText(lastData) : "";
+  if (!answer) throw new Error(`OpenAI ${model} no entregó respuesta final después de usar herramientas.`);
+  return { answer, report: toolReport };
 }
 
 async function createActivity(recordId: string, type: string, status: string, description: string, dueDate?: Date | null) {
@@ -1071,20 +1335,21 @@ aiActionsRouter.post("/chat", async (req, res) => {
     // v51: OpenAI es obligatorio. No existe fallback local.
     // Los informes descargables se construyen con datos reales para garantizar columnas/filtros,
     // pero la respuesta conversacional siempre pasa por GPT-5.5.
-    const openAiAnswer = await callOpenAI(prompt, records, userProfile, report);
-    const answer = report
-      ? `${openAiAnswer}
+    const openAiResult = await callOpenAI(prompt, records, userProfile, report);
+    const effectiveReport = report || openAiResult.report || null;
+    const answer = effectiveReport
+      ? `${openAiResult.answer}
 
-${reportToMarkdown(report)}
+${reportToMarkdown(effectiveReport)}
 
 Informe listo. Puedes copiar la tabla o descargarla desde el botón del chat.`
-      : openAiAnswer;
+      : openAiResult.answer;
     const actions = buildRuleActions(prompt, records);
 
     return res.json({
       answer,
       actions,
-      report,
+      report: effectiveReport,
       available_columns: REPORT_COLUMNS.map((column) => ({ key: column.key, label: column.label, type: column.type || "text" })),
       source: "openai",
       engine: `OpenAI ${getOpenAIModel()}`,
