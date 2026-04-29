@@ -2148,3 +2148,76 @@
 .ai-chat-input textarea { width: 100%; resize: vertical; border: 1px solid #cbd5e1; border-radius: 14px; padding: 12px; font-family: inherit; font-size: 14px; outline: none; }
 .ai-chat-input textarea:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
 @media (max-width: 760px) { .ai-chat-input { grid-template-columns: 1fr; } .ai-action-row { grid-template-columns: 1fr; } .ai-action-buttons { justify-content: flex-start; } }
+
+/* V41 - IA informes con columnas seleccionables */
+.ai-report-card {
+  margin-top: 14px;
+  border: 1px solid #d7e3f4;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.ai-report-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e7eef8;
+  background: #f8fbff;
+}
+
+.ai-report-header strong {
+  display: block;
+  color: #10213f;
+  font-size: 14px;
+}
+
+.ai-report-header small {
+  display: block;
+  color: #5a6b86;
+  margin-top: 2px;
+}
+
+.ai-report-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ai-report-filters {
+  margin: 10px 14px 0;
+  color: #244264;
+  font-size: 12px;
+}
+
+.ai-report-table-wrap {
+  width: 100%;
+  overflow: auto;
+  max-height: 360px;
+}
+
+.ai-report-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ai-report-table th,
+.ai-report-table td {
+  border-bottom: 1px solid #edf2f8;
+  padding: 9px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.ai-report-table th {
+  position: sticky;
+  top: 0;
+  background: #eef5ff;
+  color: #0d2a55;
+  font-weight: 700;
+  z-index: 1;
+}

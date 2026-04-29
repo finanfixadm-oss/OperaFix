@@ -174,6 +174,228 @@ function toNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+
+type ReportColumn = {
+  key: string;
+  label: string;
+  type?: "text" | "money" | "date" | "boolean";
+  aliases?: string[];
+};
+
+type AiReport = {
+  title: string;
+  columns: ReportColumn[];
+  rows: Record<string, unknown>[];
+  totalRows: number;
+  filtersApplied: string[];
+  generatedAt: string;
+};
+
+const REPORT_COLUMNS: ReportColumn[] = [
+  { key: "mandante", label: "Mandante", aliases: ["cliente", "nombre cliente"] },
+  { key: "razon_social", label: "Razón Social", aliases: ["empresa", "razon", "razón"] },
+  { key: "rut", label: "RUT", aliases: ["rut empresa"] },
+  { key: "entidad", label: "Entidad / AFP", aliases: ["afp", "institucion", "institución"] },
+  { key: "estado_gestion", label: "Estado Gestión", aliases: ["estado", "gestion", "gestión"] },
+  { key: "numero_solicitud", label: "N° Solicitud", aliases: ["solicitud", "ticket", "n solicitud"] },
+  { key: "motivo_tipo_exceso", label: "Motivo / Tipo exceso", aliases: ["motivo", "tipo exceso", "tipo"] },
+  { key: "grupo_empresa", label: "Buscar Grupo", aliases: ["grupo", "grupo empresa"] },
+  { key: "mes_produccion_2026", label: "Mes producción", aliases: ["mes produccion", "mes producción"] },
+  { key: "monto_devolucion", label: "Monto Devolución", type: "money", aliases: ["monto", "devolucion", "devolución"] },
+  { key: "monto_cliente", label: "Monto cliente", type: "money", aliases: ["cliente monto"] },
+  { key: "monto_finanfix_solutions", label: "Monto Finanfix", type: "money", aliases: ["finanfix", "monto finanfix"] },
+  { key: "monto_real_cliente", label: "Monto real cliente", type: "money", aliases: ["real cliente"] },
+  { key: "monto_real_finanfix_solutions", label: "Monto real Finanfix Solutions", type: "money", aliases: ["real finanfix", "monto real finanfix"] },
+  { key: "monto_pagado", label: "Monto Real Pagado", type: "money", aliases: ["pagado", "monto pagado", "real pagado"] },
+  { key: "confirmacion_cc", label: "Confirmación CC", type: "boolean", aliases: ["cc", "cuenta corriente"] },
+  { key: "confirmacion_poder", label: "Confirmación Poder", type: "boolean", aliases: ["poder"] },
+  { key: "banco", label: "Banco" },
+  { key: "tipo_cuenta", label: "Tipo de Cuenta", aliases: ["tipo cuenta"] },
+  { key: "numero_cuenta", label: "Número cuenta", aliases: ["cuenta", "numero cuenta", "número cuenta"] },
+  { key: "facturado_cliente", label: "Facturado cliente", aliases: ["facturado cliente"] },
+  { key: "facturado_finanfix", label: "Facturado Finanfix", aliases: ["facturado finanfix"] },
+  { key: "numero_factura", label: "N° Factura", aliases: ["factura"] },
+  { key: "numero_oc", label: "N° OC", aliases: ["oc", "orden compra"] },
+  { key: "fecha_presentacion_afp", label: "Fecha Presentación AFP", type: "date", aliases: ["fecha presentacion", "fecha presentación"] },
+  { key: "fecha_ingreso_afp", label: "Fecha ingreso AFP", type: "date", aliases: ["ingreso afp"] },
+  { key: "fecha_pago_afp", label: "Fecha Pago AFP", type: "date", aliases: ["pago afp", "fecha pago"] },
+  { key: "fecha_factura_finanfix", label: "Fecha Factura Finanfix", type: "date", aliases: ["fecha factura"] },
+  { key: "fecha_pago_factura_finanfix", label: "Fecha pago factura Finanfix", type: "date", aliases: ["pago factura"] },
+  { key: "fecha_notificacion_cliente", label: "Fecha notificación cliente", type: "date", aliases: ["notificacion", "notificación"] },
+  { key: "fecha_rechazo", label: "Fecha Rechazo", type: "date", aliases: ["rechazo fecha"] },
+  { key: "motivo_rechazo", label: "Motivo del rechazo/anulación", aliases: ["motivo rechazo", "rechazo"] },
+  { key: "estado_trabajador", label: "Estado Trabajador", aliases: ["trabajador"] },
+  { key: "created_at", label: "Hora de creación", type: "date", aliases: ["creacion", "creación", "fecha creacion"] },
+  { key: "updated_at", label: "Hora de modificación", type: "date", aliases: ["modificacion", "modificación"] },
+  { key: "last_activity_at", label: "Hora de la última actividad", type: "date", aliases: ["ultima actividad", "última actividad"] },
+];
+
+function normalizeForMatch(value: string) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function getRecordValue(row: any, key: string) {
+  if (key === "mandante") return row.mandante?.name || row.mandante_name || row.mandante || "";
+  if (key === "razon_social") return row.razon_social || row.company?.razon_social || row.business_name || "";
+  if (key === "rut") return row.rut || row.company?.rut || "";
+  if (key === "entidad") return row.entidad || row.lineAfp?.afp_name || row.entity || "";
+  return row[key] ?? "";
+}
+
+function findReportColumnByText(raw: string) {
+  const target = normalizeForMatch(raw);
+  if (!target) return null;
+  return REPORT_COLUMNS.find((column) => {
+    const names = [column.key, column.label, ...(column.aliases || [])].map(normalizeForMatch);
+    return names.some((name) => name === target || target.includes(name) || name.includes(target));
+  }) || null;
+}
+
+function requestedColumnsFromPrompt(prompt: string) {
+  const normalized = normalizeForMatch(prompt);
+  const selected: ReportColumn[] = [];
+
+  for (const column of REPORT_COLUMNS) {
+    const names = [column.key, column.label, ...(column.aliases || [])].map(normalizeForMatch);
+    if (names.some((name) => name && normalized.includes(name))) selected.push(column);
+  }
+
+  const afterColumnWords = prompt.match(/(?:columnas|campos|con)\s*[:：]?\s*([^\.\n]+)/i)?.[1];
+  if (afterColumnWords) {
+    for (const part of afterColumnWords.split(/,|;| y | e /i)) {
+      const column = findReportColumnByText(part);
+      if (column) selected.push(column);
+    }
+  }
+
+  const unique = new Map<string, ReportColumn>();
+  for (const column of selected) unique.set(column.key, column);
+
+  if (!unique.size) {
+    ["mandante", "razon_social", "rut", "entidad", "estado_gestion", "monto_devolucion", "numero_solicitud"].forEach((key) => {
+      const column = REPORT_COLUMNS.find((c) => c.key === key);
+      if (column) unique.set(column.key, column);
+    });
+  }
+  return [...unique.values()].slice(0, 14);
+}
+
+function applyPromptFilters(prompt: string, records: any[]) {
+  const q = normalizeForMatch(prompt);
+  const filters: string[] = [];
+  let rows = [...records];
+
+  const knownMandantes = [...new Set(records.map((r) => String(getRecordValue(r, "mandante") || "").trim()).filter(Boolean))];
+  const mandanteMention = knownMandantes.find((name) => q.includes(normalizeForMatch(name)));
+  if (mandanteMention) {
+    rows = rows.filter((r) => normalizeForMatch(String(getRecordValue(r, "mandante"))) === normalizeForMatch(mandanteMention));
+    filters.push(`Mandante = ${mandanteMention}`);
+  }
+
+  const entidadHints = ["modelo", "capital", "provida", "habitat", "hábitat", "cuprum", "planvital", "uno"];
+  const entidadMention = entidadHints.find((name) => q.includes(normalizeForMatch(name)));
+  if (entidadMention) {
+    rows = rows.filter((r) => normalizeForMatch(String(getRecordValue(r, "entidad"))).includes(normalizeForMatch(entidadMention)));
+    filters.push(`Entidad contiene ${entidadMention}`);
+  }
+
+  if (q.includes("pendiente")) {
+    rows = rows.filter((r) => normalizeForMatch(String(getRecordValue(r, "estado_gestion"))).includes("pendiente"));
+    filters.push("Estado contiene Pendiente");
+  }
+  if (q.includes("pagado") || q.includes("pagadas")) {
+    rows = rows.filter((r) => normalizeForMatch(String(getRecordValue(r, "estado_gestion"))).includes("pag") || normalizeForMatch(String(r.facturado_cliente)).includes("pag"));
+    filters.push("Estado/Facturación contiene Pagado");
+  }
+  if (q.includes("rechazo") || q.includes("rechaz")) {
+    rows = rows.filter((r) => normalizeForMatch(String(getRecordValue(r, "estado_gestion"))).includes("rechaz") || String(getRecordValue(r, "motivo_rechazo")).trim());
+    filters.push("Gestiones con rechazo");
+  }
+  if (q.includes("sin poder")) {
+    rows = rows.filter((r) => !r.confirmacion_poder);
+    filters.push("Sin confirmación de poder");
+  }
+  if (q.includes("sin cc") || q.includes("sin confirmacion cc") || q.includes("sin confirmación cc")) {
+    rows = rows.filter((r) => !r.confirmacion_cc);
+    filters.push("Sin confirmación CC");
+  }
+
+  if (q.includes("alto monto") || q.includes("mayor monto") || q.includes("montos altos")) {
+    rows = rows.sort((a, b) => toNumber(getRecordValue(b, "monto_devolucion")) - toNumber(getRecordValue(a, "monto_devolucion")));
+    filters.push("Ordenado por mayor monto");
+  }
+
+  return { rows, filters };
+}
+
+function formatReportCell(value: unknown, column: ReportColumn) {
+  if (column.type === "money") return money(value);
+  if (column.type === "boolean") return value === true || value === "true" || value === "Si" || value === "Sí" ? "Sí" : "No";
+  if (column.type === "date") {
+    if (!value) return "—";
+    const d = new Date(String(value));
+    return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString("es-CL");
+  }
+  return value === undefined || value === null || value === "" ? "—" : String(value);
+}
+
+function buildAiReport(prompt: string, records: any[]): AiReport | null {
+  const q = normalizeForMatch(prompt);
+  const wantsReport = /informe|reporte|tabla|listado|export|csv|columnas|campos/.test(q);
+  if (!wantsReport) return null;
+
+  const columns = requestedColumnsFromPrompt(prompt);
+  const filtered = applyPromptFilters(prompt, records);
+  const limitMatch = q.match(/(?:top|primeros|primeras|limite|límite)\s+(\d+)/);
+  const limit = limitMatch ? Math.min(Number(limitMatch[1]), 100) : 50;
+  const rows = filtered.rows.slice(0, limit).map((record) => {
+    const row: Record<string, unknown> = {};
+    for (const column of columns) row[column.key] = formatReportCell(getRecordValue(record, column.key), column);
+    return row;
+  });
+
+  const title = prompt.match(/(?:informe|reporte|listado)\s+(?:de|del|para)?\s*([^\.\n]*)/i)?.[0]?.trim() || "Informe generado por IA";
+  return {
+    title,
+    columns,
+    rows,
+    totalRows: filtered.rows.length,
+    filtersApplied: filtered.filters,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+function reportToMarkdown(report: AiReport) {
+  if (!report.rows.length) return `No encontré registros para el informe solicitado. Filtros aplicados: ${report.filtersApplied.join("; ") || "sin filtros"}.`;
+  const header = report.columns.map((c) => c.label).join(" | ");
+  const sep = report.columns.map(() => "---").join(" | ");
+  const lines = report.rows.slice(0, 12).map((row) =>
+    report.columns
+      .map((c) => String(row[c.key] ?? "—").replace(/\r?\n/g, " "))
+      .join(" | ")
+  );
+
+  return [
+    `${report.title}`,
+    "",
+    `Registros encontrados: ${report.totalRows}. Mostrando: ${report.rows.length}.`,
+    report.filtersApplied.length ? `Filtros: ${report.filtersApplied.join("; ")}` : "Filtros: sin filtros especiales",
+    "",
+    header,
+    sep,
+    ...lines,
+    report.rows.length > 12 ? "..." : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+}
+
 function sqlIdent(value: string) {
   return `"${String(value).replace(/"/g, '""')}"`;
 }
@@ -653,6 +875,7 @@ aiActionsRouter.post("/chat", async (req, res) => {
     if (!prompt) return res.status(400).json({ message: "Debes enviar una pregunta para la IA." });
 
     const records = await loadRecords(mandanteId, 160);
+    const report = buildAiReport(prompt, records);
     let answer: string | null = null;
     let source: "openai" | "local" = "local";
 
@@ -663,12 +886,29 @@ aiActionsRouter.post("/chat", async (req, res) => {
       console.warn("IA externa no disponible, se usa análisis local:", aiError?.message || aiError);
     }
 
+    if (report) {
+      const reportSummary = reportToMarkdown(report);
+      answer = answer
+        ? `${answer}
+
+---
+
+${reportSummary}
+
+Puedes pedirme otro informe indicando las columnas exactas que quieres usar, por ejemplo: RUT, Razón Social, Entidad, Estado Gestión, Monto Devolución y N° Solicitud.`
+        : `${reportSummary}
+
+Puedes pedirme otro informe indicando las columnas exactas que quieres usar, por ejemplo: RUT, Razón Social, Entidad, Estado Gestión, Monto Devolución y N° Solicitud.`;
+    }
+
     if (!answer) answer = buildLocalAnswer(prompt, records);
     const actions = buildRuleActions(prompt, records);
 
     return res.json({
       answer,
       actions,
+      report,
+      available_columns: REPORT_COLUMNS.map((column) => ({ key: column.key, label: column.label, type: column.type || "text" })),
       source,
       analyzed_records: records.length,
       generated_at: new Date().toISOString(),

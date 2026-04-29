@@ -12,9 +12,22 @@ type AiAction = {
   payload?: Record<string, unknown>;
 };
 
+type AiReportColumn = { key: string; label: string; type?: string };
+
+type AiReport = {
+  title: string;
+  columns: AiReportColumn[];
+  rows: Record<string, unknown>[];
+  totalRows: number;
+  filtersApplied: string[];
+  generatedAt: string;
+};
+
 type AiChatResponse = {
   answer: string;
   actions: AiAction[];
+  report?: AiReport | null;
+  available_columns?: AiReportColumn[];
   source: "openai" | "local";
   analyzed_records: number;
   generated_at: string;
@@ -25,12 +38,15 @@ type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   actions?: AiAction[];
+  report?: AiReport | null;
   source?: "openai" | "local";
   analyzed_records?: number;
 };
 
 const quickPrompts = [
   "Dame un informe ejecutivo del mandante seleccionado",
+  "Crea un informe con columnas RUT, Razón Social, Entidad, Estado Gestión, Monto Devolución y N° Solicitud",
+  "Qué informes puedo pedir y qué columnas puedo usar",
   "Qué gestiones debo priorizar esta semana",
   "Detecta casos sin poder o sin confirmación CC",
   "Prepara acciones para gestiones de alto monto",
@@ -106,6 +122,7 @@ export default function AiGestionesPage() {
         role: "assistant",
         content: response.answer,
         actions: response.actions || [],
+        report: response.report || null,
         source: response.source,
         analyzed_records: response.analyzed_records,
       };
@@ -152,6 +169,30 @@ export default function AiGestionesPage() {
     await navigator.clipboard.writeText(content);
   }
 
+  function downloadReportCsv(report: AiReport) {
+    const headers = report.columns.map((column) => column.label);
+    const rows = report.rows.map((row) => report.columns.map((column) => String(row[column.key] ?? "")));
+    const csv = [headers, ...rows]
+      .map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";"))
+      .join("\n");
+    const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${report.title || "informe-ia"}.csv`.replace(/[^a-z0-9áéíóúñ._-]+/gi, "_");
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function copyReportCsv(report: AiReport) {
+    const headers = report.columns.map((column) => column.label);
+    const rows = report.rows.map((row) => report.columns.map((column) => String(row[column.key] ?? "")));
+    const csv = [headers, ...rows].map((line) => line.join("	")).join("\n");
+    navigator.clipboard.writeText(csv);
+  }
+
   return (
     <div className="zoho-module-page ai-chat-page">
       <div className="zoho-module-header ai-chat-header">
@@ -190,7 +231,41 @@ export default function AiGestionesPage() {
                   <div className="ai-message-meta">
                     {msg.source && <span>Motor: {msg.source === "openai" ? "OpenAI" : "local"}</span>}
                     {typeof msg.analyzed_records === "number" && <span>Registros analizados: {msg.analyzed_records}</span>}
-                    <button className="zoho-link-button" onClick={() => copyMessage(msg.content)}>Copiar</button>
+                    <button className="zoho-link-button" onClick={() => copyMessage(msg.content)}>Copiar respuesta</button>
+                  </div>
+                )}
+
+                {msg.report && (
+                  <div className="ai-report-card">
+                    <div className="ai-report-header">
+                      <div>
+                        <strong>{msg.report.title}</strong>
+                        <small>{msg.report.totalRows} registros encontrados · {msg.report.rows.length} mostrados</small>
+                      </div>
+                      <div className="ai-report-actions">
+                        <button className="zoho-btn light" onClick={() => copyReportCsv(msg.report!)}>Copiar tabla</button>
+                        <button className="zoho-btn" onClick={() => downloadReportCsv(msg.report!)}>Descargar CSV</button>
+                      </div>
+                    </div>
+                    {!!msg.report.filtersApplied.length && (
+                      <p className="ai-report-filters">Filtros: {msg.report.filtersApplied.join(" · ")}</p>
+                    )}
+                    <div className="ai-report-table-wrap">
+                      <table className="ai-report-table">
+                        <thead>
+                          <tr>
+                            {msg.report.columns.map((column) => <th key={column.key}>{column.label}</th>)}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {msg.report.rows.map((row, rowIndex) => (
+                            <tr key={rowIndex}>
+                              {msg.report!.columns.map((column) => <td key={column.key}>{String(row[column.key] ?? "—")}</td>)}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>
