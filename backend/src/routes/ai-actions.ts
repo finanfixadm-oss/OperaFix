@@ -666,21 +666,31 @@ async function loadLegacyTable(tableName: "lm_records" | "tp_records", mandanteI
 }
 
 async function loadRecords(mandanteId?: string | null, limit = 120) {
+  // IMPORTANTE:
+  // La tabla visible en "Registros de empresas" del CRM puede venir desde las tablas legacy
+  // lm_records / tp_records. En Railway existían además registros demo en managements
+  // (Acciona / Finanfix) que contaminaban la IA. Por eso la IA ahora usa la misma fuente
+  // operativa real: primero legacy LM/TP, y solo si no hay nada usa managements.
   let rows: any[] = [];
 
   try {
-    rows = await loadManagementRows(mandanteId, limit);
-  } catch (error: any) {
-    console.warn("IA: no se pudo leer managements con consulta compatible:", error?.message || error);
-    rows = [];
-  }
-
-  if (!rows.length) {
     const [lmRows, tpRows] = await Promise.all([
       loadLegacyTable("lm_records", mandanteId, Math.ceil(limit / 2)),
       loadLegacyTable("tp_records", mandanteId, Math.ceil(limit / 2)),
     ]);
     rows = [...lmRows, ...tpRows].slice(0, limit);
+  } catch (error: any) {
+    console.warn("IA: no se pudo leer tablas legacy LM/TP:", error?.message || error);
+    rows = [];
+  }
+
+  if (!rows.length) {
+    try {
+      rows = await loadManagementRows(mandanteId, limit);
+    } catch (error: any) {
+      console.warn("IA: no se pudo leer managements con consulta compatible:", error?.message || error);
+      rows = [];
+    }
   }
 
   const ids = rows.map((row) => row.id).filter(Boolean);
@@ -1109,6 +1119,29 @@ aiActionsRouter.post("/execute", async (req, res) => {
   } catch (error: any) {
     console.error("ERROR /api/ai/execute:", error?.message || error);
     return res.status(500).json({ message: "No se pudo ejecutar la acción IA.", detail: String(error?.message || error) });
+  }
+});
+
+
+// Diagnóstico rápido para verificar qué registros está leyendo la IA.
+aiActionsRouter.get("/debug-records", async (req, res) => {
+  try {
+    const mandanteId = typeof req.query.mandante_id === "string" ? req.query.mandante_id : null;
+    const records = await loadRecords(mandanteId, 20);
+    res.json({
+      total: records.length,
+      records: records.map((r) => ({
+        id: r.id,
+        mandante: getRecordValue(r, "mandante"),
+        razon_social: getRecordValue(r, "razon_social"),
+        rut: getRecordValue(r, "rut"),
+        entidad: getRecordValue(r, "entidad"),
+        estado_gestion: getRecordValue(r, "estado_gestion"),
+        monto_devolucion: getRecordValue(r, "monto_devolucion"),
+      })),
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: "No se pudo diagnosticar registros IA", detail: String(error?.message || error) });
   }
 });
 
