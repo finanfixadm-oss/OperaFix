@@ -1389,6 +1389,67 @@ recordsRouter.post("/:id/notes", async (req, res, next) => {
   }
 });
 
+
+async function deleteLegacyRecordById(recordId: string) {
+  let deleted = 0;
+  for (const tableName of ["lm_records", "tp_records"] as const) {
+    try {
+      const columns = await getExistingColumnsAny(tableName);
+      const conditions: string[] = [];
+      if (columns.has("id")) conditions.push(`id = $1`);
+      if (columns.has("management_id")) conditions.push(`management_id = $1`);
+      if (!conditions.length) continue;
+      const result: any = await prisma.$executeRawUnsafe(`delete from ${tableName} where ${conditions.join(" or ")}`, recordId);
+      deleted += Number(result || 0);
+    } catch (error) {
+      console.warn(`No se pudo eliminar legacy ${tableName}:`, error);
+    }
+  }
+  return deleted;
+}
+
+async function deleteRecordDocumentsFromDisk(recordId: string) {
+  const docs = await prisma.document.findMany({
+    where: { OR: [{ management_id: recordId }, { related_module: "records", related_record_id: recordId }] },
+  }).catch(() => [] as any[]);
+
+  for (const doc of docs) {
+    try {
+      const filePath = doc.file_url?.startsWith("/storage/")
+        ? path.resolve(process.cwd(), doc.file_url.replace(/^\//, ""))
+        : null;
+      if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    } catch (error) {
+      console.warn("No se pudo eliminar archivo físico:", error);
+    }
+  }
+
+  await prisma.document.deleteMany({ where: { OR: [{ management_id: recordId }, { related_module: "records", related_record_id: recordId }] } }).catch(() => null);
+  return docs.length;
+}
+
+recordsRouter.delete("/:id", async (req, res) => {
+  try {
+    const recordId = req.params.id;
+    const docsDeleted = await deleteRecordDocumentsFromDisk(recordId);
+
+    await prisma.note.deleteMany({ where: { OR: [{ management_id: recordId }, { related_module: "records", related_record_id: recordId }] } }).catch(() => null);
+    await prisma.activity.deleteMany({ where: { OR: [{ management_id: recordId }, { related_module: "records", related_record_id: recordId }] } }).catch(() => null);
+
+    const legacyDeleted = await deleteLegacyRecordById(recordId);
+    const managementDeleted = await prisma.management.deleteMany({ where: { id: recordId } }).catch(() => ({ count: 0 } as any));
+
+    if (!legacyDeleted && !managementDeleted.count) {
+      return res.status(404).json({ message: "Registro no encontrado o ya eliminado." });
+    }
+
+    res.json({ ok: true, deleted: { management: managementDeleted.count, legacy: legacyDeleted, documents: docsDeleted } });
+  } catch (error: any) {
+    console.error("Error eliminando registro:", error);
+    res.status(500).json({ message: "No se pudo eliminar el registro.", detail: error?.message || String(error) });
+  }
+});
+
 recordsRouter.delete("/documents/:documentId", async (req, res) => {
   const documentId = String(req.params.documentId);
   try {

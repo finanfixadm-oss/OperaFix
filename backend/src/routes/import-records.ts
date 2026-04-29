@@ -199,6 +199,12 @@ function stringValue(value: unknown) {
   return text === "" ? null : text;
 }
 
+function normalizeMandanteName(value: unknown) {
+  const text = stringValue(value);
+  if (!text) return null;
+  return text.replace(/\s+/g, " ").trim();
+}
+
 function numberValue(value: unknown) {
   if (value === undefined || value === null || value === "") return null;
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -314,7 +320,7 @@ function normalizeRow(raw: Record<string, unknown>, rowNumber: number, headerMap
   const row: NormalizedImportRow = {
     rowNumber,
     management_type: detectType(motivo),
-    mandante: stringValue(target.mandante),
+    mandante: normalizeMandanteName(target.mandante),
     estado_contrato_cliente: stringValue(target.estado_contrato_cliente),
     motivo_tipo_exceso: motivo,
     entidad: stringValue(target.entidad),
@@ -557,6 +563,69 @@ function dateOrNull(value: string | null) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+async function insertManagementDynamic(row: NormalizedImportRow, context: Awaited<ReturnType<typeof ensureContext>>) {
+  const columns = await prisma.$queryRawUnsafe<{ column_name: string }[]>(
+    `select column_name from information_schema.columns where table_schema = 'public' and table_name = 'managements'`
+  );
+  const existing = new Set(columns.map((item) => item.column_name));
+  if (!existing.has("id")) return null;
+
+  const data: Record<string, unknown> = {
+    id: `mgm_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+    mandante_id: context.mandante.id,
+    group_id: context.group.id,
+    company_id: context.company.id,
+    line_id: context.line.id,
+    line_afp_id: context.lineAfp?.id || null,
+    management_type: row.management_type,
+    estado_contrato_cliente: row.estado_contrato_cliente,
+    motivo_tipo_exceso: row.motivo_tipo_exceso,
+    entidad: row.entidad,
+    envio_afp: row.envio_afp,
+    estado_gestion: row.estado_gestion,
+    fecha_presentacion_afp: dateOrNull(row.fecha_presentacion_afp),
+    fecha_pago_afp: dateOrNull(row.fecha_pago_afp),
+    numero_solicitud: row.numero_solicitud,
+    grupo_empresa: row.grupo_empresa,
+    razon_social: row.razon_social,
+    rut: row.rut,
+    monto_devolucion: row.monto_devolucion,
+    monto_pagado: row.monto_pagado,
+    monto_cliente: row.monto_cliente,
+    fee: row.fee,
+    monto_finanfix_solutions: row.monto_finanfix_solutions,
+    banco: row.banco,
+    tipo_cuenta: row.tipo_cuenta,
+    numero_cuenta: row.numero_cuenta,
+    confirmacion_cc: row.confirmacion_cc,
+    confirmacion_poder: row.confirmacion_poder,
+    acceso_portal: row.acceso_portal,
+    facturado_finanfix: row.facturado_finanfix,
+    facturado_cliente: row.facturado_cliente,
+    fecha_factura_finanfix: dateOrNull(row.fecha_factura_finanfix),
+    fecha_pago_factura_finanfix: dateOrNull(row.fecha_pago_factura_finanfix),
+    numero_factura: row.numero_factura,
+    numero_oc: row.numero_oc,
+    consulta_cen: row.consulta_cen,
+    contenido_cen: row.contenido_cen,
+    respuesta_cen: row.respuesta_cen,
+    estado_trabajador: row.estado_trabajador,
+    last_activity_at: new Date(),
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+
+  const entries = Object.entries(data).filter(([column, value]) => existing.has(column) && value !== undefined);
+  const sqlColumns = entries.map(([column]) => `"${column}"`).join(", ");
+  const placeholders = entries.map((_, index) => `$${index + 1}`).join(", ");
+  const values = entries.map(([, value]) => value);
+  const rows = await prisma.$queryRawUnsafe<any[]>(
+    `insert into managements (${sqlColumns}) values (${placeholders}) returning *`,
+    ...values
+  );
+  return rows[0] || null;
+}
+
 async function createManagement(row: NormalizedImportRow, context: Awaited<ReturnType<typeof ensureContext>>) {
   try {
     return await prisma.management.create({
@@ -602,8 +671,14 @@ async function createManagement(row: NormalizedImportRow, context: Awaited<Retur
         last_activity_at: new Date(),
       } as any,
     });
-  } catch {
-    return null;
+  } catch (error) {
+    console.warn("Prisma management.create falló; se intenta insert dinámico compatible Railway:", error);
+    try {
+      return await insertManagementDynamic(row, context);
+    } catch (dynamicError) {
+      console.warn("Insert dinámico managements falló; se usará solo respaldo legacy:", dynamicError);
+      return null;
+    }
   }
 }
 
@@ -631,7 +706,7 @@ async function insertRow(row: NormalizedImportRow, skipDuplicates: boolean) {
     account_number: row.numero_cuenta,
     account_type: row.tipo_cuenta,
     comment: "Creado por carga masiva inteligente v54",
-    mandante: row.mandante,
+    mandante: context.mandante.name,
     portal_access: row.acceso_portal,
     estado_contrato_cliente: row.estado_contrato_cliente,
     fecha_termino_contrato: null,

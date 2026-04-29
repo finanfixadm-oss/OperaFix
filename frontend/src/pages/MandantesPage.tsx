@@ -85,6 +85,21 @@ export default function MandantesPage() {
     setModalOpen(true);
   }
 
+  async function deleteMandante(row: MandanteRow) {
+    const registros = row._count?.managements ?? 0;
+    const empresas = row._count?.companies ?? 0;
+    const grupos = row._count?.groups ?? 0;
+    const message = `¿Eliminar el mandante "${row.name}"?\n\nTambién se eliminarán/aislarán sus gestiones, empresas, líneas, grupos y usuarios cliente asociados.\nRegistros: ${registros} · Empresas: ${empresas} · Grupos: ${grupos}`;
+    if (!confirm(message)) return;
+    try {
+      await fetchJson(`/mandantes/${row.id}?force=true`, { method: "DELETE" });
+      await load();
+    } catch (error: any) {
+      console.error(error);
+      alert(error?.message || "No se pudo eliminar el mandante.");
+    }
+  }
+
   async function saveMandante() {
     if (!form.name.trim()) {
       alert("Debes ingresar el nombre del mandante.");
@@ -176,9 +191,14 @@ export default function MandantesPage() {
                     <td>{row._count?.managements ?? 0}</td>
                     <td>{row._count?.companies ?? 0}</td>
                     <td>
-                      <button className="zoho-small-btn" onClick={() => openEdit(row)}>
-                        Editar
-                      </button>
+                      <div className="zoho-actions-row compact-actions">
+                        <button className="zoho-small-btn" onClick={() => openEdit(row)}>
+                          Editar
+                        </button>
+                        <button className="zoho-small-btn danger" onClick={() => deleteMandante(row)}>
+                          Eliminar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

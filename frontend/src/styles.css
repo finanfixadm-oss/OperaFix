@@ -365,3 +365,17 @@ button { cursor: pointer; }
   .default-users-grid { grid-template-columns: 1fr; }
   .login-brand { align-items: flex-start; }
 }
+
+
+.compact-actions {
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+.zoho-small-btn.danger, .zoho-btn.danger {
+  color: #b42318;
+  border-color: #f3b7b2;
+  background: #fff5f5;
+}
+.zoho-small-btn.danger:hover, .zoho-btn.danger:hover {
+  background: #ffe3e0;
+}

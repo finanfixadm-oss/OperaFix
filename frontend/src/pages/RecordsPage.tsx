@@ -333,6 +333,19 @@ export default function RecordsPage() {
 
   const selectedAfp = useMemo(() => allAfps.find((item) => item.id === form.line_afp_id) || null, [allAfps, form.line_afp_id]);
 
+  async function deleteRecord(row: RecordItem) {
+    const razon = String((row as any).razon_social || (row as any).company?.razon_social || "registro");
+    const rut = String((row as any).rut || (row as any).company?.rut || "");
+    if (!confirm(`¿Eliminar la gestión de ${razon}${rut ? ` (${rut})` : ""}?\n\nEsta acción eliminará el registro y su trazabilidad/documentos asociados.`)) return;
+    try {
+      await fetchJson(`/records/${row.id}`, { method: "DELETE" });
+      await loadRows();
+    } catch (error: any) {
+      console.error(error);
+      alert(error?.message || "No se pudo eliminar la gestión.");
+    }
+  }
+
   async function createRecord() {
     if (!form.mandante_id.trim()) {
       alert("Debes seleccionar el mandante.");
@@ -547,11 +560,12 @@ export default function RecordsPage() {
                 <tr>
                   <th><input type="checkbox" /></th>
                   {selectedColumns.map((column) => <th key={column.field}>{column.label}</th>)}
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {sortedRows.length === 0 ? (
-                  <tr><td colSpan={selectedColumns.length + 1}>Sin registros de empresas.</td></tr>
+                  <tr><td colSpan={selectedColumns.length + 2}>Sin registros de empresas.</td></tr>
                 ) : (
                   sortedRows.map((row) => (
                     <tr key={row.id}>
@@ -569,6 +583,12 @@ export default function RecordsPage() {
                           </td>
                         );
                       })}
+                      <td>
+                        <div className="zoho-actions-row compact-actions">
+                          <button className="zoho-small-btn" onClick={() => navigate(`/records/${row.id}`)}>Ver</button>
+                          <button className="zoho-small-btn danger" onClick={() => deleteRecord(row)}>Eliminar</button>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}

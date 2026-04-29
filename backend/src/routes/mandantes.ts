@@ -117,15 +117,65 @@ mandantesRouter.put("/:id", async (req, res, next) => {
   }
 });
 
-mandantesRouter.delete("/:id", async (req, res, next) => {
+mandantesRouter.delete("/:id", async (req, res) => {
   try {
-    await prisma.mandante.delete({
-      where: { id: req.params.id },
+    const mandanteId = req.params.id;
+    const force = String(req.query.force || "").toLowerCase() === "true";
+
+    const mandante = await prisma.mandante.findUnique({
+      where: { id: mandanteId },
+      include: {
+        _count: {
+          select: { groups: true, companies: true, managements: true, lmRecords: true, tpRecords: true },
+        },
+      },
     });
 
-    res.json({ ok: true });
-  } catch (error) {
-    next(error);
+    if (!mandante) return res.status(404).json({ message: "Mandante no encontrado." });
+
+    const relatedCount =
+      (mandante._count?.groups || 0) +
+      (mandante._count?.companies || 0) +
+      (mandante._count?.managements || 0) +
+      (mandante._count?.lmRecords || 0) +
+      (mandante._count?.tpRecords || 0);
+
+    if (relatedCount > 0 && !force) {
+      return res.status(409).json({
+        message: "El mandante tiene información asociada. Confirma eliminación forzada para eliminar también sus gestiones, empresas, líneas y grupos.",
+        counts: mandante._count,
+        requiresForce: true,
+      });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const managements = await tx.management.findMany({ where: { mandante_id: mandanteId }, select: { id: true } }).catch(() => []);
+      const managementIds = managements.map((item) => item.id);
+
+      if (managementIds.length) {
+        await tx.document.deleteMany({ where: { OR: [{ management_id: { in: managementIds } }, { related_module: "records", related_record_id: { in: managementIds } }] } }).catch(() => null);
+        await tx.note.deleteMany({ where: { OR: [{ management_id: { in: managementIds } }, { related_module: "records", related_record_id: { in: managementIds } }] } }).catch(() => null);
+        await tx.activity.deleteMany({ where: { OR: [{ management_id: { in: managementIds } }, { related_module: "records", related_record_id: { in: managementIds } }] } }).catch(() => null);
+      }
+
+      const lines = await tx.managementLine.findMany({ where: { mandante_id: mandanteId }, select: { id: true } }).catch(() => []);
+      const lineIds = lines.map((item: any) => item.id);
+
+      await tx.lmRecord.deleteMany({ where: { mandante_id: mandanteId } }).catch(() => null);
+      await tx.tpRecord.deleteMany({ where: { mandante_id: mandanteId } }).catch(() => null);
+      await tx.management.deleteMany({ where: { mandante_id: mandanteId } }).catch(() => null);
+      if (lineIds.length) await tx.managementLineAfp.deleteMany({ where: { line_id: { in: lineIds } } }).catch(() => null);
+      await tx.managementLine.deleteMany({ where: { mandante_id: mandanteId } }).catch(() => null);
+      await tx.company.deleteMany({ where: { mandante_id: mandanteId } }).catch(() => null);
+      await tx.companyGroup.deleteMany({ where: { mandante_id: mandanteId } }).catch(() => null);
+      await tx.$executeRawUnsafe(`update operafix_users set active = false, mandante_id = null, mandante_name = null, updated_at = now() where mandante_id = $1`, mandanteId).catch(() => null);
+      await tx.mandante.delete({ where: { id: mandanteId } });
+    });
+
+    res.json({ ok: true, deletedMandante: mandante.name });
+  } catch (error: any) {
+    console.error("Error eliminando mandante:", error);
+    res.status(500).json({ message: "No se pudo eliminar el mandante.", detail: error?.message || String(error) });
   }
 });
 
