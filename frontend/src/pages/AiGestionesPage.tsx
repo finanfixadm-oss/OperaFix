@@ -28,7 +28,8 @@ type AiChatResponse = {
   actions: AiAction[];
   report?: AiReport | null;
   available_columns?: AiReportColumn[];
-  source: "openai" | "local";
+  source: "openai" | "openai_required";
+  engine?: string;
   analyzed_records: number;
   generated_at: string;
 };
@@ -39,7 +40,8 @@ type ChatMessage = {
   content: string;
   actions?: AiAction[];
   report?: AiReport | null;
-  source?: "openai" | "local";
+  source?: "openai" | "openai_required";
+  engine?: string;
   analyzed_records?: number;
 };
 
@@ -136,6 +138,7 @@ export default function AiGestionesPage() {
         actions: response.actions || [],
         report: response.report || null,
         source: response.source,
+        engine: response.engine,
         analyzed_records: response.analyzed_records,
       };
       setMessages((prev) => [...prev, assistantMessage]);
@@ -253,7 +256,7 @@ export default function AiGestionesPage() {
                 <pre>{msg.content}</pre>
                 {msg.role === "assistant" && (
                   <div className="ai-message-meta">
-                    {msg.source && <span>Motor: {msg.source === "openai" ? "OpenAI" : "local"}</span>}
+                    {msg.engine && <span>Motor: {msg.engine}</span>}
                     {typeof msg.analyzed_records === "number" && <span>Registros analizados: {msg.analyzed_records}</span>}
                     <button className="zoho-link-button" onClick={() => copyMessage(msg.content)}>Copiar respuesta</button>
                   </div>

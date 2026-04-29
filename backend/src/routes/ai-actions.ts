@@ -919,50 +919,89 @@ function buildRuleActions(prompt: string, records: any[]): AiAction[] {
   return [...unique.values()].slice(0, 12).map((action, index) => ({ ...action, id: `${action.type}-${action.recordId}-${index}` }));
 }
 
-async function callOpenAI(prompt: string, records: any[], userProfile?: { name?: string; role?: string }) {
+function getRequiredOpenAIApiKey() {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey || !apiKey.trim()) {
+    throw new Error("OPENAI_API_KEY no configurada en Railway/backend. La IA no tiene modo local en v51.");
+  }
+  return apiKey.trim();
+}
 
-  const compact = records.map(compactRecord).slice(0, 100);
+function getOpenAIModel() {
+  return (process.env.OPENAI_MODEL || "gpt-5.5").trim();
+}
+
+function extractResponsesText(data: any) {
+  if (typeof data?.output_text === "string" && data.output_text.trim()) return data.output_text.trim();
+  const chunks: string[] = [];
+  for (const item of data?.output || []) {
+    for (const content of item?.content || []) {
+      if (typeof content?.text === "string") chunks.push(content.text);
+    }
+  }
+  return chunks.join("\n").trim();
+}
+
+async function callOpenAI(prompt: string, records: any[], userProfile?: { name?: string; role?: string }, report?: AiReport | null) {
+  const apiKey = getRequiredOpenAIApiKey();
+  const model = getOpenAIModel();
+
+  const compact = records.map(compactRecord).slice(0, 160);
   const userIdentity = userProfile?.name
     ? `Usuario identificado: ${userProfile.name}${userProfile.role ? ` (${userProfile.role})` : ""}.`
     : "Usuario no identificado todavía. Si la solicitud es amplia, ambigua o pide ejecutar acciones, pregunta primero: ¿quién eres y qué rol tienes en la operación?";
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const reportContext = report
+    ? `
+
+El sistema ya construyó un informe determinístico desde la base real. Resumen del informe:
+${reportToMarkdown(report)}
+
+No expliques pasos para crear Excel. Indica que el informe está listo para copiar/descargar y agrega una lectura ejecutiva breve.`
+    : "";
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || "gpt-5.5",
-      temperature: 0.15,
-      messages: [
+      model,
+      input: [
         {
-          role: "system",
+          role: "developer",
           content:
             `Eres la IA estratégica y operativa de OperaFix/Finanfix. ${userIdentity}
 ` +
             "Trabajas con recuperaciones LM/TP, AFP, mandantes, montos de devolución, poder, CC, estados y solicitudes. " +
             "Entiende español informal/chileno, errores de tipeo y solicitudes poco formales. Ejemplos: 'sácame', 'dame la pega', 'plata', 'lucas', 'mundo previsional', 'modelo'. " +
-            "No inventes datos. Usa solo el JSON entregado. Si el usuario pide un informe descargable o columnas, responde breve y deja que el sistema entregue la tabla/archivo; NO expliques cómo crear Excel manualmente. " +
-            "Si faltan columnas o filtros, pregunta una aclaración concreta. Si recomiendas acciones, deben ser específicas, operativas y seguras.",
+            "No inventes datos. Usa solo el JSON entregado y respeta filtros del usuario como mandante, AFP, estado, sin CC o sin poder. " +
+            "Si el usuario pide columnas específicas, respeta esas columnas. Si pide separar por mandante, presenta secciones por mandante. " +
+            "Si faltan datos, dilo claramente. Si recomiendas acciones, deben ser específicas, operativas y seguras. " +
+            "Nunca digas que el usuario debe abrir Excel manualmente: el CRM entrega tabla/descarga cuando corresponde.",
         },
-        { role: "user", content: `Solicitud del usuario: ${prompt}
+        {
+          role: "user",
+          content: `Solicitud del usuario: ${prompt}
+${reportContext}
 
-Registros disponibles en JSON:
-${JSON.stringify(compact)}` },
+Registros reales disponibles en JSON:
+${JSON.stringify(compact)}`,
+        },
       ],
     }),
   });
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`OpenAI error ${response.status}: ${detail}`);
+    throw new Error(`OpenAI ${model} error ${response.status}: ${detail}`);
   }
 
   const data: any = await response.json();
-  return data?.choices?.[0]?.message?.content || null;
+  const answer = extractResponsesText(data);
+  if (!answer) throw new Error(`OpenAI ${model} no devolvió texto utilizable.`);
+  return answer;
 }
 
 async function createActivity(recordId: string, type: string, status: string, description: string, dueDate?: Date | null) {
@@ -1028,24 +1067,18 @@ aiActionsRouter.post("/chat", async (req, res) => {
 
     const records = await loadRecords(mandanteId, 180);
     const report = buildAiReport(prompt, records);
-    let answer: string | null = null;
-    let source: "openai" | "local" = "local";
 
-    // Para informes descargables, el sistema genera la tabla de forma determinística para evitar respuestas genéricas.
-    if (report) {
-      answer = `${reportToMarkdown(report)}
+    // v51: OpenAI es obligatorio. No existe fallback local.
+    // Los informes descargables se construyen con datos reales para garantizar columnas/filtros,
+    // pero la respuesta conversacional siempre pasa por GPT-5.5.
+    const openAiAnswer = await callOpenAI(prompt, records, userProfile, report);
+    const answer = report
+      ? `${openAiAnswer}
 
-Informe listo. Puedes copiar la tabla o descargarla desde el botón del chat. Puedes pedirme otro informe con otras columnas, filtros o mandante.`;
-    } else {
-      try {
-        answer = await callOpenAI(prompt, records, userProfile);
-        if (answer) source = "openai";
-      } catch (aiError: any) {
-        console.warn("IA externa no disponible, se usa análisis local:", aiError?.message || aiError);
-      }
-    }
+${reportToMarkdown(report)}
 
-    if (!answer) answer = buildLocalAnswer(prompt, records);
+Informe listo. Puedes copiar la tabla o descargarla desde el botón del chat.`
+      : openAiAnswer;
     const actions = buildRuleActions(prompt, records);
 
     return res.json({
@@ -1053,13 +1086,21 @@ Informe listo. Puedes copiar la tabla o descargarla desde el botón del chat. Pu
       actions,
       report,
       available_columns: REPORT_COLUMNS.map((column) => ({ key: column.key, label: column.label, type: column.type || "text" })),
-      source,
+      source: "openai",
+      engine: `OpenAI ${getOpenAIModel()}`,
       analyzed_records: records.length,
       generated_at: new Date().toISOString(),
     });
   } catch (error: any) {
     console.error("ERROR /api/ai/chat:", error?.message || error);
-    return res.status(500).json({ message: "No se pudo procesar la solicitud de IA.", detail: String(error?.message || error) });
+    const message = String(error?.message || error);
+    const status = message.includes("OPENAI_API_KEY") ? 500 : message.startsWith("OpenAI") ? 502 : 500;
+    return res.status(status).json({
+      message: "No se pudo procesar la solicitud de IA con OpenAI. En v51 no existe modo local.",
+      detail: message,
+      source: "openai_required",
+      engine: `OpenAI ${getOpenAIModel()}`,
+    });
   }
 });
 
