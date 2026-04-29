@@ -1110,8 +1110,8 @@ recordsRouter.get("/", async (req, res, next) => {
     } catch (managementError: any) {
       console.error("ERROR /api/records usando managements:", managementError?.message || managementError);
       const [lmRows, tpRows] = await Promise.all([
-        prisma.lmRecord.findMany({ orderBy: { created_at: "desc" }, take: 500 }),
-        prisma.tpRecord.findMany({ orderBy: { created_at: "desc" }, take: 500 }),
+        prisma.lmRecord.findMany({ orderBy: { created_at: "desc" }, take: 5000 }),
+        prisma.tpRecord.findMany({ orderBy: { created_at: "desc" }, take: 5000 }),
       ]);
       const legacyRows = [
         ...lmRows.map((row: any) => ({ id: row.management_id || row.id, management_type: "LM", entidad: row.entity, rut: row.rut, estado_gestion: row.management_status, monto_devolucion: row.refund_amount, razon_social: row.business_name, numero_solicitud: row.request_number, grupo_empresa: row.search_group, confirmacion_cc: row.confirmation_cc, confirmacion_poder: row.confirmation_power, banco: row.bank_name, tipo_cuenta: row.account_type, numero_cuenta: row.account_number, acceso_portal: row.portal_access, motivo_tipo_exceso: row.motivo_tipo_exceso || row.excess_type_reason, mes_produccion_2026: row.mes_produccion_2026, mandante: row.mandante ? { name: row.mandante } : null, company: { razon_social: row.business_name, rut: row.rut }, lineAfp: { afp_name: row.entity }, documents: [] })),

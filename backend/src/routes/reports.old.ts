@@ -43,7 +43,7 @@ reportsRouter.get("/lm-records", async (_req, res, next) => {
         client_contract_status: true,
         created_at: true
       },
-      take: 500,
+      take: 5000,
       orderBy: { updated_at: "desc" }
     });
     res.json(rows);

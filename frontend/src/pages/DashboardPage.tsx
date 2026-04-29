@@ -1,5 +1,6 @@
 import KpiCard from "../components/KpiCard";
 
+import { parseMoney } from "../utils/number";
 export default function DashboardPage() {
   return (
     <div>
