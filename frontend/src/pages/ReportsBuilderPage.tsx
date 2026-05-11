@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { downloadBlob, fetchJson, postJson } from "../api";
 
 type Field = { key: string; label: string; type: "text" | "money" | "boolean" | "date" };
@@ -26,7 +26,8 @@ export default function ReportsBuilderPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [fileName, setFileName] = useState("informe_operafix.xlsx");
-  const [dragColumn, setDragColumn] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
 
   const fieldsByKey = useMemo(() => new Map(fields.map((f) => [f.key, f])), [fields]);
 
@@ -51,18 +52,21 @@ export default function ReportsBuilderPage() {
     });
   }
 
-  function dropColumn(targetKey: string) {
-    if (!dragColumn || dragColumn === targetKey) return;
+  function reorderSelectedColumn(activeKey: string, overKey: string) {
+    if (!activeKey || !overKey || activeKey === overKey) return;
     setColumns((prev) => {
-      const from = prev.indexOf(dragColumn);
-      const to = prev.indexOf(targetKey);
-      if (from < 0 || to < 0) return prev;
-      const copy = [...prev];
-      const [moved] = copy.splice(from, 1);
-      copy.splice(to, 0, moved);
-      return copy;
+      const fromIndex = prev.indexOf(activeKey);
+      const toIndex = prev.indexOf(overKey);
+      if (fromIndex === -1 || toIndex === -1) return prev;
+      const next = [...prev];
+      const [removed] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, removed);
+      return next;
     });
-    setDragColumn(null);
+  }
+
+  function handleColumnDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
   }
 
   async function runPreview() {
@@ -111,36 +115,49 @@ export default function ReportsBuilderPage() {
       <section className="reports-grid">
         <div className="zoho-card">
           <h2>Columnas del informe</h2>
-          <p className="zoho-help-text">Marca las casillas y arrastra las columnas seleccionadas para moverlas de forma interactiva.</p>
           <div className="report-form-actions compact">
             <button className="zoho-btn subtle" onClick={() => setColumns(fields.map((f) => f.key))}>Seleccionar todas</button>
             <button className="zoho-btn subtle" onClick={() => setColumns(defaultColumns)}>Vista estándar</button>
           </div>
-          <div className="report-field-list">
+          <div className="report-selected-strip">
+            <strong>Columnas seleccionadas: {columns.length}</strong>
+            <span>Arrastra las casillas seleccionadas para ordenar el informe.</span>
+          </div>
+          <div className="report-field-list report-field-list-orderable">
             {fields.map((field) => {
               const checked = columns.includes(field.key);
+              const order = columns.indexOf(field.key);
               return (
-                <label
+                <div
                   key={field.key}
-                  className={`report-field-card ${checked ? "selected" : ""}`}
+                  className={`report-field-card ${checked ? "selected" : ""} ${draggedColumn === field.key ? "dragging" : ""}`}
                   draggable={checked}
-                  onDragStart={() => setDragColumn(field.key)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => dropColumn(field.key)}
-                  title={checked ? "Arrastra esta casilla para mover la columna" : "Marca para agregar al informe"}
+                  onDragStart={() => checked && setDraggedColumn(field.key)}
+                  onDragOver={handleColumnDragOver}
+                  onDrop={() => { if (checked && draggedColumn) reorderSelectedColumn(draggedColumn, field.key); setDraggedColumn(null); }}
+                  onDragEnd={() => setDraggedColumn(null)}
                 >
-                  <input type="checkbox" checked={checked} onChange={() => toggleColumn(field.key)} />
-                  <span>{field.label}</span>
+                  <label>
+                    <input type="checkbox" checked={checked} onChange={() => toggleColumn(field.key)} />
+                    <span>{field.label}</span>
+                  </label>
                   <small>{field.type}</small>
-                  {checked && <span className="report-field-order"><button type="button" onClick={(e) => { e.preventDefault(); moveColumn(field.key, -1); }}>↑</button><button type="button" onClick={(e) => { e.preventDefault(); moveColumn(field.key, 1); }}>↓</button></span>}
-                </label>
+                  {checked && <span className="report-field-order"><b>{order + 1}</b><button type="button" onClick={(e) => { e.preventDefault(); moveColumn(field.key, -1); }}>↑</button><button type="button" onClick={(e) => { e.preventDefault(); moveColumn(field.key, 1); }}>↓</button></span>}
+                </div>
               );
             })}
           </div>
         </div>
 
-        <div className="zoho-card">
-          <h2>Filtros</h2>
+        <div className="zoho-card report-filter-card">
+          <div className="report-filter-header">
+            <div>
+              <h2>Filtros</h2>
+              <p>{filters.filter((f) => f.field).length} filtros activos</p>
+            </div>
+            <button className="zoho-btn" onClick={() => setFiltersOpen((value) => !value)}>{filtersOpen ? "Ocultar filtros" : "Filtrar"}</button>
+          </div>
+          {filtersOpen && <div className="report-filter-collapsible">
           <label>Patrón de criterios
             <select className="zoho-select" value={criteriaPattern} onChange={(e) => setCriteriaPattern(e.target.value)}>
               <option value="AND">Todos los filtros (Y)</option>
@@ -171,6 +188,8 @@ export default function ReportsBuilderPage() {
           <label>Nombre archivo
             <input className="zoho-input" value={fileName} onChange={(e) => setFileName(e.target.value)} />
           </label>
+          </div>}
+          {!filtersOpen && <div className="zoho-empty small">Los filtros están contraídos para dejar más espacio al informe.</div>}
         </div>
       </section>
 

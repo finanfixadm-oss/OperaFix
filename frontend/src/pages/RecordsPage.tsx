@@ -268,6 +268,7 @@ export default function RecordsPage() {
   const [columnOrder, setColumnOrder] = useState<string[]>(() => initialRecordsSettings.columnOrder);
   const [sort, setSort] = useState<RecordsSortState>(() => initialRecordsSettings.sort);
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -343,6 +344,28 @@ export default function RecordsPage() {
     } catch (error: any) {
       console.error(error);
       alert(error?.message || "No se pudo eliminar la gestión.");
+    }
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]);
+  }
+
+  function toggleAllVisible(checked: boolean) {
+    const visibleIds = sortedRows.map((row) => String(row.id));
+    setSelectedIds((prev) => checked ? Array.from(new Set([...prev, ...visibleIds])) : prev.filter((id) => !visibleIds.includes(id)));
+  }
+
+  async function deleteSelectedRecords() {
+    if (!selectedIds.length) return;
+    if (!confirm(`¿Eliminar ${selectedIds.length} gestiones seleccionadas?\n\nEsta acción elimina registros, trazabilidad y documentos asociados.`)) return;
+    try {
+      await fetchJson("/records/bulk/delete", { method: "DELETE", body: JSON.stringify({ ids: selectedIds }) });
+      setSelectedIds([]);
+      await loadRows();
+    } catch (error: any) {
+      console.error(error);
+      alert(error?.message || "No se pudo ejecutar la eliminación masiva.");
     }
   }
 
@@ -490,6 +513,9 @@ export default function RecordsPage() {
     });
   }, [filteredRows, sort]);
 
+  const visibleSortedIds = useMemo(() => sortedRows.map((row) => String(row.id)), [sortedRows]);
+  const allVisibleSelected = visibleSortedIds.length > 0 && visibleSortedIds.every((id) => selectedIds.includes(id));
+
   const currentSortLabel = recordColumns.find((column) => column.field === sort.field)?.label || "Fecha actualización";
 
   function clearAdvancedFilters() {
@@ -513,6 +539,7 @@ export default function RecordsPage() {
           <button className="zoho-btn" onClick={() => setFilterModalOpen(true)}>Filtrar</button>
           <button className="zoho-btn" onClick={() => setSortModalOpen(true)}>Ordenar</button>
           <button className="zoho-btn" onClick={() => setColumnModalOpen(true)}>Campos / columnas</button>
+          {selectedIds.length > 0 && <button className="zoho-btn danger" onClick={deleteSelectedRecords}>Eliminar seleccionados ({selectedIds.length})</button>}
           <button className="zoho-btn zoho-btn-primary" onClick={() => setModalOpen(true)}>
             Crear Registro de empresa
           </button>
@@ -536,18 +563,16 @@ export default function RecordsPage() {
       <div className="zoho-scope-hint">Los filtros, columnas visibles y orden de columnas quedan guardados solo para la vista seleccionada.</div>
 
       <div className="zoho-module-layout">
-        <ModuleFilterPanel
-          title="Filtrar Registros de empresas"
-          fields={fields}
-          onApply={(rules, search) => {
-            setActiveRules(rules);
-            setQuickSearch(search);
-          }}
-        />
+        <aside className="zoho-filter-compact-card">
+          <strong>Filtros</strong>
+          <span>{activeRules.length} criterios · {quickSearch ? `Búsqueda: ${quickSearch}` : "Sin búsqueda"}</span>
+          <button className="zoho-btn" onClick={() => setFilterModalOpen(true)}>Abrir filtros</button>
+          {(activeRules.length > 0 || quickSearch) && <button className="zoho-btn subtle" onClick={clearAdvancedFilters}>Limpiar</button>}
+        </aside>
 
         <section className="zoho-table-wrap zoho-table-wrap-scroll">
           <div className="zoho-table-toolbar">
-            <span>Registros totales {sortedRows.length}</span>
+            <span>Registros totales {sortedRows.length} · Seleccionados {selectedIds.length}</span>
             <span className="zoho-table-range">Orden: {currentSortLabel} · {sort.direction === "asc" ? "Asc" : "Desc"} · 1 a {Math.min(sortedRows.length, 100)}</span>
           </div>
 
@@ -558,7 +583,7 @@ export default function RecordsPage() {
             <table className="zoho-table zoho-table-wide">
               <thead>
                 <tr>
-                  <th><input type="checkbox" /></th>
+                  <th><input type="checkbox" checked={allVisibleSelected} onChange={(e) => toggleAllVisible(e.target.checked)} /></th>
                   {selectedColumns.map((column) => <th key={column.field}>{column.label}</th>)}
                   <th>Acciones</th>
                 </tr>
@@ -569,7 +594,7 @@ export default function RecordsPage() {
                 ) : (
                   sortedRows.map((row) => (
                     <tr key={row.id}>
-                      <td><input type="checkbox" /></td>
+                      <td><input type="checkbox" checked={selectedIds.includes(String(row.id))} onChange={() => toggleSelected(String(row.id))} /></td>
                       {selectedColumns.map((column) => {
                         const value = column.value(row);
                         const clickable = ["razon_social", "entidad", "company.razon_social", "lineAfp.afp_name"].includes(column.field);

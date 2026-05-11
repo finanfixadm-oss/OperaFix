@@ -45,25 +45,44 @@ type ChatMessage = {
   analyzed_records?: number;
 };
 
-const AI_MESSAGES_STORAGE_KEY = "operafix_ai_chat_messages";
-const AI_EXECUTED_STORAGE_KEY = "operafix_ai_executed_actions";
+type AiConversation = {
+  id: string;
+  title: string;
+  mandanteId: string;
+  updatedAt: string;
+  messages: ChatMessage[];
+};
 
-function loadStoredMessages(): ChatMessage[] | null {
+const AI_CONVERSATIONS_KEY = "operafix_ai_chatgpt_conversations_v1";
+const AI_ACTIVE_CONVERSATION_KEY = "operafix_ai_chatgpt_active_v1";
+
+const welcomeMessage: ChatMessage = {
+  id: "welcome",
+  role: "assistant",
+  content:
+    "Hola. Soy la IA estratégica de OperaFix. Puedo analizar datos, generar informes, preparar acciones y ayudarte a priorizar gestiones. El historial queda guardado aunque cambies de pantalla.",
+};
+
+function safeParseConversations(): AiConversation[] {
   try {
-    const parsed = JSON.parse(localStorage.getItem(AI_MESSAGES_STORAGE_KEY) || "null");
-    return Array.isArray(parsed) ? parsed : null;
+    const raw = localStorage.getItem(AI_CONVERSATIONS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item) => item?.id && Array.isArray(item.messages));
   } catch {
-    return null;
+    return [];
   }
 }
 
-function loadStoredExecuted(): Record<string, string> {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(AI_EXECUTED_STORAGE_KEY) || "{}");
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
+function buildConversationTitle(prompt: string) {
+  const clean = prompt.replace(/\s+/g, " ").trim();
+  return clean.length > 48 ? `${clean.slice(0, 48)}...` : clean || "Nuevo chat";
+}
+
+function formatConversationDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Sin fecha";
+  return date.toLocaleString("es-CL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 const quickPrompts = [
@@ -104,21 +123,91 @@ export default function AiGestionesPage() {
   const [mandanteId, setMandanteId] = useState("");
   const [userName, setUserName] = useState(() => localStorage.getItem("operafix_ai_user_name") || "");
   const [userRole, setUserRole] = useState(() => localStorage.getItem("operafix_ai_user_role") || "");
-  const [messages, setMessages] = useState<ChatMessage[]>(() =>
-    loadStoredMessages() || [
-      {
-        id: "welcome",
-        role: "assistant",
-        content:
-          "Hola. Soy la IA estratégica de OperaFix. Antes de ejecutar acciones amplias, dime quién eres y qué rol tienes. Puedo entender pedidos poco formales, detectar oportunidades de plata, generar informes por columnas y proponer acciones con confirmación.",
-      },
-    ]
+  const [conversations, setConversations] = useState<AiConversation[]>(() => safeParseConversations());
+  const [activeConversationId, setActiveConversationId] = useState(() => localStorage.getItem(AI_ACTIVE_CONVERSATION_KEY) || "");
+  const activeConversation = useMemo(
+    () => conversations.find((conversation) => conversation.id === activeConversationId) || null,
+    [conversations, activeConversationId]
   );
+  const messages = activeConversation?.messages?.length ? activeConversation.messages : [welcomeMessage];
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [executingId, setExecutingId] = useState<string | null>(null);
-  const [executed, setExecuted] = useState<Record<string, string>>(() => loadStoredExecuted());
+  const [executed, setExecuted] = useState<Record<string, string>>({});
   const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  function persistConversations(next: AiConversation[]) {
+    setConversations(next);
+    localStorage.setItem(AI_CONVERSATIONS_KEY, JSON.stringify(next.slice(0, 30)));
+  }
+
+  function startNewChat() {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const conversation: AiConversation = { id, title: "Nuevo chat", mandanteId, updatedAt: now, messages: [welcomeMessage] };
+    const next = [conversation, ...conversations].slice(0, 30);
+    persistConversations(next);
+    setActiveConversationId(id);
+    localStorage.setItem(AI_ACTIVE_CONVERSATION_KEY, id);
+  }
+
+  function updateActiveConversation(updater: (messages: ChatMessage[]) => ChatMessage[], titleFromPrompt?: string) {
+    const now = new Date().toISOString();
+    const storedActiveId = localStorage.getItem(AI_ACTIVE_CONVERSATION_KEY) || activeConversationId;
+    let nextActiveId = storedActiveId;
+
+    setConversations((previous) => {
+      let base = previous;
+      let existing = base.find((conversation) => conversation.id === nextActiveId);
+
+      if (!existing) {
+        nextActiveId = crypto.randomUUID();
+        existing = {
+          id: nextActiveId,
+          title: titleFromPrompt ? buildConversationTitle(titleFromPrompt) : "Nuevo chat",
+          mandanteId,
+          updatedAt: now,
+          messages: [welcomeMessage],
+        };
+        base = [existing, ...previous];
+        setActiveConversationId(nextActiveId);
+        localStorage.setItem(AI_ACTIVE_CONVERSATION_KEY, nextActiveId);
+      }
+
+      const next = base.map((conversation) => {
+        if (conversation.id !== nextActiveId) return conversation;
+        const currentMessages = conversation.messages?.length ? conversation.messages : [welcomeMessage];
+        const nextMessages = updater(currentMessages);
+        const shouldRename = (!conversation.title || conversation.title === "Nuevo chat") && titleFromPrompt;
+        return {
+          ...conversation,
+          title: shouldRename ? buildConversationTitle(titleFromPrompt) : conversation.title,
+          mandanteId,
+          updatedAt: now,
+          messages: nextMessages,
+        };
+      }).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 30);
+
+      localStorage.setItem(AI_CONVERSATIONS_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function openConversation(id: string) {
+    setActiveConversationId(id);
+    localStorage.setItem(AI_ACTIVE_CONVERSATION_KEY, id);
+  }
+
+  function deleteConversation(id: string) {
+    const next = conversations.filter((conversation) => conversation.id !== id);
+    persistConversations(next);
+    if (activeConversationId === id) {
+      const replacement = next[0]?.id || "";
+      setActiveConversationId(replacement);
+      if (replacement) localStorage.setItem(AI_ACTIVE_CONVERSATION_KEY, replacement);
+      else localStorage.removeItem(AI_ACTIVE_CONVERSATION_KEY);
+    }
+  }
 
   useEffect(() => {
     fetchJson<MandanteOption[]>("/mandantes")
@@ -131,15 +220,6 @@ export default function AiGestionesPage() {
     localStorage.setItem("operafix_ai_user_role", userRole);
   }, [userName, userRole]);
 
-
-  useEffect(() => {
-    localStorage.setItem(AI_MESSAGES_STORAGE_KEY, JSON.stringify(messages));
-  }, [messages]);
-
-  useEffect(() => {
-    localStorage.setItem(AI_EXECUTED_STORAGE_KEY, JSON.stringify(executed));
-  }, [executed]);
-
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
@@ -151,7 +231,7 @@ export default function AiGestionesPage() {
     if (!prompt || loading) return;
 
     const userMessage: ChatMessage = { id: crypto.randomUUID(), role: "user", content: prompt };
-    setMessages((prev) => [...prev, userMessage]);
+    updateActiveConversation((prev) => [...prev, userMessage], prompt);
     setInput("");
     setLoading(true);
 
@@ -173,9 +253,9 @@ export default function AiGestionesPage() {
         engine: response.engine,
         analyzed_records: response.analyzed_records,
       };
-      setMessages((prev) => [...prev, assistantMessage]);
+      updateActiveConversation((prev) => [...prev, assistantMessage]);
     } catch (error: any) {
-      setMessages((prev) => [
+      updateActiveConversation((prev) => [
         ...prev,
         {
           id: crypto.randomUUID(),
@@ -197,7 +277,7 @@ export default function AiGestionesPage() {
         action,
       });
       setExecuted((prev) => ({ ...prev, [action.id]: response.message || "Acción ejecutada" }));
-      setMessages((prev) => [
+      updateActiveConversation((prev) => [
         ...prev,
         {
           id: crypto.randomUUID(),
@@ -248,14 +328,14 @@ export default function AiGestionesPage() {
       <div className="zoho-module-header ai-chat-header">
         <div>
           <h1>IA para gestiones</h1>
-          <p>Chat real conectado al CRM. Analiza datos, genera informes y ejecuta acciones con confirmación. El historial queda guardado aunque cambies de pantalla.</p>
+          <p>Chat real conectado al CRM. Analiza datos, genera informes y ejecuta acciones con confirmación.</p>
         </div>
         <div className="zoho-module-actions">
           <select className="zoho-select" value={mandanteId} onChange={(e) => setMandanteId(e.target.value)}>
             <option value="">Todos los mandantes</option>
             {mandantes.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
-          <button className="zoho-btn" onClick={() => setMessages((prev) => prev.slice(0, 1))}>Limpiar chat</button>
+          <button className="zoho-btn" onClick={startNewChat}>Nuevo chat</button>
         </div>
       </div>
 
@@ -279,7 +359,31 @@ export default function AiGestionesPage() {
         ))}
       </section>
 
-      <section className="ai-chat-shell">
+      <section className="ai-chatgpt-layout">
+        <aside className="ai-chat-sidebar">
+          <div className="ai-chat-sidebar-head">
+            <strong>Recientes</strong>
+            <button className="zoho-btn light" onClick={startNewChat}>+</button>
+          </div>
+          <div className="ai-chat-recent-list">
+            {conversations.length === 0 ? (
+              <div className="ai-chat-empty-recent">Aún no hay conversaciones guardadas.</div>
+            ) : conversations.map((conversation) => (
+              <button
+                type="button"
+                key={conversation.id}
+                className={`ai-chat-recent-item ${conversation.id === activeConversationId ? "active" : ""}`}
+                onClick={() => openConversation(conversation.id)}
+              >
+                <span>{conversation.title || "Nuevo chat"}</span>
+                <small>{formatConversationDate(conversation.updatedAt)}</small>
+                <em onClick={(event) => { event.stopPropagation(); deleteConversation(conversation.id); }}>Eliminar</em>
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        <div className="ai-chat-shell">
         <div className="ai-chat-messages">
           {messages.map((msg) => (
             <article key={msg.id} className={`ai-chat-message ${msg.role}`}>
@@ -369,6 +473,7 @@ export default function AiGestionesPage() {
           />
           <button className="zoho-btn primary" disabled={loading || !input.trim()}>{loading ? "Analizando..." : "Enviar"}</button>
         </form>
+        </div>
       </section>
     </div>
   );
