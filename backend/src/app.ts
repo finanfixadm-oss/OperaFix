@@ -15,7 +15,6 @@ import managementDocumentsRouter from "./routes/management-documents.js";
 import recordsRouter from "./routes/records.js";
 
 
-
 const app = express();
 
 app.use(
@@ -29,7 +28,6 @@ app.use(
   })
 );
 
-app.use("/api/auth", authRouter);
 app.use(express.json());
 app.use("/storage", express.static(path.resolve(process.cwd(), "storage")));
 app.use("/managements", managementsRouter);
@@ -44,6 +42,8 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/companies", companiesRouter);
 app.use("/api/documents", documentsRouter);
 app.use("/api/analytics", analyticsRouter);
+app.use("/api/auth", authRouter);
+app.use("/auth", authRouter);
 app.use("/api/mandantes", mandantesRouter);
 app.use("/api/company-groups", companyGroupsRouter);
 app.use("/api/management-lines", managementLinesRouter);
