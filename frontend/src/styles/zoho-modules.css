@@ -2309,3 +2309,71 @@
 .dashboard-without-side-filters .dashboard-main-workspace {
   width: 100%;
 }
+
+/* Mejoras V62: filtros buscables, agrupados y paginación de 100 registros */
+.zoho-filter-actions-top {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+  border-bottom: 1px solid #eef2f7;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+}
+.zoho-filter-search-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.zoho-filter-search-grid label {
+  display: grid;
+  gap: 6px;
+  color: #36506f;
+  font-size: 12px;
+  font-weight: 700;
+}
+.zoho-filter-group {
+  border: 1px solid #e5ebf5;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  background: #fbfdff;
+}
+.zoho-filter-group summary {
+  cursor: pointer;
+  padding: 10px 12px;
+  color: #0f2a6b;
+  font-weight: 800;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f4f7fb;
+}
+.zoho-filter-group summary::-webkit-details-marker { display: none; }
+.zoho-filter-group summary span {
+  background: #e8f0ff;
+  color: #1f4f9a;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.zoho-filter-group .zoho-filter-item { padding-left: 12px; padding-right: 12px; }
+.zoho-pagination-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0 0;
+  color: #36506f;
+  font-size: 13px;
+}
+.zoho-pagination-bar .zoho-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@media (max-width: 760px) {
+  .zoho-filter-search-grid { grid-template-columns: 1fr; }
+  .zoho-pagination-bar { justify-content: center; flex-wrap: wrap; }
+}

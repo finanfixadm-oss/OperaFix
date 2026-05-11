@@ -269,6 +269,7 @@ export default function RecordsPage() {
   const [sort, setSort] = useState<RecordsSortState>(() => initialRecordsSettings.sort);
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -352,7 +353,7 @@ export default function RecordsPage() {
   }
 
   function toggleAllVisible(checked: boolean) {
-    const visibleIds = sortedRows.map((row) => String(row.id));
+    const visibleIds = pagedRows.map((row) => String(row.id));
     setSelectedIds((prev) => checked ? Array.from(new Set([...prev, ...visibleIds])) : prev.filter((id) => !visibleIds.includes(id)));
   }
 
@@ -513,7 +514,20 @@ export default function RecordsPage() {
     });
   }, [filteredRows, sort]);
 
-  const visibleSortedIds = useMemo(() => sortedRows.map((row) => String(row.id)), [sortedRows]);
+  const pageSize = 100;
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pagedRows = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return sortedRows.slice(start, start + pageSize);
+  }, [sortedRows, safeCurrentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedIds([]);
+  }, [activeRules, quickSearch, activeView, sort]);
+
+  const visibleSortedIds = useMemo(() => pagedRows.map((row) => String(row.id)), [pagedRows]);
   const allVisibleSelected = visibleSortedIds.length > 0 && visibleSortedIds.every((id) => selectedIds.includes(id));
 
   const currentSortLabel = recordColumns.find((column) => column.field === sort.field)?.label || "Fecha actualización";
@@ -573,12 +587,13 @@ export default function RecordsPage() {
         <section className="zoho-table-wrap zoho-table-wrap-scroll">
           <div className="zoho-table-toolbar">
             <span>Registros totales {sortedRows.length} · Seleccionados {selectedIds.length}</span>
-            <span className="zoho-table-range">Orden: {currentSortLabel} · {sort.direction === "asc" ? "Asc" : "Desc"} · 1 a {Math.min(sortedRows.length, 100)}</span>
+            <span className="zoho-table-range">Orden: {currentSortLabel} · {sort.direction === "asc" ? "Asc" : "Desc"} · Página {safeCurrentPage}/{totalPages} · Mostrando {pagedRows.length} de {sortedRows.length}</span>
           </div>
 
           {loading ? (
             <div className="zoho-empty">Cargando registros...</div>
           ) : (
+            <>
             <div className="zoho-table-horizontal-scroll">
             <table className="zoho-table zoho-table-wide">
               <thead>
@@ -592,7 +607,8 @@ export default function RecordsPage() {
                 {sortedRows.length === 0 ? (
                   <tr><td colSpan={selectedColumns.length + 2}>Sin registros de empresas.</td></tr>
                 ) : (
-                  sortedRows.map((row) => (
+                  <>
+                  {pagedRows.map((row) => (
                     <tr key={row.id}>
                       <td><input type="checkbox" checked={selectedIds.includes(String(row.id))} onChange={() => toggleSelected(String(row.id))} /></td>
                       {selectedColumns.map((column) => {
@@ -615,11 +631,20 @@ export default function RecordsPage() {
                         </div>
                       </td>
                     </tr>
-                  ))
+                  ))}
+                  </>
                 )}
               </tbody>
             </table>
             </div>
+            {sortedRows.length > pageSize && (
+              <div className="zoho-pagination-bar">
+                <button className="zoho-btn" disabled={safeCurrentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>Anterior</button>
+                <span>Registros {(safeCurrentPage - 1) * pageSize + 1} a {Math.min(safeCurrentPage * pageSize, sortedRows.length)} de {sortedRows.length}</span>
+                <button className="zoho-btn" disabled={safeCurrentPage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>Siguiente</button>
+              </div>
+            )}
+            </>
           )}
         </section>
       </div>
@@ -631,6 +656,8 @@ export default function RecordsPage() {
         <ModuleFilterPanel
           title="Filtros avanzados"
           fields={fields}
+          initialRules={activeRules}
+          initialQuickSearch={quickSearch}
           onApply={(rules, search) => {
             setActiveRules(rules);
             setQuickSearch(search);
