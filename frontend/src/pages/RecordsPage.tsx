@@ -262,12 +262,14 @@ export default function RecordsPage() {
   const [activeView, setActiveView] = useState("todos");
   const [columnModalOpen, setColumnModalOpen] = useState(false);
   const [filterModalOpen, setFilterModalOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [sortModalOpen, setSortModalOpen] = useState(false);
   const initialRecordsSettings = readRecordsScopedSettings("todos");
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => initialRecordsSettings.visibleColumns);
   const [columnOrder, setColumnOrder] = useState<string[]>(() => initialRecordsSettings.columnOrder);
   const [sort, setSort] = useState<RecordsSortState>(() => initialRecordsSettings.sort);
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -278,6 +280,7 @@ export default function RecordsPage() {
     try {
       const data = await fetchJson<RecordItem[]>("/records");
       setRows(data);
+      setSelectedIds((prev) => prev.filter((id) => data.some((row) => row.id === id)));
     } catch (error) {
       console.error(error);
       alert("No se pudieron cargar los registros de empresas.");
@@ -343,6 +346,36 @@ export default function RecordsPage() {
     } catch (error: any) {
       console.error(error);
       alert(error?.message || "No se pudo eliminar la gestión.");
+    }
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]);
+  }
+
+  function toggleSelectAllVisible(checked: boolean) {
+    const visibleIds = sortedRows.map((row) => row.id);
+    if (checked) {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+    } else {
+      setSelectedIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+    }
+  }
+
+  async function deleteSelectedRecords() {
+    if (!selectedIds.length) return;
+    if (!confirm(`¿Eliminar ${selectedIds.length} registro(s) seleccionado(s)?
+
+Esta acción eliminará cada registro con su trazabilidad/documentos asociados.`)) return;
+    try {
+      for (const id of selectedIds) {
+        await fetchJson(`/records/${id}`, { method: "DELETE" });
+      }
+      setSelectedIds([]);
+      await loadRows();
+    } catch (error: any) {
+      console.error(error);
+      alert(error?.message || "No se pudo completar la eliminación masiva.");
     }
   }
 
@@ -490,6 +523,9 @@ export default function RecordsPage() {
     });
   }, [filteredRows, sort]);
 
+  const visibleSelectedCount = sortedRows.filter((row) => selectedIds.includes(row.id)).length;
+  const allVisibleSelected = sortedRows.length > 0 && visibleSelectedCount === sortedRows.length;
+
   const currentSortLabel = recordColumns.find((column) => column.field === sort.field)?.label || "Fecha actualización";
 
   function clearAdvancedFilters() {
@@ -510,9 +546,12 @@ export default function RecordsPage() {
           <p>Lista de líneas/casos de gestión por empresa, AFP y mandante</p>
         </div>
         <div className="zoho-module-actions">
-          <button className="zoho-btn" onClick={() => setFilterModalOpen(true)}>Filtrar</button>
+          <button className="zoho-btn" onClick={() => setFiltersOpen((prev) => !prev)}>{filtersOpen ? "Ocultar filtros" : "Filtrar"}</button>
           <button className="zoho-btn" onClick={() => setSortModalOpen(true)}>Ordenar</button>
           <button className="zoho-btn" onClick={() => setColumnModalOpen(true)}>Campos / columnas</button>
+          {selectedIds.length > 0 && (
+            <button className="zoho-btn danger" onClick={deleteSelectedRecords}>Eliminar seleccionados ({selectedIds.length})</button>
+          )}
           <button className="zoho-btn zoho-btn-primary" onClick={() => setModalOpen(true)}>
             Crear Registro de empresa
           </button>
@@ -536,14 +575,16 @@ export default function RecordsPage() {
       <div className="zoho-scope-hint">Los filtros, columnas visibles y orden de columnas quedan guardados solo para la vista seleccionada.</div>
 
       <div className="zoho-module-layout">
-        <ModuleFilterPanel
-          title="Filtrar Registros de empresas"
-          fields={fields}
-          onApply={(rules, search) => {
-            setActiveRules(rules);
-            setQuickSearch(search);
-          }}
-        />
+        {filtersOpen && (
+          <ModuleFilterPanel
+            title="Filtrar Registros de empresas"
+            fields={fields}
+            onApply={(rules, search) => {
+              setActiveRules(rules);
+              setQuickSearch(search);
+            }}
+          />
+        )}
 
         <section className="zoho-table-wrap zoho-table-wrap-scroll">
           <div className="zoho-table-toolbar">
@@ -558,7 +599,7 @@ export default function RecordsPage() {
             <table className="zoho-table zoho-table-wide">
               <thead>
                 <tr>
-                  <th><input type="checkbox" /></th>
+                  <th><input type="checkbox" checked={allVisibleSelected} onChange={(event) => toggleSelectAllVisible(event.target.checked)} /></th>
                   {selectedColumns.map((column) => <th key={column.field}>{column.label}</th>)}
                   <th>Acciones</th>
                 </tr>
@@ -569,7 +610,7 @@ export default function RecordsPage() {
                 ) : (
                   sortedRows.map((row) => (
                     <tr key={row.id}>
-                      <td><input type="checkbox" /></td>
+                      <td><input type="checkbox" checked={selectedIds.includes(row.id)} onChange={(event) => toggleSelected(row.id)} onClick={(event) => event.stopPropagation()} /></td>
                       {selectedColumns.map((column) => {
                         const value = column.value(row);
                         const clickable = ["razon_social", "entidad", "company.razon_social", "lineAfp.afp_name"].includes(column.field);

@@ -59,6 +59,32 @@ const quickPrompts = [
   "Dame la pega ordenada para hoy",
 ];
 
+const AI_CHAT_STORAGE_KEY = "operafix_ai_chat_history_v1";
+const AI_EXECUTED_STORAGE_KEY = "operafix_ai_executed_actions_v1";
+
+const welcomeMessage: ChatMessage = {
+  id: "welcome",
+  role: "assistant",
+  content:
+    "Hola. Soy la IA estratégica de OperaFix. Antes de ejecutar acciones amplias, dime quién eres y qué rol tienes. Puedo entender pedidos poco formales, detectar oportunidades de plata, generar informes por columnas y proponer acciones con confirmación.",
+};
+
+function readStoredMessages() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(AI_CHAT_STORAGE_KEY) || "null");
+    if (Array.isArray(parsed) && parsed.length) return parsed as ChatMessage[];
+  } catch {}
+  return [welcomeMessage];
+}
+
+function readStoredExecuted() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(AI_EXECUTED_STORAGE_KEY) || "{}");
+    if (parsed && typeof parsed === "object") return parsed as Record<string, string>;
+  } catch {}
+  return {};
+}
+
 function actionTypeLabel(type: AiAction["type"]) {
   const labels: Record<AiAction["type"], string> = {
     UPDATE_STATUS: "Cambiar estado",
@@ -83,18 +109,11 @@ export default function AiGestionesPage() {
   const [mandanteId, setMandanteId] = useState("");
   const [userName, setUserName] = useState(() => localStorage.getItem("operafix_ai_user_name") || "");
   const [userRole, setUserRole] = useState(() => localStorage.getItem("operafix_ai_user_role") || "");
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content:
-        "Hola. Soy la IA estratégica de OperaFix. Antes de ejecutar acciones amplias, dime quién eres y qué rol tienes. Puedo entender pedidos poco formales, detectar oportunidades de plata, generar informes por columnas y proponer acciones con confirmación.",
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => readStoredMessages());
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [executingId, setExecutingId] = useState<string | null>(null);
-  const [executed, setExecuted] = useState<Record<string, string>>({});
+  const [executed, setExecuted] = useState<Record<string, string>>(() => readStoredExecuted());
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -107,6 +126,14 @@ export default function AiGestionesPage() {
     localStorage.setItem("operafix_ai_user_name", userName);
     localStorage.setItem("operafix_ai_user_role", userRole);
   }, [userName, userRole]);
+
+  useEffect(() => {
+    localStorage.setItem(AI_CHAT_STORAGE_KEY, JSON.stringify(messages));
+  }, [messages]);
+
+  useEffect(() => {
+    localStorage.setItem(AI_EXECUTED_STORAGE_KEY, JSON.stringify(executed));
+  }, [executed]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -223,7 +250,7 @@ export default function AiGestionesPage() {
             <option value="">Todos los mandantes</option>
             {mandantes.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
-          <button className="zoho-btn" onClick={() => setMessages((prev) => prev.slice(0, 1))}>Limpiar chat</button>
+          <button className="zoho-btn" onClick={() => { setMessages([welcomeMessage]); setExecuted({}); localStorage.removeItem(AI_CHAT_STORAGE_KEY); localStorage.removeItem(AI_EXECUTED_STORAGE_KEY); }}>Limpiar chat</button>
         </div>
       </div>
 
