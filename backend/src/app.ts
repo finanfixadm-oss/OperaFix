@@ -15,6 +15,7 @@ import managementDocumentsRouter from "./routes/management-documents.js";
 import recordsRouter from "./routes/records.js";
 
 
+
 const app = express();
 
 app.use(
@@ -28,6 +29,7 @@ app.use(
   })
 );
 
+app.use("/api/auth", authRouter);
 app.use(express.json());
 app.use("/storage", express.static(path.resolve(process.cwd(), "storage")));
 app.use("/managements", managementsRouter);
