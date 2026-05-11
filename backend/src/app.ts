@@ -5,6 +5,7 @@ import path from "node:path";
 import companiesRouter from "./routes/companies.js";
 import documentsRouter from "./routes/documents.js";
 import analyticsRouter from "./routes/analytics.js";
+import authRouter from "./routes/auth.js";
 import mandantesRouter from "./routes/mandantes.js";
 import companyGroupsRouter from "./routes/company-groups.js";
 import managementLinesRouter from "./routes/management-lines.js";

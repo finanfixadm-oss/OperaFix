@@ -277,7 +277,13 @@ recordsRouter.get("/", async (req, res, next) => {
     const where: any = {};
 
     if (mandanteId) where.mandante_id = mandanteId;
-    if (mandante) where.mandante = { name: { contains: mandante, mode: "insensitive" } };
+    if (mandante) {
+      where.mandante = {
+        is: {
+          name: { contains: mandante, mode: "insensitive" },
+        },
+      };
+    }
     if (search) {
       where.OR = [
         { razon_social: { contains: search, mode: "insensitive" } },
