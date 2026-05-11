@@ -2300,3 +2300,12 @@
 .zoho-table td { padding:10px; border-bottom:1px solid #f1f5f9; font-size:13px; color:#334155; white-space:nowrap; }
 .report-preview-table td, .report-preview-table th { max-width:260px; overflow:hidden; text-overflow:ellipsis; }
 @media (max-width: 1100px) { .reports-grid { grid-template-columns:1fr; } .report-filter-row { grid-template-columns:1fr; } }
+
+/* V61 - Dashboard: sin panel lateral de filtros avanzados */
+.dashboard-dashboard-layout-fixed.dashboard-without-side-filters {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.dashboard-without-side-filters .dashboard-main-workspace {
+  width: 100%;
+}

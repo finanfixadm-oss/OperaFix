@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchJson } from "../api";
-import ModuleFilterPanel from "../components/ModuleFilterPanel";
 import ZohoModal from "../components/ZohoModal";
 import type { FilterRule } from "../types";
 import type { RecordItem } from "../types-records";
-import { defaultRecordColumnFields, formatCellValue, getValueByPath, recordColumns, recordFilterFields, type RecordColumnDefinition } from "../utils-record-fields";
+import { defaultRecordColumnFields, formatCellValue, getValueByPath, recordColumns, type RecordColumnDefinition } from "../utils-record-fields";
 
 import { parseMoney } from "../utils/number";
 function money(value: number) {
@@ -495,12 +494,12 @@ export default function DashboardExecutivePage() {
   useEffect(() => { load(); }, []);
 
   useEffect(() => {
-    saveDashboardScopedSettings(mandante, { activeRules, quickSearch, visibleColumns, columnOrder });
+    saveDashboardScopedSettings(mandante, { activeRules: [], quickSearch: "", visibleColumns, columnOrder });
     saveDashboardPanels(mandante, panels);
   }, [mandante, activeRules, quickSearch, visibleColumns, columnOrder, panels]);
 
   function switchMandante(nextMandante: string) {
-    saveDashboardScopedSettings(mandante, { activeRules, quickSearch, visibleColumns, columnOrder });
+    saveDashboardScopedSettings(mandante, { activeRules: [], quickSearch: "", visibleColumns, columnOrder });
     saveDashboardPanels(mandante, panels);
     const nextSettings = readDashboardScopedSettings(nextMandante);
     setActiveRules(nextSettings.activeRules);
@@ -561,18 +560,8 @@ export default function DashboardExecutivePage() {
 
     if (!matchesTopFilters) return false;
 
-    if (quickSearch.trim()) {
-      const q = quickSearch.toLowerCase();
-      const matchesSearch = recordColumns
-        .map((column) => column.value(row))
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(q));
-      if (!matchesSearch) return false;
-    }
-
-    if (activeRules.length) return activeRules.every((rule) => matchRule(getValueByPath(row, rule.field), rule));
     return true;
-  }), [rows, mandante, estado, tipo, quickSearch, activeRules]);
+  }), [rows, mandante, estado, tipo]);
 
   const totalDevolucion = data.reduce((sum, row) => sum + numberValue(parseMoney(row.monto_devolucion)), 0);
   const totalFinanfix = data.reduce((sum, row) => sum + numberValue(parseMoney(row.monto_real_finanfix_solutions) || row.monto_finanfix_solutions), 0);
@@ -711,13 +700,7 @@ export default function DashboardExecutivePage() {
 
       <div className="zoho-scope-hint">Los filtros, columnas y paneles personalizados se guardan por mandante seleccionado. Registros base encontrados: <strong>{data.length}</strong>.</div>
 
-      <div className="dashboard-advanced-layout dashboard-dashboard-layout-fixed">
-        <ModuleFilterPanel
-          title="Filtrar dashboard por cualquier campo"
-          fields={recordFilterFields}
-          onApply={(rules, search) => { setActiveRules(rules); setQuickSearch(search); }}
-        />
-
+      <div className="dashboard-advanced-layout dashboard-dashboard-layout-fixed dashboard-without-side-filters">
         <div className="dashboard-main-workspace">
           <div className="dashboard-filter-help">
             <strong>Constructor de paneles:</strong> crea componentes como los de Zoho seleccionando el módulo, una medida, varios agrupamientos y filtros con patrón <strong>{"((1 y 2) y 3)"}</strong>.
