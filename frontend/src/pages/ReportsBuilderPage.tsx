@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { downloadBlob, fetchJson, postJson } from "../api";
 
 type Field = { key: string; label: string; type: "text" | "money" | "boolean" | "date" };
@@ -26,7 +26,7 @@ export default function ReportsBuilderPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [fileName, setFileName] = useState("informe_operafix.xlsx");
-  const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
+  const [dragColumn, setDragColumn] = useState<string | null>(null);
 
   const fieldsByKey = useMemo(() => new Map(fields.map((f) => [f.key, f])), [fields]);
 
@@ -50,28 +50,20 @@ export default function ReportsBuilderPage() {
       return copy;
     });
   }
-  function handleColumnDragOver(event: DragEvent<HTMLLabelElement>) {
-    event.preventDefault();
-  }
 
-  function handleColumnDrop(targetKey: string) {
-    if (!draggedColumn || draggedColumn === targetKey) {
-      setDraggedColumn(null);
-      return;
-    }
-
+  function dropColumn(targetKey: string) {
+    if (!dragColumn || dragColumn === targetKey) return;
     setColumns((prev) => {
-      const sourceIndex = prev.indexOf(draggedColumn);
-      const targetIndex = prev.indexOf(targetKey);
-      if (sourceIndex < 0 || targetIndex < 0) return prev;
-      const next = [...prev];
-      const [removed] = next.splice(sourceIndex, 1);
-      next.splice(targetIndex, 0, removed);
-      return next;
+      const from = prev.indexOf(dragColumn);
+      const to = prev.indexOf(targetKey);
+      if (from < 0 || to < 0) return prev;
+      const copy = [...prev];
+      const [moved] = copy.splice(from, 1);
+      copy.splice(to, 0, moved);
+      return copy;
     });
-    setDraggedColumn(null);
+    setDragColumn(null);
   }
-
 
   async function runPreview() {
     setLoading(true);
@@ -119,6 +111,7 @@ export default function ReportsBuilderPage() {
       <section className="reports-grid">
         <div className="zoho-card">
           <h2>Columnas del informe</h2>
+          <p className="zoho-help-text">Marca las casillas y arrastra las columnas seleccionadas para moverlas de forma interactiva.</p>
           <div className="report-form-actions compact">
             <button className="zoho-btn subtle" onClick={() => setColumns(fields.map((f) => f.key))}>Seleccionar todas</button>
             <button className="zoho-btn subtle" onClick={() => setColumns(defaultColumns)}>Vista estándar</button>
@@ -129,16 +122,14 @@ export default function ReportsBuilderPage() {
               return (
                 <label
                   key={field.key}
-                  className={`report-field-card ${checked ? "selected" : ""} ${draggedColumn === field.key ? "dragging" : ""}`}
+                  className={`report-field-card ${checked ? "selected" : ""}`}
                   draggable={checked}
-                  onDragStart={() => checked && setDraggedColumn(field.key)}
-                  onDragOver={checked ? handleColumnDragOver : undefined}
-                  onDrop={checked ? () => handleColumnDrop(field.key) : undefined}
-                  onDragEnd={() => setDraggedColumn(null)}
-                  title={checked ? "Arrastra esta casilla para mover la columna" : "Marca para incluir la columna"}
+                  onDragStart={() => setDragColumn(field.key)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => dropColumn(field.key)}
+                  title={checked ? "Arrastra esta casilla para mover la columna" : "Marca para agregar al informe"}
                 >
                   <input type="checkbox" checked={checked} onChange={() => toggleColumn(field.key)} />
-                  {checked && <span className="drag-handle" aria-hidden="true">☰</span>}
                   <span>{field.label}</span>
                   <small>{field.type}</small>
                   {checked && <span className="report-field-order"><button type="button" onClick={(e) => { e.preventDefault(); moveColumn(field.key, -1); }}>↑</button><button type="button" onClick={(e) => { e.preventDefault(); moveColumn(field.key, 1); }}>↓</button></span>}

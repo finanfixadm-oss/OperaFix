@@ -45,6 +45,27 @@ type ChatMessage = {
   analyzed_records?: number;
 };
 
+const AI_MESSAGES_STORAGE_KEY = "operafix_ai_chat_messages";
+const AI_EXECUTED_STORAGE_KEY = "operafix_ai_executed_actions";
+
+function loadStoredMessages(): ChatMessage[] | null {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(AI_MESSAGES_STORAGE_KEY) || "null");
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function loadStoredExecuted(): Record<string, string> {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(AI_EXECUTED_STORAGE_KEY) || "{}");
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 const quickPrompts = [
   "Quién eres y qué puedes hacer por mí",
   "Sácame un Excel de Mundo Previsional con Razón Social, RUT, Entidad, Estado Gestión, Monto Devolución y N° Solicitud",
@@ -58,32 +79,6 @@ const quickPrompts = [
   "Agrega nota: pendiente respuesta de la entidad",
   "Dame la pega ordenada para hoy",
 ];
-
-const AI_CHAT_STORAGE_KEY = "operafix_ai_chat_history_v1";
-const AI_EXECUTED_STORAGE_KEY = "operafix_ai_executed_actions_v1";
-
-const welcomeMessage: ChatMessage = {
-  id: "welcome",
-  role: "assistant",
-  content:
-    "Hola. Soy la IA estratégica de OperaFix. Antes de ejecutar acciones amplias, dime quién eres y qué rol tienes. Puedo entender pedidos poco formales, detectar oportunidades de plata, generar informes por columnas y proponer acciones con confirmación.",
-};
-
-function readStoredMessages() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(AI_CHAT_STORAGE_KEY) || "null");
-    if (Array.isArray(parsed) && parsed.length) return parsed as ChatMessage[];
-  } catch {}
-  return [welcomeMessage];
-}
-
-function readStoredExecuted() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(AI_EXECUTED_STORAGE_KEY) || "{}");
-    if (parsed && typeof parsed === "object") return parsed as Record<string, string>;
-  } catch {}
-  return {};
-}
 
 function actionTypeLabel(type: AiAction["type"]) {
   const labels: Record<AiAction["type"], string> = {
@@ -109,11 +104,20 @@ export default function AiGestionesPage() {
   const [mandanteId, setMandanteId] = useState("");
   const [userName, setUserName] = useState(() => localStorage.getItem("operafix_ai_user_name") || "");
   const [userRole, setUserRole] = useState(() => localStorage.getItem("operafix_ai_user_role") || "");
-  const [messages, setMessages] = useState<ChatMessage[]>(() => readStoredMessages());
+  const [messages, setMessages] = useState<ChatMessage[]>(() =>
+    loadStoredMessages() || [
+      {
+        id: "welcome",
+        role: "assistant",
+        content:
+          "Hola. Soy la IA estratégica de OperaFix. Antes de ejecutar acciones amplias, dime quién eres y qué rol tienes. Puedo entender pedidos poco formales, detectar oportunidades de plata, generar informes por columnas y proponer acciones con confirmación.",
+      },
+    ]
+  );
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [executingId, setExecutingId] = useState<string | null>(null);
-  const [executed, setExecuted] = useState<Record<string, string>>(() => readStoredExecuted());
+  const [executed, setExecuted] = useState<Record<string, string>>(() => loadStoredExecuted());
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -127,8 +131,9 @@ export default function AiGestionesPage() {
     localStorage.setItem("operafix_ai_user_role", userRole);
   }, [userName, userRole]);
 
+
   useEffect(() => {
-    localStorage.setItem(AI_CHAT_STORAGE_KEY, JSON.stringify(messages));
+    localStorage.setItem(AI_MESSAGES_STORAGE_KEY, JSON.stringify(messages));
   }, [messages]);
 
   useEffect(() => {
@@ -243,14 +248,14 @@ export default function AiGestionesPage() {
       <div className="zoho-module-header ai-chat-header">
         <div>
           <h1>IA para gestiones</h1>
-          <p>Chat real conectado al CRM. Analiza datos, genera informes y ejecuta acciones con confirmación.</p>
+          <p>Chat real conectado al CRM. Analiza datos, genera informes y ejecuta acciones con confirmación. El historial queda guardado aunque cambies de pantalla.</p>
         </div>
         <div className="zoho-module-actions">
           <select className="zoho-select" value={mandanteId} onChange={(e) => setMandanteId(e.target.value)}>
             <option value="">Todos los mandantes</option>
             {mandantes.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
-          <button className="zoho-btn" onClick={() => { setMessages([welcomeMessage]); setExecuted({}); localStorage.removeItem(AI_CHAT_STORAGE_KEY); localStorage.removeItem(AI_EXECUTED_STORAGE_KEY); }}>Limpiar chat</button>
+          <button className="zoho-btn" onClick={() => setMessages((prev) => prev.slice(0, 1))}>Limpiar chat</button>
         </div>
       </div>
 

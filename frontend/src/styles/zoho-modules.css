@@ -2301,47 +2301,19 @@
 .report-preview-table td, .report-preview-table th { max-width:260px; overflow:hidden; text-overflow:ellipsis; }
 @media (max-width: 1100px) { .reports-grid { grid-template-columns:1fr; } .report-filter-row { grid-template-columns:1fr; } }
 
-/* v59 - Bloque PRO: filtros plegables, eliminación masiva, drag/drop informes e historial IA */
-.zoho-btn.danger,
-.zoho-small-btn.danger {
-  border-color: #fecaca;
-  background: #fff1f2;
-  color: #b42318;
-}
-
-.zoho-btn.danger:hover,
-.zoho-small-btn.danger:hover {
-  background: #fee2e2;
-  border-color: #fca5a5;
-}
-
-.zoho-module-layout > .zoho-filter-panel {
-  transition: all 0.18s ease;
-}
-
-.report-field-card[draggable="true"] {
-  cursor: grab;
-}
-
-.report-field-card.dragging,
-.draggable-column-item.dragging {
-  opacity: 0.55;
-  border-style: dashed;
-  transform: scale(0.99);
-}
-
-.drag-handle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  color: #64748b;
-  font-weight: 800;
-  cursor: grab;
-}
-
-.ai-chat-history-note {
-  color: #64748b;
-  font-size: 12px;
-}
+/* Bloque PRO registros: tabla completa, filtros desplegables, columnas y edición inline */
+.records-layout-collapsed { grid-template-columns: 1fr !important; }
+.records-table-wrap { min-width: 0; }
+.records-table-scroll { width: 100%; overflow: auto; }
+.records-main-table { min-width: 1450px; }
+.zoho-btn.danger { background: #dc2626; color: #fff; border-color: #dc2626; }
+.record-column-list { display: grid; gap: 8px; max-height: 520px; overflow: auto; }
+.record-column-card { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 10px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; cursor: pointer; }
+.record-column-card.selected { border-color: #2563eb; background: #eff6ff; }
+.record-column-card small { color: #64748b; font-size: 11px; }
+.zoho-help-text { color: #64748b; font-size: 13px; margin: 4px 0 10px; }
+.editable-info-line span { display: flex; align-items: center; gap: 5px; }
+.inline-pencil { border: 0; background: transparent; color: #0b73ff; cursor: pointer; font-weight: 700; padding: 0 2px; }
+.inline-pencil:hover { transform: scale(1.15); }
+.fixed-detail-header { align-items: flex-start; }
+.zoho-textarea { min-height: 150px; }
