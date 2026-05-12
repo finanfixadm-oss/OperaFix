@@ -4,11 +4,22 @@ const parseMoney = (value: string): number => {
   return Number(value.replace(/\./g, "").replace(/\$/g, "").trim());
 };
 
+const AFP_MAP: Record<string, string> = {
+  modelo: "modelo",
+  capital: "capital",
+  habitat: "habitat",
+  provida: "provida",
+  cuprum: "cuprum",
+  uno: "uno",
+  planvital: "planvital",
+};
+
 export const nlToFilters = (text: string): PrismaFilter => {
   const t = text.toLowerCase();
   const where: PrismaFilter = {};
   const andFilters: PrismaFilter[] = [];
 
+  // 💰 MONTO
   const montoMatch = t.match(/(sobre|mayor a|>\s*)(\$?\s*[\d\.]+)/);
 
   if (montoMatch) {
@@ -19,6 +30,7 @@ export const nlToFilters = (text: string): PrismaFilter => {
     });
   }
 
+  // 📊 ESTADOS
   if (t.includes("pendiente")) {
     andFilters.push({
       management_status: {
@@ -37,23 +49,32 @@ export const nlToFilters = (text: string): PrismaFilter => {
     });
   }
 
-  if (t.includes("modelo")) {
+  if (t.includes("rechazado")) {
     andFilters.push({
-      pension_fund: {
-        contains: "modelo",
+      management_status: {
+        contains: "rechazado",
         mode: "insensitive",
       },
     });
   }
 
-  if (t.includes("capital")) {
-    andFilters.push({
-      pension_fund: {
-        contains: "capital",
-        mode: "insensitive",
-      },
-    });
-  }
+  // 🏦 AFP DINÁMICA
+  let afpDetected = false;
+
+  Object.entries(AFP_MAP).forEach(([key, value]) => {
+    if (t.includes(key)) {
+      afpDetected = true;
+
+      andFilters.push({
+        entity: {
+          contains: value,
+          mode: "insensitive",
+        },
+      });
+    }
+  });
+
+  // 🔥 BONUS: si no detecta AFP, no filtra (trae todas)
 
   if (andFilters.length > 0) {
     where.AND = andFilters;
