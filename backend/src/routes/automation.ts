@@ -37,4 +37,21 @@ router.post("/run-cron", async (_req, res) => {
   }
 });
 
+router.post("/run-cron", async (_req, res) => {
+  try {
+    const result = await runCron();
+
+    res.json({
+      success: true,
+      message: "Automatización ejecutada correctamente",
+      result,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Error ejecutando automatización",
+    });
+  }
+});
+
 export default router;

@@ -3,7 +3,6 @@ import { evaluateRule, Rule } from "../modules/workflow/engine.v2.js";
 
 const prisma = new PrismaClient();
 
-// ejemplo de reglas (puedes persistirlas en DB luego)
 const rules: Rule[] = [
   {
     id: "high_amount_pending",
@@ -11,31 +10,31 @@ const rules: Rule[] = [
     enabled: true,
     conditions: [
       { field: "refund_amount", op: "gt", value: 1000000 },
-      { field: "management_status", op: "contains", value: "pendiente" },
     ],
-    actions: [
-      { type: "update", data: { tag_auto: "HIGH_VALUE" } },
-    ],
+    actions: [],
   },
 ];
 
 export const runCron = async () => {
-  const records = await prisma.lmRecord.findMany({ take: 5000 });
+  const records = await prisma.lmRecord.findMany({
+    take: 5000,
+  });
+
+  let matched = 0;
 
   for (const r of records) {
-    const row = r as unknown as Record<string, any>;
+    const row = r as unknown as Record<string, unknown>;
 
     for (const rule of rules) {
       if (evaluateRule(row, rule)) {
-        for (const a of rule.actions) {
-          if (a.type === "update") {
-            await prisma.lmRecord.update({
-              where: { id: r.id },
-              data: a.data as any,
-            });
-          }
-        }
+        matched++;
       }
     }
   }
+
+  return {
+    success: true,
+    total: records.length,
+    matched,
+  };
 };
