@@ -12,7 +12,9 @@ import UsersPage from "./pages/UsersPage";
 import ReportsBuilderPage from "./pages/ReportsBuilderPage";
 import LoginPage from "./pages/LoginPage";
 import { defaultPathForUser, getCurrentUser } from "./auth";
+import V66AutomationPage from "./pages/V66AutomationPage";
 import "./styles/zoho-modules.css";
+
 
 function RootRedirect() {
   return <Navigate to={defaultPathForUser(getCurrentUser())} replace />;
@@ -26,6 +28,7 @@ export default function App() {
           <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<LoginPage />} />
 
+          <Route path="/v66-automation" element={<V66AutomationPage />} />
           <Route path="/dashboard" element={<ProtectedRoute roles={["admin", "interno", "kam"]}><DashboardExecutivePage /></ProtectedRoute>} />
           <Route path="/records" element={<ProtectedRoute roles={["admin", "interno", "kam"]}><RecordsPage /></ProtectedRoute>} />
           <Route path="/records/:id" element={<ProtectedRoute roles={["admin", "interno", "kam"]}><RecordDetailPage /></ProtectedRoute>} />
