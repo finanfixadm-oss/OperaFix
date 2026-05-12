@@ -1,44 +1,62 @@
-type Filters = Record<string, any>;
+type PrismaFilter = Record<string, unknown>;
 
-const money = (s: string) =>
-  Number(s.replace(/\./g, "").replace(/\$/g, "").trim());
+const parseMoney = (value: string): number => {
+  return Number(value.replace(/\./g, "").replace(/\$/g, "").trim());
+};
 
-export const nlToFilters = (text: string): Filters => {
+export const nlToFilters = (text: string): PrismaFilter => {
   const t = text.toLowerCase();
+  const where: PrismaFilter = {};
+  const andFilters: PrismaFilter[] = [];
 
-  const where: Filters = {};
-
-  // monto (usa refund_amount que sí tienes)
   const montoMatch = t.match(/(sobre|mayor a|>\s*)(\$?\s*[\d\.]+)/);
+
   if (montoMatch) {
-    where.refund_amount = { gt: money(montoMatch[2]) };
+    andFilters.push({
+      refund_amount: {
+        gt: parseMoney(montoMatch[2]),
+      },
+    });
   }
 
-  // estado (usa variantes posibles)
   if (t.includes("pendiente")) {
-    where.OR = [
-      { management_status: { contains: "pendiente", mode: "insensitive" } },
-      { estado: { contains: "pendiente", mode: "insensitive" } },
-    ];
+    andFilters.push({
+      management_status: {
+        contains: "pendiente",
+        mode: "insensitive",
+      },
+    });
   }
 
-  // entidad (variantes)
+  if (t.includes("pagado")) {
+    andFilters.push({
+      management_status: {
+        contains: "pagado",
+        mode: "insensitive",
+      },
+    });
+  }
+
   if (t.includes("modelo")) {
-    where.OR = [
-      ...(where.OR || []),
-      { afp: { contains: "modelo", mode: "insensitive" } },
-      { entidad: { contains: "modelo", mode: "insensitive" } },
-      { institution: { contains: "modelo", mode: "insensitive" } },
-    ];
+    andFilters.push({
+      pension_fund: {
+        contains: "modelo",
+        mode: "insensitive",
+      },
+    });
   }
 
   if (t.includes("capital")) {
-    where.OR = [
-      ...(where.OR || []),
-      { afp: { contains: "capital", mode: "insensitive" } },
-      { entidad: { contains: "capital", mode: "insensitive" } },
-      { institution: { contains: "capital", mode: "insensitive" } },
-    ];
+    andFilters.push({
+      pension_fund: {
+        contains: "capital",
+        mode: "insensitive",
+      },
+    });
+  }
+
+  if (andFilters.length > 0) {
+    where.AND = andFilters;
   }
 
   return where;
