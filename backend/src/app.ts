@@ -23,6 +23,7 @@ import { requireAuth, requireRoles } from "./middleware/security.js";
 import aiRoutes from "./modules/ai/ai.routes.js";
 import dashboardRoutes from "./routes/dashboard.js";
 import automationRoutes from "./routes/automation.js";
+import aiExecuteRoutes from "./modules/ai/ai.execute.routes.js";
 
 const app = express();
 
@@ -41,6 +42,7 @@ app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 app.use("/storage", express.static(path.resolve(process.cwd(), "storage")));
 app.use("/api/ai", aiRoutes);
+app.use("/api/ai", aiExecuteRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.get("/", (_req, res) => {
   res.json({ status: "OK DESDE SERVER" });
