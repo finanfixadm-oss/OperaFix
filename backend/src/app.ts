@@ -22,7 +22,7 @@ import auditRouter from "./routes/audit.js";
 import { requireAuth, requireRoles } from "./middleware/security.js";
 import aiRoutes from "./modules/ai/ai.routes.js";
 import dashboardRoutes from "./routes/dashboard.js";
-
+import automationRoutes from "./routes/automation.js";
 
 const app = express();
 
@@ -36,7 +36,7 @@ app.use(
     credentials: true,
   })
 );
-
+app.use("/api/automation", automationRoutes);
 app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 app.use("/storage", express.static(path.resolve(process.cwd(), "storage")));
