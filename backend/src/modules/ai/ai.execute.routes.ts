@@ -6,123 +6,85 @@ import { nlToAction } from "./nl2action.js";
 const prisma = new PrismaClient();
 const router = express.Router();
 
-/**
- * Campos permitidos para actualización.
- * IMPORTANTE: deben existir en tu modelo LmRecord.
- */
-const ALLOWED_UPDATE_FIELDS = [
-  "management_status",
-  "tag_manual",
-  "notes",
-] as const;
-
-type AllowedField = (typeof ALLOWED_UPDATE_FIELDS)[number];
-
 type ExecuteBody = {
   text: string;
   action?: "get" | "update";
   data?: Record<string, unknown>;
   limit?: number;
   dryRun?: boolean;
+  recordIds?: string[];
+  confirmExecution?: boolean;
 };
 
-function sanitizeData(data: Record<string, unknown> | undefined) {
-  const clean: Record<string, unknown> = {};
-
-  if (!data) {
-    return clean;
-  }
-
-  for (const [key, value] of Object.entries(data)) {
-    if ((ALLOWED_UPDATE_FIELDS as readonly string[]).includes(key)) {
-      clean[key as AllowedField] = value;
-    }
-  }
-
-  return clean;
-}
+const toNumber = (value: unknown): number => Number(value || 0);
 
 router.post("/execute", async (req, res) => {
   try {
     const body = req.body as ExecuteBody;
 
-    if (!body?.text || !body.text.trim()) {
+    if (!body?.text?.trim() && !body?.recordIds?.length) {
       return res.status(400).json({
         success: false,
-        error: "Falta 'text'",
+        error: "Debes enviar texto de consulta o IDs específicos.",
       });
     }
 
-    const where = nlToFilters(body.text);
-    const parsedAction = nlToAction(body.text);
+    const where = body.recordIds?.length
+      ? { id: { in: body.recordIds } }
+      : nlToFilters(body.text || "");
 
+    const parsedAction = nlToAction(body.text || "");
     const finalAction: "get" | "update" = body.action || parsedAction.intent;
-
-    const rawData =
-      body.data && Object.keys(body.data).length > 0
-        ? body.data
-        : parsedAction.data;
-
-    const data = sanitizeData(rawData);
-
     const limit = Math.min(Number(body.limit || 100), 500);
 
     const preview = await prisma.lmRecord.findMany({
       where,
       take: limit,
+      orderBy: {
+        refund_amount: "desc",
+      },
       select: {
         id: true,
+        management_id: true,
+        mandante: true,
+        business_name: true,
+        rut: true,
+        request_number: true,
         refund_amount: true,
         management_status: true,
         entity: true,
+        confirmation_cc: true,
+        confirmation_power: true,
+        fecha_presentacion_afp: true,
+        fecha_ingreso_afp: true,
+        fecha_pago_afp: true,
       },
     });
 
-    if (finalAction === "get" || body.dryRun) {
+    const totalAmount = preview.reduce((acc, record) => acc + toNumber(record.refund_amount), 0);
+
+    if (finalAction === "get" || body.dryRun || !body.confirmExecution) {
       return res.json({
         success: true,
-        mode: body.dryRun ? "dry-run" : "get",
+        mode: finalAction === "update" ? "preview-required" : "get",
+        message:
+          finalAction === "update"
+            ? "Por seguridad no se ejecutan cambios masivos desde lenguaje natural. Revisa el detalle y confirma usando recordIds + confirmExecution=true."
+            : "Consulta realizada sobre campos reales del CRM.",
         detectedAction: parsedAction,
         finalAction,
         where,
-        data,
         previewCount: preview.length,
+        totalAmount,
         preview,
       });
     }
 
-    if (finalAction === "update" && Object.keys(data).length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: "No hay campos válidos para actualizar",
-        detectedAction: parsedAction,
-        allowedFields: ALLOWED_UPDATE_FIELDS,
-      });
-    }
-
-    if (preview.length === 0) {
-      return res.json({
-        success: true,
-        updated: 0,
-        message: "Sin registros que cumplan filtros",
-        where,
-      });
-    }
-
-    const result = await prisma.lmRecord.updateMany({
-      where: {
-        id: {
-          in: preview.map((record) => record.id),
-        },
-      },
-      data,
-    });
-
-    return res.json({
-      success: true,
-      updated: result.count,
-      appliedData: data,
-      where,
+    return res.status(400).json({
+      success: false,
+      error: "La ejecución directa está bloqueada para evitar cambios masivos. Usa acciones específicas por ID desde el detalle del registro.",
+      previewCount: preview.length,
+      preview,
     });
   } catch (error) {
     return res.status(500).json({
