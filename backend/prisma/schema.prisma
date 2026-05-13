@@ -288,6 +288,9 @@ model LmRecord {
   comment            String?
   mandante           String?
   portal_access      String?
+  direccion          String?
+  confirmation_cc    Boolean? @default(false)
+  confirmation_power Boolean? @default(false)
 
   estado_contrato_cliente     String?
   fecha_termino_contrato      DateTime?
@@ -357,11 +360,34 @@ model TpRecord {
   comment            String?
   mandante           String?
   portal_access      String?
+  direccion          String?
+  confirmation_cc    Boolean? @default(false)
+  confirmation_power Boolean? @default(false)
 
   estado_contrato_cliente String?
   fecha_termino_contrato  DateTime?
   mes_produccion_2026     String?
+  mes_ingreso_solicitud   String?
   acceso_portal           String?
+  motivo_tipo_exceso      String?
+  envio_afp               String?
+  fecha_presentacion_afp  DateTime?
+  fecha_ingreso_afp       DateTime?
+  fecha_pago_afp          DateTime?
+  monto_cliente           Decimal? @db.Decimal(18, 2)
+  fee                     Decimal? @db.Decimal(18, 2)
+  monto_finanfix_solutions Decimal? @db.Decimal(18, 2)
+  monto_real_cliente      Decimal? @db.Decimal(18, 2)
+  monto_real_finanfix_solutions Decimal? @db.Decimal(18, 2)
+  facturado_finanfix      String?
+  facturado_cliente       String?
+  fecha_factura_finanfix  DateTime?
+  fecha_pago_factura_finanfix DateTime?
+  fecha_notificacion_cliente DateTime?
+  numero_factura          String?
+  numero_oc               String?
+  fecha_rechazo           DateTime?
+  motivo_rechazo          String?
   consulta_cen            String?
   contenido_cen           String?
   respuesta_cen           String?

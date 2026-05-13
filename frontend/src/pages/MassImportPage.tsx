@@ -13,19 +13,18 @@ type ImportStats = {
   byEstado: Record<string, number>;
 };
 
-type ImportRow = {
+type ImportRow = Record<string, any> & {
   rowNumber: number;
-  mandante: string | null;
-  razon_social: string | null;
-  rut: string | null;
-  entidad: string | null;
-  estado_gestion: string | null;
-  monto_devolucion: number | null;
-  numero_solicitud: string | null;
   validation_status: "OK" | "ADVERTENCIA" | "ERROR";
   validation_messages: string[];
   is_duplicate_in_file: boolean;
   exists_in_database: boolean;
+};
+
+type FieldCatalogItem = {
+  field: string;
+  label: string;
+  type: "text" | "number" | "money" | "boolean" | "date" | "enum";
 };
 
 type PreviewResponse = {
@@ -33,7 +32,8 @@ type PreviewResponse = {
   fileName: string;
   sheetName: string;
   headers: string[];
-  mappedColumns: Array<{ header: string; field: string }>;
+  fieldCatalog: FieldCatalogItem[];
+  mappedColumns: Array<{ header: string; field: string; label: string }>;
   unmappedHeaders: string[];
   stats: ImportStats;
   aiReview: string;
@@ -50,12 +50,42 @@ type CommitResponse = {
 };
 
 function formatMoney(value: number | null | undefined) {
-  return new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(value || 0);
+  return new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Number(value || 0));
+}
+
+function formatCell(value: unknown, type?: FieldCatalogItem["type"]) {
+  if (value === undefined || value === null || value === "") return "—";
+  if (type === "money") return formatMoney(Number(value || 0));
+  if (type === "boolean") return value === true ? "Sí" : "No";
+  if (type === "date") {
+    const date = new Date(String(value));
+    return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString("es-CL");
+  }
+  return String(value);
 }
 
 function StatusBadge({ status }: { status: ImportRow["validation_status"] }) {
   return <span className={`import-badge import-badge-${status.toLowerCase()}`}>{status}</span>;
 }
+
+const PRIORITY_FIELDS = [
+  "mandante",
+  "razon_social",
+  "rut",
+  "entidad",
+  "estado_gestion",
+  "monto_devolucion",
+  "confirmacion_cc",
+  "confirmacion_poder",
+  "numero_solicitud",
+  "mes_produccion_2026",
+  "mes_ingreso_solicitud",
+  "fecha_presentacion_afp",
+  "fecha_ingreso_afp",
+  "fecha_pago_afp",
+  "facturado_finanfix",
+  "facturado_cliente",
+];
 
 export default function MassImportPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -67,17 +97,30 @@ export default function MassImportPage() {
   const [skipDuplicates, setSkipDuplicates] = useState(true);
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [showAllFields, setShowAllFields] = useState(false);
+
+  const fieldMap = useMemo(() => {
+    return new Map((preview?.fieldCatalog || []).map((field) => [field.field, field]));
+  }, [preview]);
+
+  const previewColumns = useMemo(() => {
+    if (!preview) return [];
+    const mapped = Array.from(new Set(preview.mappedColumns.map((item) => item.field)));
+    const priority = PRIORITY_FIELDS.filter((field) => mapped.includes(field));
+    const rest = mapped.filter((field) => !priority.includes(field));
+    const fields = showAllFields ? [...priority, ...rest] : priority;
+    return fields.map((field) => fieldMap.get(field) || { field, label: field, type: "text" as const });
+  }, [preview, showAllFields, fieldMap]);
 
   const visibleRows = useMemo(() => {
     const rows = preview?.rows || [];
     const q = search.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((row) =>
-      [row.mandante, row.razon_social, row.rut, row.entidad, row.estado_gestion, row.numero_solicitud]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(q))
+      previewColumns.some((column) => String(row[column.field] || "").toLowerCase().includes(q)) ||
+      String(row.validation_messages?.join(" ") || "").toLowerCase().includes(q)
     );
-  }, [preview, search]);
+  }, [preview, previewColumns, search]);
 
   async function handleUpload(file: File) {
     setError(null);
@@ -124,7 +167,7 @@ export default function MassImportPage() {
         <div>
           <p className="zoho-breadcrumb">Herramientas / Carga masiva</p>
           <h1>Carga masiva inteligente</h1>
-          <p className="zoho-muted">Sube un Excel, revisa la vista previa, valida duplicados y confirma la creación de gestiones.</p>
+          <p className="zoho-muted">Sube el Excel BBDD CRM. La carga usa el mismo catálogo de campos que Registros de empresas, IA y Portal Cliente.</p>
         </div>
         <div className="zoho-actions-row">
           <button className="zoho-btn" onClick={() => fileInputRef.current?.click()} disabled={loading || committing}>
@@ -147,13 +190,13 @@ export default function MassImportPage() {
       <section className="import-drop-card" onClick={() => fileInputRef.current?.click()}>
         <div className="import-drop-icon">⬆</div>
         <div>
-          <h3>{fileName || "Arrastra visualmente tu proceso acá: primero selecciona el Excel"}</h3>
-          <p>El chat IA del CRM no permite adjuntar archivos. Por eso esta pantalla carga el archivo y luego la IA valida la estructura.</p>
-          <p className="zoho-muted">Formato esperado: Mandante, Razón Social, RUT, Entidad, Estado Gestión, Monto Devolución, N° Solicitud y demás campos operativos.</p>
+          <h3>{fileName || "Selecciona el Excel oficial BBDD CRM"}</h3>
+          <p>La carga detecta automáticamente todos los campos del archivo: mandante, empresa, AFP, estado, montos, fechas, facturación, CEN, banco, poder y cuenta corriente.</p>
+          <p className="zoho-muted">Los campos no mapeados se informan antes de cargar. Los datos se guardan en Gestión, LM/TP, Línea y AFP asociada.</p>
         </div>
       </section>
 
-      {loading && <div className="zoho-card import-loading">Procesando Excel y validando información...</div>}
+      {loading && <div className="zoho-card import-loading">Procesando Excel, mapeando campos y validando duplicados...</div>}
       {error && <div className="zoho-card import-error">{error}</div>}
 
       {preview && (
@@ -176,7 +219,7 @@ export default function MassImportPage() {
               <div className="zoho-section-title">Mapeo automático de columnas</div>
               <div className="import-summary-list">
                 {(preview.mappedColumns || []).map((item) => (
-                  <div key={`${item.header}-${item.field}`}><span>{item.header}</span><strong>{item.field}</strong></div>
+                  <div key={`${item.header}-${item.field}`}><span>{item.header}</span><strong>{item.label || item.field}</strong></div>
                 ))}
               </div>
               {(preview.unmappedHeaders || []).length > 0 && (
@@ -205,10 +248,16 @@ export default function MassImportPage() {
           <section className="zoho-card">
             <div className="import-table-toolbar">
               <div>
-                <div className="zoho-section-title">Vista previa tipo Zoho</div>
-                <p className="zoho-muted">Mostrando hasta 100 filas de {preview.totalRows}. Las filas con error crítico no se cargarán.</p>
+                <div className="zoho-section-title">Vista previa con campos oficiales CRM</div>
+                <p className="zoho-muted">Mostrando hasta 100 filas de {preview.totalRows}. Columnas mapeadas: {preview.mappedColumns.length}. Las filas con error crítico no se cargarán.</p>
               </div>
-              <input className="zoho-input" placeholder="Buscar en vista previa" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <div className="zoho-actions-row">
+                <label className="import-checkbox">
+                  <input type="checkbox" checked={showAllFields} onChange={(e) => setShowAllFields(e.target.checked)} />
+                  Mostrar todos los campos
+                </label>
+                <input className="zoho-input" placeholder="Buscar en vista previa" value={search} onChange={(e) => setSearch(e.target.value)} />
+              </div>
             </div>
             <div className="records-table-scroll import-table-scroll">
               <table className="zoho-table import-preview-table">
@@ -216,13 +265,7 @@ export default function MassImportPage() {
                   <tr>
                     <th>Fila</th>
                     <th>Validación</th>
-                    <th>Mandante</th>
-                    <th>Razón Social</th>
-                    <th>RUT</th>
-                    <th>Entidad</th>
-                    <th>Estado</th>
-                    <th>Monto</th>
-                    <th>N° Solicitud</th>
+                    {previewColumns.map((column) => <th key={column.field}>{column.label}</th>)}
                     <th>Observaciones</th>
                   </tr>
                 </thead>
@@ -231,13 +274,7 @@ export default function MassImportPage() {
                     <tr key={`${row.rowNumber}-${row.rut || ""}`} className={row.validation_status === "ERROR" ? "import-row-error" : ""}>
                       <td>{row.rowNumber}</td>
                       <td><StatusBadge status={row.validation_status} /></td>
-                      <td>{row.mandante || "—"}</td>
-                      <td>{row.razon_social || "—"}</td>
-                      <td>{row.rut || "—"}</td>
-                      <td>{row.entidad || "—"}</td>
-                      <td>{row.estado_gestion || "—"}</td>
-                      <td>{formatMoney(row.monto_devolucion)}</td>
-                      <td>{row.numero_solicitud || "—"}</td>
+                      {previewColumns.map((column) => <td key={column.field}>{formatCell(row[column.field], column.type)}</td>)}
                       <td>{row.validation_messages.length ? row.validation_messages.join(" · ") : "Sin observaciones"}</td>
                     </tr>
                   ))}
