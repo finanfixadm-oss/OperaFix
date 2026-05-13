@@ -461,75 +461,110 @@ function buildSelect(columns: string[]): Record<string, boolean> {
   return Object.fromEntries(columns.map((column) => [column, true]));
 }
 
-async function runQuery(plan: AIQueryPlan): Promise<Record<string, unknown>[]> {
-  const where = buildWhere(plan.filters || []);
-  const select = buildSelect(plan.columns || DEFAULT_COLUMNS);
+async function runQuery(
+  plan: AIQueryPlan,
+  fields: string[]
+): Promise<Record<string, unknown>[]> {
+  const safeFilters = (plan.filters || []).filter((filter) =>
+    fields.includes(filter.field)
+  );
 
-  const rows = await prisma.lmRecord.findMany({
-    where,
-    select,
-    take: plan.limit || 100,
-    orderBy: plan.orderBy
-      ? {
-          [plan.orderBy.field]: plan.orderBy.direction,
-        }
-      : undefined,
-  });
+  const safeColumns = (plan.columns || []).filter((column) =>
+    fields.includes(column)
+  );
 
-  return rows as unknown as Record<string, unknown>[];
+  const safeOrderBy =
+    plan.orderBy && fields.includes(plan.orderBy.field)
+      ? plan.orderBy
+      : fields.includes("refund_amount")
+        ? { field: "refund_amount", direction: "desc" as const }
+        : undefined;
+
+  const where = buildWhere(safeFilters);
+
+  const select = buildSelect(
+    safeColumns.length
+      ? safeColumns
+      : DEFAULT_COLUMNS.filter((column) => fields.includes(column))
+  );
+
+  try {
+    const rows = await prisma.lmRecord.findMany({
+      where,
+      select,
+      take: plan.limit || 100,
+      orderBy: safeOrderBy
+        ? {
+            [safeOrderBy.field]: safeOrderBy.direction,
+          }
+        : undefined,
+    });
+
+    return rows as unknown as Record<string, unknown>[];
+  } catch (error) {
+    console.error("ERROR RUNQUERY IA:", error);
+
+    return [];
+  }
 }
 
 async function runSuggestions(fields: string[]): Promise<Record<string, unknown>[]> {
   const columns = DEFAULT_COLUMNS.filter((field) => fields.includes(field));
 
-  const rows = await prisma.lmRecord.findMany({
-    where: {
-      AND: [
-        fields.includes("management_status")
-          ? {
-              management_status: {
-                contains: "pendiente",
-                mode: "insensitive",
-              },
-            }
-          : {},
-        fields.includes("refund_amount")
-          ? {
-              refund_amount: {
-                gt: 0,
-              },
-            }
-          : {},
-      ],
-    },
-    select: buildSelect(columns),
-    take: 300,
-    orderBy: fields.includes("refund_amount")
-      ? {
-          refund_amount: "desc",
-        }
-      : undefined,
-  });
+  try {
+    const rows = await prisma.lmRecord.findMany({
+      where: {
+        AND: [
+          fields.includes("management_status")
+            ? {
+                management_status: {
+                  contains: "pendiente",
+                  mode: "insensitive",
+                },
+              }
+            : {},
+          fields.includes("refund_amount")
+            ? {
+                refund_amount: {
+                  gt: 0,
+                },
+              }
+            : {},
+        ],
+      },
+      select: buildSelect(columns),
+      take: 300,
+      orderBy: fields.includes("refund_amount")
+        ? {
+            refund_amount: "desc",
+          }
+        : undefined,
+    });
 
-  return (rows as unknown as Record<string, unknown>[])
-    .filter((row) => {
-      const hasCc = fields.includes("confirmation_cc")
-        ? isTruthySi(row.confirmation_cc)
-        : true;
+    return (rows as unknown as Record<string, unknown>[])
+      .filter((row) => {
+        const hasCc = fields.includes("confirmation_cc")
+          ? isTruthySi(row.confirmation_cc)
+          : true;
 
-      const hasPower = fields.includes("confirmation_power")
-        ? isTruthySi(row.confirmation_power)
-        : true;
+        const hasPower = fields.includes("confirmation_power")
+          ? isTruthySi(row.confirmation_power)
+          : true;
 
-      const hasEntity = fields.includes("entity")
-        ? normalize(row.entity) && !normalize(row.entity).includes("pendiente")
-        : true;
+        const hasEntity = fields.includes("entity")
+          ? normalize(row.entity) && !normalize(row.entity).includes("pendiente")
+          : true;
 
-      const hasAmount = Number(row.refund_amount || 0) > 0;
+        const hasAmount = Number(row.refund_amount || 0) > 0;
 
-      return hasCc && hasPower && hasEntity && hasAmount;
-    })
-    .slice(0, 100);
+        return hasCc && hasPower && hasEntity && hasAmount;
+      })
+      .slice(0, 100);
+  } catch (error) {
+    console.error("ERROR RUNSUGGESTIONS IA:", error);
+
+    return [];
+  }
 }
 
 function buildAnswer(plan: AIQueryPlan, rows: Record<string, unknown>[]): string {
@@ -599,7 +634,7 @@ router.post("/message", async (req, res) => {
       rows = previous.lastRows;
       plan.columns = previous.lastColumns || plan.columns;
     } else {
-      rows = await runQuery(plan);
+      rows = await runQuery(plan, fields);
     }
 
     const answer = buildAnswer(plan, rows);
@@ -623,6 +658,8 @@ router.post("/message", async (req, res) => {
       canExport: rows.length > 0,
     });
   } catch (error) {
+    console.error("ERROR IA CHAT:", error);
+
     return res.status(500).json({
       success: false,
       answer: "No pude procesar la solicitud del CRM.",
