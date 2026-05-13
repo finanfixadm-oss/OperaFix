@@ -120,6 +120,7 @@ function normalize(value: unknown): string {
 
 function money(value: unknown): string {
   const n = Number(value || 0);
+
   return new Intl.NumberFormat("es-CL", {
     style: "currency",
     currency: "CLP",
@@ -129,6 +130,7 @@ function money(value: unknown): string {
 
 function isTruthySi(value: unknown): boolean {
   const v = normalize(value);
+
   return (
     v === "si" ||
     v === "sí" ||
@@ -136,6 +138,37 @@ function isTruthySi(value: unknown): boolean {
     v === "1" ||
     v.includes("si")
   );
+}
+
+function normalizeBooleanValue(field: string, value: unknown): unknown {
+  const booleanFields = ["confirmation_cc", "confirmation_power"];
+
+  if (!booleanFields.includes(field)) {
+    return value;
+  }
+
+  const normalized = normalize(value);
+
+  if (
+    normalized === "si" ||
+    normalized === "sí" ||
+    normalized === "true" ||
+    normalized === "1" ||
+    normalized.includes("confirmado")
+  ) {
+    return true;
+  }
+
+  if (
+    normalized === "no" ||
+    normalized === "false" ||
+    normalized === "0" ||
+    normalized.includes("pendiente")
+  ) {
+    return false;
+  }
+
+  return value;
 }
 
 function parseLocalIntent(message: string, fields: string[]): Partial<AIQueryPlan> {
@@ -166,7 +199,13 @@ function parseLocalIntent(message: string, fields: string[]): Partial<AIQueryPla
     });
   }
 
-  if (q.includes("cc si") || q.includes("cuenta corriente si")) {
+  if (
+    q.includes("cc si") ||
+    q.includes("cc = si") ||
+    q.includes("confirmacion cc si") ||
+    q.includes("confirmacion cc = si") ||
+    q.includes("cuenta corriente si")
+  ) {
     filters.push({
       field: "confirmation_cc",
       operator: "equals",
@@ -174,7 +213,12 @@ function parseLocalIntent(message: string, fields: string[]): Partial<AIQueryPla
     });
   }
 
-  if (q.includes("poder si")) {
+  if (
+    q.includes("poder si") ||
+    q.includes("poder = si") ||
+    q.includes("confirmacion poder si") ||
+    q.includes("confirmacion poder = si")
+  ) {
     filters.push({
       field: "confirmation_power",
       operator: "equals",
@@ -182,7 +226,10 @@ function parseLocalIntent(message: string, fields: string[]): Partial<AIQueryPla
     });
   }
 
-  const amountMatch = q.match(/(?:sobre|mayor a|mas de|más de|>=|>)\s*\$?\s*([\d\.]+)/);
+  const amountMatch = q.match(
+    /(?:sobre|mayor a|mas de|más de|>=|>)\s*\$?\s*([\d\.]+)/
+  );
+
   if (amountMatch) {
     filters.push({
       field: "refund_amount",
@@ -191,7 +238,16 @@ function parseLocalIntent(message: string, fields: string[]): Partial<AIQueryPla
     });
   }
 
-  const afps = ["modelo", "capital", "habitat", "provida", "cuprum", "planvital", "uno"];
+  const afps = [
+    "modelo",
+    "capital",
+    "habitat",
+    "provida",
+    "cuprum",
+    "planvital",
+    "uno",
+  ];
+
   for (const afp of afps) {
     if (q.includes(afp)) {
       filters.push({
@@ -226,6 +282,7 @@ function parseLocalIntent(message: string, fields: string[]): Partial<AIQueryPla
         operator: "contains",
         value,
       });
+
       break;
     }
   }
@@ -233,11 +290,12 @@ function parseLocalIntent(message: string, fields: string[]): Partial<AIQueryPla
   const columns = [...DEFAULT_COLUMNS].filter((field) => fields.includes(field));
 
   return {
-    intent: q.includes("excel") || q.includes("descarg")
-      ? "export_excel"
-      : q.includes("gestionar primero") || q.includes("listos para gestionar")
-        ? "suggest_management"
-        : "query_records",
+    intent:
+      q.includes("excel") || q.includes("descarg")
+        ? "export_excel"
+        : q.includes("gestionar primero") || q.includes("listos para gestionar")
+          ? "suggest_management"
+          : "query_records",
     filters: filters.filter((f) => fields.includes(f.field)),
     columns,
     orderBy: fields.includes("refund_amount")
@@ -254,6 +312,7 @@ async function interpretWithOpenAI(
 ): Promise<AIQueryPlan> {
   if (!apiKey) {
     const local = parseLocalIntent(message, fields);
+
     return {
       intent: local.intent || "query_records",
       filters: local.filters || [],
@@ -304,6 +363,8 @@ Reglas:
 - Si pide Excel, intent debe ser export_excel.
 - Si pide casos listos para gestionar, intent debe ser suggest_management.
 - Casos listos para gestionar = pendiente + CC sí + poder sí + monto devolución mayor a 0 + entidad asignada.
+- Si el usuario dice Confirmación CC Sí, cc sí, CC = Sí o cuenta corriente sí, usa field "confirmation_cc", operator "equals", value true.
+- Si el usuario dice Confirmación Poder Sí, poder sí o poder = Sí, usa field "confirmation_power", operator "equals", value true.
 `;
 
   const response = await openai.chat.completions.create({
@@ -330,12 +391,14 @@ Reglas:
 function sanitizePlan(plan: AIQueryPlan, fields: string[]): AIQueryPlan {
   const fieldSet = new Set(fields);
 
-  const filters = (plan.filters || []).filter((f) => fieldSet.has(f.field));
+  const filters = (plan.filters || []).filter((filter) =>
+    fieldSet.has(filter.field)
+  );
 
   const columns =
     plan.columns && plan.columns.length
-      ? plan.columns.filter((c) => fieldSet.has(c))
-      : DEFAULT_COLUMNS.filter((c) => fieldSet.has(c));
+      ? plan.columns.filter((column) => fieldSet.has(column))
+      : DEFAULT_COLUMNS.filter((column) => fieldSet.has(column));
 
   const orderBy =
     plan.orderBy && fieldSet.has(plan.orderBy.field)
@@ -349,7 +412,7 @@ function sanitizePlan(plan: AIQueryPlan, fields: string[]): AIQueryPlan {
     filters,
     columns,
     orderBy,
-    groupBy: (plan.groupBy || []).filter((g) => fieldSet.has(g)),
+    groupBy: (plan.groupBy || []).filter((group) => fieldSet.has(group)),
     limit: Math.min(Math.max(Number(plan.limit || 100), 1), 500),
     answerHint: plan.answerHint,
   };
@@ -358,8 +421,9 @@ function sanitizePlan(plan: AIQueryPlan, fields: string[]): AIQueryPlan {
 function buildWhere(filters: AIFieldFilter[]): Record<string, unknown> {
   const AND: Record<string, unknown>[] = [];
 
-  for (const filter of filters) {
-    const { field, operator, value } = filter;
+  for (const filter of filters || []) {
+    const { field, operator } = filter;
+    const value = normalizeBooleanValue(field, filter.value);
 
     if (operator === "contains") {
       AND.push({
@@ -371,20 +435,17 @@ function buildWhere(filters: AIFieldFilter[]): Record<string, unknown> {
     }
 
     if (operator === "equals") {
-      if (typeof value === "boolean") {
-        AND.push({
-          [field]: value,
-        });
-      } else {
-        AND.push({
-          [field]: {
-            equals: value,
-          },
-        });
-      }
+      AND.push({
+        [field]: value,
+      });
     }
 
-    if (operator === "gt" || operator === "gte" || operator === "lt" || operator === "lte") {
+    if (
+      operator === "gt" ||
+      operator === "gte" ||
+      operator === "lt" ||
+      operator === "lte"
+    ) {
       AND.push({
         [field]: {
           [operator]: Number(value),
@@ -401,7 +462,7 @@ function buildSelect(columns: string[]): Record<string, boolean> {
 }
 
 async function runQuery(plan: AIQueryPlan): Promise<Record<string, unknown>[]> {
-  const where = buildWhere(plan.filters || {});
+  const where = buildWhere(plan.filters || []);
   const select = buildSelect(plan.columns || DEFAULT_COLUMNS);
 
   const rows = await prisma.lmRecord.findMany({
@@ -419,33 +480,51 @@ async function runQuery(plan: AIQueryPlan): Promise<Record<string, unknown>[]> {
 }
 
 async function runSuggestions(fields: string[]): Promise<Record<string, unknown>[]> {
-  const columns = DEFAULT_COLUMNS.filter((f) => fields.includes(f));
+  const columns = DEFAULT_COLUMNS.filter((field) => fields.includes(field));
 
   const rows = await prisma.lmRecord.findMany({
     where: {
       AND: [
         fields.includes("management_status")
-          ? { management_status: { contains: "pendiente", mode: "insensitive" } }
+          ? {
+              management_status: {
+                contains: "pendiente",
+                mode: "insensitive",
+              },
+            }
           : {},
         fields.includes("refund_amount")
-          ? { refund_amount: { gt: 0 } }
+          ? {
+              refund_amount: {
+                gt: 0,
+              },
+            }
           : {},
       ],
     },
     select: buildSelect(columns),
     take: 300,
     orderBy: fields.includes("refund_amount")
-      ? { refund_amount: "desc" }
+      ? {
+          refund_amount: "desc",
+        }
       : undefined,
   });
 
   return (rows as unknown as Record<string, unknown>[])
     .filter((row) => {
-      const hasCc = fields.includes("confirmation_cc") ? isTruthySi(row.confirmation_cc) : true;
-      const hasPower = fields.includes("confirmation_power") ? isTruthySi(row.confirmation_power) : true;
+      const hasCc = fields.includes("confirmation_cc")
+        ? isTruthySi(row.confirmation_cc)
+        : true;
+
+      const hasPower = fields.includes("confirmation_power")
+        ? isTruthySi(row.confirmation_power)
+        : true;
+
       const hasEntity = fields.includes("entity")
         ? normalize(row.entity) && !normalize(row.entity).includes("pendiente")
         : true;
+
       const hasAmount = Number(row.refund_amount || 0) > 0;
 
       return hasCc && hasPower && hasEntity && hasAmount;
@@ -454,7 +533,10 @@ async function runSuggestions(fields: string[]): Promise<Record<string, unknown>
 }
 
 function buildAnswer(plan: AIQueryPlan, rows: Record<string, unknown>[]): string {
-  const totalMonto = rows.reduce((acc, row) => acc + Number(row.refund_amount || 0), 0);
+  const totalMonto = rows.reduce(
+    (acc, row) => acc + Number(row.refund_amount || 0),
+    0
+  );
 
   if (plan.intent === "suggest_management") {
     return `Encontré ${rows.length} casos que están en mejores condiciones para gestionar. Priorizo los que tienen monto, estado pendiente, entidad asignada, Confirmación CC y Confirmación Poder. Monto total aproximado: ${money(totalMonto)}.`;
@@ -479,7 +561,7 @@ function toCsv(rows: Record<string, unknown>[]): string {
 
   return [
     headers.map(escape).join(";"),
-    ...rows.map((row) => headers.map((h) => escape(row[h])).join(";")),
+    ...rows.map((row) => headers.map((header) => escape(row[header])).join(";")),
   ].join("\n");
 }
 
