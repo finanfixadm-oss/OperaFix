@@ -1,11 +1,11 @@
 import express from "express";
 import OpenAI from "openai";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
-const apiKey = process.env.OPENAI_API_KEY || process.env.crm || "";
+const apiKey = process.env.OPENAI_API_KEY || process.env.crm || process.env.CRM || "";
 const openai = new OpenAI({
   apiKey: apiKey || "dummy",
 });
@@ -45,52 +45,56 @@ type ChatMemory = {
 const memory = new Map<string, ChatMemory>();
 
 const FIELD_LABELS: Record<string, string> = {
-  mandante: "Mandante",
+  id: "ID",
   management_type: "Tipo",
-  mes_produccion_2026: "Mes de producción",
-  mes_ingreso_solicitud: "Mes de ingreso solicitud",
-  portal_access: "Acceso portal",
-  envio_afp: "Envío AFP",
-  estado_contrato_cliente: "Estado contrato con cliente",
-  management_status: "Estado Gestión",
-  request_number: "N° Solicitud",
-  motivo_rechazo: "Motivo del rechazo/anulación",
-  fecha_rechazo: "Fecha rechazo",
-  search_group: "Buscar Grupo",
-  owner_name: "Propietario",
+  mandante: "Mandante",
+  mandante_id: "ID Mandante",
+  search_group: "Grupo empresa",
   business_name: "Razón Social",
   rut: "RUT",
-  direccion: "Dirección",
-  entity: "Entidad (AFP)",
+  entity: "Entidad / AFP",
+  management_status: "Estado Gestión",
+  request_number: "N° Solicitud",
+  refund_amount: "Monto Devolución",
+  actual_paid_amount: "Monto Real Pagado",
+  client_amount: "Monto cliente",
+  finanfix_amount: "Monto Finanfix",
+  actual_client_amount: "Monto real cliente",
+  actual_finanfix_amount: "Monto real Finanfix Solutions",
+  fee: "FEE",
+  confirmation_cc: "Confirmación CC",
+  confirmation_power: "Confirmación Poder",
   bank_name: "Banco",
   account_type: "Tipo de Cuenta",
   account_number: "Número cuenta",
-  confirmation_cc: "Confirmación CC",
-  confirmation_power: "Confirmación Poder",
-  consulta_cen: "Consulta CEN",
-  contenido_cen: "Contenido CEN",
-  respuesta_cen: "Respuesta CEN",
+  portal_access: "Acceso portal",
+  afp_shipment: "Envío AFP",
+  client_contract_status: "Estado contrato con cliente",
+  contract_end_date: "Fecha término contrato",
+  excess_type_reason: "Motivo Tipo de exceso",
+  production_months: "Mes de producción",
+  request_entry_month: "Mes ingreso solicitud",
+  afp_submission_date: "Fecha presentación AFP",
+  afp_entry_date: "Fecha ingreso AFP",
+  afp_payment_date: "Fecha Pago AFP",
+  invoice_number: "N° Factura",
+  oc_number: "N° OC",
+  rejection_date: "Fecha rechazo",
+  rejection_reason: "Motivo rechazo",
+  cen_query: "Consulta CEN",
+  cen_content: "Contenido CEN",
+  cen_response: "Respuesta CEN",
   worker_status: "Estado Trabajador",
-  motivo_tipo_exceso: "Motivo Tipo de exceso",
-  refund_amount: "Monto Devolución",
-  actual_paid_amount: "Monto Real Pagado",
-  monto_cliente: "Monto cliente",
-  monto_finanfix_solutions: "Monto Finanfix",
-  monto_real_cliente: "Monto real cliente",
-  monto_real_finanfix_solutions: "Monto real Finanfix Solutions",
-  fee: "FEE",
-  facturado_cliente: "Facturado cliente",
-  facturado_finanfix: "Facturado Finanfix",
-  fecha_pago_afp: "Fecha Pago AFP",
-  fecha_factura_finanfix: "Fecha Factura Finanfix",
-  fecha_pago_factura_finanfix: "Fecha pago factura Finanfix",
-  fecha_notificacion_cliente: "Fecha notificación cliente",
-  numero_factura: "N° Factura",
-  numero_oc: "N° OC",
+  finanfix_invoice_date: "Fecha Factura Finanfix",
+  finanfix_invoice_payment_date: "Fecha pago factura Finanfix",
+  client_notification_date: "Fecha notificación cliente",
   comment: "Comentario",
   created_at: "Creado",
   updated_at: "Actualizado",
+  last_activity_at: "Última actividad",
 };
+
+const CRM_FIELDS = Object.keys(FIELD_LABELS);
 
 const DEFAULT_COLUMNS = [
   "mandante",
@@ -104,10 +108,17 @@ const DEFAULT_COLUMNS = [
   "request_number",
 ];
 
-function getLmRecordFields(): string[] {
-  const model = Prisma.dmmf.datamodel.models.find((m) => m.name === "LmRecord");
-  return model?.fields.map((f) => f.name) || [];
-}
+const BOOLEAN_FIELDS = new Set(["confirmation_cc", "confirmation_power"]);
+
+const NUMBER_FIELDS = new Set([
+  "refund_amount",
+  "actual_paid_amount",
+  "client_amount",
+  "finanfix_amount",
+  "actual_client_amount",
+  "actual_finanfix_amount",
+  "fee",
+]);
 
 function normalize(value: unknown): string {
   return String(value || "")
@@ -116,6 +127,66 @@ function normalize(value: unknown): string {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+function normalizeCompact(value: unknown): string {
+  return normalize(value).replace(/\s+/g, "");
+}
+
+function levenshtein(a: string, b: string): number {
+  const matrix: number[][] = [];
+
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+
+  return matrix[b.length][a.length];
+}
+
+function fuzzyIncludes(source: unknown, search: unknown): boolean {
+  const s1 = normalize(source);
+  const s2 = normalize(search);
+
+  if (!s1 || !s2) return false;
+
+  if (s1.includes(s2) || s2.includes(s1)) return true;
+
+  const c1 = normalizeCompact(source);
+  const c2 = normalizeCompact(search);
+
+  if (c1.includes(c2) || c2.includes(c1)) return true;
+
+  const sourceParts = s1.split(" ").filter(Boolean);
+  const searchParts = s2.split(" ").filter(Boolean);
+
+  if (!sourceParts.length || !searchParts.length) return false;
+
+  return searchParts.every((part) => {
+    return sourceParts.some((candidate) => {
+      if (candidate.includes(part) || part.includes(candidate)) return true;
+
+      const maxDistance = part.length <= 4 ? 1 : 2;
+      return levenshtein(candidate, part) <= maxDistance;
+    });
+  });
 }
 
 function money(value: unknown): string {
@@ -128,33 +199,31 @@ function money(value: unknown): string {
   }).format(Number.isFinite(n) ? n : 0);
 }
 
-function isTruthySi(value: unknown): boolean {
-  const v = normalize(value);
+function parseNumber(value: unknown): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
 
-  return (
-    v === "si" ||
-    v === "sí" ||
-    v === "true" ||
-    v === "1" ||
-    v.includes("si")
-  );
+  const cleaned = String(value || "")
+    .replace(/\$/g, "")
+    .replace(/\./g, "")
+    .replace(/,/g, ".")
+    .replace(/[^0-9.-]/g, "");
+
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function normalizeBooleanValue(field: string, value: unknown): unknown {
-  const booleanFields = ["confirmation_cc", "confirmation_power"];
-
-  if (!booleanFields.includes(field)) {
-    return value;
-  }
+function normalizeBooleanValue(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value;
 
   const normalized = normalize(value);
 
   if (
     normalized === "si" ||
-    normalized === "sí" ||
     normalized === "true" ||
     normalized === "1" ||
-    normalized.includes("confirmado")
+    normalized.includes("confirmado") ||
+    normalized.includes("vigente") ||
+    normalized.includes("tiene")
   ) {
     return true;
   }
@@ -163,146 +232,32 @@ function normalizeBooleanValue(field: string, value: unknown): unknown {
     normalized === "no" ||
     normalized === "false" ||
     normalized === "0" ||
-    normalized.includes("pendiente")
+    normalized.includes("pendiente") ||
+    normalized.includes("sin") ||
+    normalized.includes("no tiene")
   ) {
     return false;
   }
 
-  return value;
+  return null;
 }
 
-function parseLocalIntent(message: string, fields: string[]): Partial<AIQueryPlan> {
-  const q = normalize(message);
-  const filters: AIFieldFilter[] = [];
+function isTruthySi(value: unknown): boolean {
+  const normalized = normalizeBooleanValue(value);
+  if (normalized !== null) return normalized;
+  return false;
+}
 
-  if (q.includes("pendiente")) {
-    filters.push({
-      field: "management_status",
-      operator: "contains",
-      value: "pendiente",
-    });
+function normalizePlanValue(field: string, value: unknown): string | number | boolean {
+  if (BOOLEAN_FIELDS.has(field)) {
+    return normalizeBooleanValue(value) ?? Boolean(value);
   }
 
-  if (q.includes("pagado") || q.includes("pagada")) {
-    filters.push({
-      field: "management_status",
-      operator: "contains",
-      value: "pag",
-    });
+  if (NUMBER_FIELDS.has(field)) {
+    return parseNumber(value);
   }
 
-  if (q.includes("rechaz")) {
-    filters.push({
-      field: "management_status",
-      operator: "contains",
-      value: "rechaz",
-    });
-  }
-
-  if (
-    q.includes("cc si") ||
-    q.includes("cc = si") ||
-    q.includes("confirmacion cc si") ||
-    q.includes("confirmacion cc = si") ||
-    q.includes("cuenta corriente si")
-  ) {
-    filters.push({
-      field: "confirmation_cc",
-      operator: "equals",
-      value: true,
-    });
-  }
-
-  if (
-    q.includes("poder si") ||
-    q.includes("poder = si") ||
-    q.includes("confirmacion poder si") ||
-    q.includes("confirmacion poder = si")
-  ) {
-    filters.push({
-      field: "confirmation_power",
-      operator: "equals",
-      value: true,
-    });
-  }
-
-  const amountMatch = q.match(
-    /(?:sobre|mayor a|mas de|más de|>=|>)\s*\$?\s*([\d\.]+)/
-  );
-
-  if (amountMatch) {
-    filters.push({
-      field: "refund_amount",
-      operator: "gt",
-      value: Number(amountMatch[1].replace(/\./g, "")),
-    });
-  }
-
-  const afps = [
-    "modelo",
-    "capital",
-    "habitat",
-    "provida",
-    "cuprum",
-    "planvital",
-    "uno",
-  ];
-
-  for (const afp of afps) {
-    if (q.includes(afp)) {
-      filters.push({
-        field: "entity",
-        operator: "contains",
-        value: afp,
-      });
-    }
-  }
-
-  const possibleMandantes = [
-    "mundo previsional",
-    "mundo",
-    "previsional",
-    "optimiza",
-    "optmiza",
-    "optimisa",
-    "finanfix",
-  ];
-
-  for (const mandante of possibleMandantes) {
-    if (q.includes(mandante)) {
-      const value =
-        mandante.includes("mundo") || mandante.includes("previsional")
-          ? "mundo previsional"
-          : mandante.includes("optim")
-            ? "optimiza"
-            : mandante;
-
-      filters.push({
-        field: "mandante",
-        operator: "contains",
-        value,
-      });
-
-      break;
-    }
-  }
-
-  const columns = [...DEFAULT_COLUMNS].filter((field) => fields.includes(field));
-
-  return {
-    intent:
-      q.includes("excel") || q.includes("descarg")
-        ? "export_excel"
-        : q.includes("gestionar primero") || q.includes("listos para gestionar")
-          ? "suggest_management"
-          : "query_records",
-    filters: filters.filter((f) => fields.includes(f.field)),
-    columns,
-    orderBy: fields.includes("refund_amount")
-      ? { field: "refund_amount", direction: "desc" }
-      : undefined,
-    limit: 100,
-  };
+  return String(value ?? "");
 }
 
 async function interpretWithOpenAI(
@@ -311,65 +266,113 @@ async function interpretWithOpenAI(
   previous?: ChatMemory
 ): Promise<AIQueryPlan> {
   if (!apiKey) {
-    const local = parseLocalIntent(message, fields);
-
-    return {
-      intent: local.intent || "query_records",
-      filters: local.filters || [],
-      columns: local.columns || DEFAULT_COLUMNS.filter((f) => fields.includes(f)),
-      orderBy: local.orderBy,
-      limit: local.limit || 100,
-      answerHint: "OpenAI no está configurado; se usó interpretación local.",
-    };
+    throw new Error("OPENAI_API_KEY, crm o CRM no está configurada.");
   }
 
   const system = `
 Eres el chat inteligente de OperaFix, un CRM de recuperación previsional.
 
-Tu trabajo es conversar como ChatGPT, pero conectado al CRM.
+Tu trabajo es interpretar exactamente lo que el usuario pide y convertirlo en un plan JSON seguro.
 
-Debes interpretar la solicitud del usuario y devolver SOLO JSON válido.
-
-Puedes entender errores ortográficos:
-- "mundo", "previsional", "mundo previsonal" => Mandante Mundo Previsional
-- "optmiza", "optimisa" => Optimiza
-- "cc" => Confirmación CC
-- "poder" => Confirmación Poder
-- "plata", "lucas", "monto" => Monto Devolución
+Reglas críticas:
+- Debes comportarte como ChatGPT conversando con el CRM.
+- Entiende errores ortográficos, frases incompletas y sinónimos.
+- No inventes campos: usa SOLO los campos disponibles.
+- No cambies la intención del usuario.
+- No conviertas una búsqueda normal en sugerencia.
+- Usa suggest_management solo si el usuario pide explícitamente: "sugerencias", "prioriza", "qué gestiono primero", "casos listos", "mejores condiciones para gestionar".
+- Para textos usa SIEMPRE operator "contains".
+- Para booleanos usa operator "equals" con true o false.
+- Para montos usa gt/gte/lt/lte cuando corresponda.
+- Si el usuario dice "ahora", usa el contexto anterior.
 
 Campos disponibles reales:
 ${fields.join(", ")}
 
-Campos recomendados de salida si el usuario no especifica:
-${DEFAULT_COLUMNS.filter((f) => fields.includes(f)).join(", ")}
+Equivalencias importantes:
+- Confirmación CC, CC, cuenta corriente => confirmation_cc
+- Confirmación Poder, poder => confirmation_power
+- Estado Gestión, estado, gestión => management_status
+- AFP, entidad, administradora => entity
+- Monto, plata, devolución, lucas => refund_amount
+- Razón Social, empresa, compañía => business_name
+- Grupo empresa, grupo => search_group
+- N° Solicitud, número solicitud, solicitud => request_number
+- Mundo, Previsional, Mundo Previsional, mundo previsonal => mandante contains "Mundo Previsional"
+- Optimiza, Optmiza, Optimisa => mandante contains "Optimiza"
+- Capital, AFP Capital => entity contains "Capital"
+- Modelo, AFP Modelo => entity contains "Modelo"
+- Habitat, AFP Habitat => entity contains "Habitat"
+- Provida, AFP Provida => entity contains "Provida"
+- Cuprum, AFP Cuprum => entity contains "Cuprum"
+- Planvital, AFP Planvital => entity contains "Planvital"
+- Uno, AFP Uno => entity contains "Uno"
+- Gestionado, gestionada => management_status contains "Gestionado"
+- Pendiente, pendiente gestión => management_status contains "Pendiente"
+- Pagado, pagada => management_status contains "Pag"
+- Rechazado, rechazo => management_status contains "Rechaz"
 
-Nunca inventes campos. Si el usuario pide "todos los campos", usa todos los campos disponibles.
+Devuelve SOLO JSON válido con esta estructura:
 
-Devuelve este JSON:
 {
   "intent": "query_records" | "aggregate" | "export_excel" | "suggest_management" | "general_answer",
   "filters": [
-    { "field": "campo_real", "operator": "contains|equals|gt|gte|lt|lte", "value": "valor" }
+    {
+      "field": "campo_real",
+      "operator": "contains" | "equals" | "gt" | "gte" | "lt" | "lte",
+      "value": "valor"
+    }
   ],
   "columns": ["campo_real"],
-  "orderBy": { "field": "campo_real", "direction": "asc|desc" },
+  "orderBy": {
+    "field": "campo_real",
+    "direction": "asc" | "desc"
+  },
   "groupBy": ["campo_real"],
   "limit": 100,
   "answerHint": "respuesta breve en español natural"
 }
 
-Reglas:
-- Si el usuario dice "ahora", usa el contexto anterior.
-- Si pide Excel, intent debe ser export_excel.
-- Si pide casos listos para gestionar, intent debe ser suggest_management.
-- Casos listos para gestionar = pendiente + CC sí + poder sí + monto devolución mayor a 0 + entidad asignada.
-- Si el usuario dice Confirmación CC Sí, cc sí, CC = Sí o cuenta corriente sí, usa field "confirmation_cc", operator "equals", value true.
-- Si el usuario dice Confirmación Poder Sí, poder sí o poder = Sí, usa field "confirmation_power", operator "equals", value true.
+Reglas de columnas:
+- Si el usuario pide campos específicos, usa esos campos.
+- Si el usuario pide todos los campos, usa todos los campos disponibles.
+- Si no pide campos, usa columnas principales:
+  mandante, business_name, rut, entity, management_status, refund_amount, confirmation_cc, confirmation_power, request_number.
+
+Ejemplos:
+Usuario: "muestrame mundo capital gestionado"
+JSON:
+{
+  "intent": "query_records",
+  "filters": [
+    { "field": "mandante", "operator": "contains", "value": "Mundo Previsional" },
+    { "field": "entity", "operator": "contains", "value": "Capital" },
+    { "field": "management_status", "operator": "contains", "value": "Gestionado" }
+  ],
+  "columns": ["mandante", "business_name", "rut", "entity", "management_status", "refund_amount", "confirmation_cc", "confirmation_power", "request_number"],
+  "orderBy": { "field": "refund_amount", "direction": "desc" },
+  "limit": 100,
+  "answerHint": "Busqué casos gestionados de Mundo Previsional en AFP Capital."
+}
+
+Usuario: "casos con cc si y poder no"
+JSON:
+{
+  "intent": "query_records",
+  "filters": [
+    { "field": "confirmation_cc", "operator": "equals", "value": true },
+    { "field": "confirmation_power", "operator": "equals", "value": false }
+  ],
+  "columns": ["mandante", "business_name", "rut", "entity", "management_status", "refund_amount", "confirmation_cc", "confirmation_power", "request_number"],
+  "orderBy": { "field": "refund_amount", "direction": "desc" },
+  "limit": 100,
+  "answerHint": "Busqué casos con cuenta corriente confirmada y poder pendiente."
+}
 `;
 
   const response = await openai.chat.completions.create({
     model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-    temperature: 0.1,
+    temperature: 0,
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: system },
@@ -391,9 +394,32 @@ Reglas:
 function sanitizePlan(plan: AIQueryPlan, fields: string[]): AIQueryPlan {
   const fieldSet = new Set(fields);
 
-  const filters = (plan.filters || []).filter((filter) =>
-    fieldSet.has(filter.field)
-  );
+  const filters = (plan.filters || [])
+    .filter((filter) => fieldSet.has(filter.field))
+    .map((filter) => {
+      const value = normalizePlanValue(filter.field, filter.value);
+
+      if (BOOLEAN_FIELDS.has(filter.field)) {
+        return {
+          ...filter,
+          operator: "equals" as const,
+          value,
+        };
+      }
+
+      if (NUMBER_FIELDS.has(filter.field)) {
+        return {
+          ...filter,
+          value,
+        };
+      }
+
+      return {
+        ...filter,
+        operator: filter.operator === "equals" ? ("contains" as const) : filter.operator,
+        value,
+      };
+    });
 
   const columns =
     plan.columns && plan.columns.length
@@ -423,35 +449,31 @@ function buildWhere(filters: AIFieldFilter[]): Record<string, unknown> {
 
   for (const filter of filters || []) {
     const { field, operator } = filter;
-    const value = normalizeBooleanValue(field, filter.value);
+    const value = normalizePlanValue(field, filter.value);
 
-    if (operator === "contains") {
-      AND.push({
-        [field]: {
-          contains: String(value),
-          mode: "insensitive",
-        },
-      });
+    if (BOOLEAN_FIELDS.has(field)) {
+      AND.push({ [field]: value });
+      continue;
     }
 
-    if (operator === "equals") {
-      AND.push({
-        [field]: value,
-      });
+    if (NUMBER_FIELDS.has(field)) {
+      const numericValue = parseNumber(value);
+
+      if (operator === "gt" || operator === "gte" || operator === "lt" || operator === "lte") {
+        AND.push({ [field]: { [operator]: numericValue } });
+      } else {
+        AND.push({ [field]: numericValue });
+      }
+
+      continue;
     }
 
-    if (
-      operator === "gt" ||
-      operator === "gte" ||
-      operator === "lt" ||
-      operator === "lte"
-    ) {
-      AND.push({
-        [field]: {
-          [operator]: Number(value),
-        },
-      });
-    }
+    AND.push({
+      [field]: {
+        contains: String(value),
+        mode: "insensitive",
+      },
+    });
   }
 
   return AND.length ? { AND } : {};
@@ -464,117 +486,176 @@ function buildSelect(columns: string[]): Record<string, boolean> {
   };
 }
 
+function legacyRowToAIRecord(row: any, managementType: "LM" | "TP"): Record<string, unknown> {
+  return {
+    id: row.management_id || row.id,
+    management_type: managementType,
+    mandante: row.mandante || row.mandante_name || row.client_name || null,
+    mandante_id: row.mandante_id || null,
+    search_group: row.search_group || row.grupo_empresa || null,
+    business_name: row.business_name || row.razon_social || row.company_name || null,
+    rut: row.rut || row.company_rut || null,
+    entity: row.entity || row.entidad || row.afp_name || null,
+    management_status: row.management_status || row.estado_gestion || null,
+    request_number: row.request_number || row.numero_solicitud || null,
+    refund_amount: row.refund_amount ?? row.monto_devolucion ?? null,
+    actual_paid_amount: row.actual_paid_amount ?? row.monto_pagado ?? null,
+    client_amount: row.client_amount ?? row.monto_cliente ?? null,
+    finanfix_amount: row.finanfix_amount ?? row.monto_finanfix_solutions ?? null,
+    actual_client_amount: row.actual_client_amount ?? row.monto_real_cliente ?? null,
+    actual_finanfix_amount: row.actual_finanfix_amount ?? row.monto_real_finanfix_solutions ?? null,
+    fee: row.fee ?? null,
+    confirmation_cc: Boolean(row.confirmation_cc ?? row.confirmacion_cc ?? false),
+    confirmation_power: Boolean(row.confirmation_power ?? row.confirmacion_poder ?? false),
+    bank_name: row.bank_name || row.banco || null,
+    account_type: row.account_type || row.tipo_cuenta || null,
+    account_number: row.account_number || row.numero_cuenta || null,
+    portal_access: row.portal_access || row.acceso_portal || null,
+    afp_shipment: row.afp_shipment || row.envio_afp || null,
+    client_contract_status: row.client_contract_status || row.estado_contrato_cliente || null,
+    contract_end_date: row.contract_end_date || row.fecha_termino_contrato || null,
+    excess_type_reason: row.excess_type_reason || row.motivo_tipo_exceso || null,
+    production_months: row.production_months || row.mes_produccion_2026 || null,
+    request_entry_month: row.request_entry_month || row.mes_ingreso_solicitud || null,
+    afp_submission_date: row.afp_submission_date || row.fecha_presentacion_afp || null,
+    afp_entry_date: row.afp_entry_date || row.fecha_ingreso_afp || null,
+    afp_payment_date: row.afp_payment_date || row.fecha_pago_afp || null,
+    invoice_number: row.invoice_number || row.numero_factura || null,
+    oc_number: row.oc_number || row.numero_oc || null,
+    rejection_date: row.rejection_date || row.fecha_rechazo || null,
+    rejection_reason: row.rejection_reason || row.motivo_rechazo || null,
+    cen_query: row.cen_query || row.consulta_cen || null,
+    cen_content: row.cen_content || row.contenido_cen || null,
+    cen_response: row.cen_response || row.respuesta_cen || null,
+    worker_status: row.worker_status || row.estado_trabajador || null,
+    finanfix_invoice_date: row.finanfix_invoice_date || row.fecha_factura_finanfix || null,
+    finanfix_invoice_payment_date: row.finanfix_invoice_payment_date || row.fecha_pago_factura_finanfix || null,
+    client_notification_date: row.client_notification_date || row.fecha_notificacion_cliente || null,
+    comment: row.comment || null,
+    created_at: row.created_at || null,
+    updated_at: row.updated_at || null,
+    last_activity_at: row.last_activity_at || null,
+  };
+}
+
+async function loadAllCRMRows(): Promise<Record<string, unknown>[]> {
+  const [lmRows, tpRows] = await Promise.all([
+    prisma.$queryRawUnsafe<any[]>(`
+      SELECT *
+      FROM lm_records
+      ORDER BY created_at DESC NULLS LAST
+      LIMIT 5000
+    `),
+    prisma.$queryRawUnsafe<any[]>(`
+      SELECT *
+      FROM tp_records
+      ORDER BY created_at DESC NULLS LAST
+      LIMIT 5000
+    `),
+  ]);
+
+  return [
+    ...lmRows.map((row) => legacyRowToAIRecord(row, "LM")),
+    ...tpRows.map((row) => legacyRowToAIRecord(row, "TP")),
+  ];
+}
+
+function rowMatchesFilter(row: Record<string, unknown>, filter: AIFieldFilter): boolean {
+  const fieldValue = row[filter.field];
+  const value = normalizePlanValue(filter.field, filter.value);
+
+  if (BOOLEAN_FIELDS.has(filter.field)) {
+    const rowBool = normalizeBooleanValue(fieldValue) ?? Boolean(fieldValue);
+    const targetBool = normalizeBooleanValue(value) ?? Boolean(value);
+    return rowBool === targetBool;
+  }
+
+  if (NUMBER_FIELDS.has(filter.field)) {
+    const n1 = parseNumber(fieldValue);
+    const n2 = parseNumber(value);
+
+    if (filter.operator === "gt") return n1 > n2;
+    if (filter.operator === "gte") return n1 >= n2;
+    if (filter.operator === "lt") return n1 < n2;
+    if (filter.operator === "lte") return n1 <= n2;
+
+    return n1 === n2;
+  }
+
+  return fuzzyIncludes(fieldValue, value);
+}
+
 async function runQuery(
   plan: AIQueryPlan,
   fields: string[]
 ): Promise<Record<string, unknown>[]> {
-  const safeFilters = (plan.filters || []).filter((filter) =>
-    fields.includes(filter.field)
-  );
+  const rows = await loadAllCRMRows();
 
-  const safeColumns = (plan.columns || []).filter((column) =>
-    fields.includes(column)
-  );
+  let filtered = rows.filter((row) => {
+    return (plan.filters || []).every((filter) => rowMatchesFilter(row, filter));
+  });
 
-  const safeOrderBy =
-    plan.orderBy && fields.includes(plan.orderBy.field)
-      ? plan.orderBy
-      : fields.includes("refund_amount")
-        ? { field: "refund_amount", direction: "desc" as const }
-        : undefined;
+  if (plan.orderBy?.field) {
+    filtered.sort((a, b) => {
+      const aVal = a[plan.orderBy!.field];
+      const bVal = b[plan.orderBy!.field];
 
-  const where = buildWhere(safeFilters);
+      if (NUMBER_FIELDS.has(plan.orderBy!.field)) {
+        const result = parseNumber(aVal) - parseNumber(bVal);
+        return plan.orderBy!.direction === "desc" ? result * -1 : result;
+      }
 
-  const select = buildSelect(
-    safeColumns.length
-      ? safeColumns
-      : DEFAULT_COLUMNS.filter((column) => fields.includes(column))
-  );
+      const result = String(aVal ?? "").localeCompare(String(bVal ?? ""), "es", {
+        numeric: true,
+        sensitivity: "base",
+      });
 
-  try {
-    const rows = await prisma.lmRecord.findMany({
-      where,
-      select,
-      take: plan.limit || 100,
-      orderBy: safeOrderBy
-        ? {
-            [safeOrderBy.field]: safeOrderBy.direction,
-          }
-        : undefined,
+      return plan.orderBy!.direction === "desc" ? result * -1 : result;
     });
-
-    return rows as unknown as Record<string, unknown>[];
-  } catch (error) {
-    console.error("ERROR RUNQUERY IA:", error);
-
-    return [];
   }
+
+  const columns = plan.columns?.length ? plan.columns : DEFAULT_COLUMNS;
+
+  return filtered.slice(0, plan.limit || 100).map((row) => {
+    const result: Record<string, unknown> = { id: row.id };
+
+    for (const column of columns) {
+      result[column] = row[column];
+    }
+
+    return result;
+  });
 }
 
 async function runSuggestions(fields: string[]): Promise<Record<string, unknown>[]> {
-  const columns = DEFAULT_COLUMNS.filter((field) => fields.includes(field));
+  const rows = await loadAllCRMRows();
 
-  try {
-    const rows = await prisma.lmRecord.findMany({
-      where: {
-        AND: [
-          fields.includes("management_status")
-            ? {
-                management_status: {
-                  contains: "pendiente",
-                  mode: "insensitive",
-                },
-              }
-            : {},
-          fields.includes("refund_amount")
-            ? {
-                refund_amount: {
-                  gt: 0,
-                },
-              }
-            : {},
-        ],
-      },
-      select: buildSelect(columns),
-      take: 300,
-      orderBy: fields.includes("refund_amount")
-        ? {
-            refund_amount: "desc",
-          }
-        : undefined,
-    });
+  const filtered = rows
+    .filter((row) => {
+      const isPending = fuzzyIncludes(row.management_status, "Pendiente");
+      const hasCc = isTruthySi(row.confirmation_cc);
+      const hasPower = isTruthySi(row.confirmation_power);
+      const hasEntity = Boolean(normalize(row.entity));
+      const hasAmount = parseNumber(row.refund_amount) > 0;
 
-    return (rows as unknown as Record<string, unknown>[])
-      .filter((row) => {
-        const hasCc = fields.includes("confirmation_cc")
-          ? isTruthySi(row.confirmation_cc)
-          : true;
+      return isPending && hasCc && hasPower && hasEntity && hasAmount;
+    })
+    .sort((a, b) => parseNumber(b.refund_amount) - parseNumber(a.refund_amount))
+    .slice(0, 100);
 
-        const hasPower = fields.includes("confirmation_power")
-          ? isTruthySi(row.confirmation_power)
-          : true;
+  return filtered.map((row) => {
+    const result: Record<string, unknown> = { id: row.id };
 
-        const hasEntity = fields.includes("entity")
-          ? normalize(row.entity) && !normalize(row.entity).includes("pendiente")
-          : true;
+    for (const column of DEFAULT_COLUMNS) {
+      result[column] = row[column];
+    }
 
-        const hasAmount = Number(row.refund_amount || 0) > 0;
-
-        return hasCc && hasPower && hasEntity && hasAmount;
-      })
-      .slice(0, 100);
-  } catch (error) {
-    console.error("ERROR RUNSUGGESTIONS IA:", error);
-
-    return [];
-  }
+    return result;
+  });
 }
 
 function buildAnswer(plan: AIQueryPlan, rows: Record<string, unknown>[]): string {
-  const totalMonto = rows.reduce(
-    (acc, row) => acc + Number(row.refund_amount || 0),
-    0
-  );
+  const totalMonto = rows.reduce((acc, row) => acc + parseNumber(row.refund_amount), 0);
 
   if (plan.intent === "suggest_management") {
     return `Encontré ${rows.length} casos que están en mejores condiciones para gestionar. Priorizo los que tienen monto, estado pendiente, entidad asignada, Confirmación CC y Confirmación Poder. Monto total aproximado: ${money(totalMonto)}.`;
@@ -582,6 +663,10 @@ function buildAnswer(plan: AIQueryPlan, rows: Record<string, unknown>[]): string
 
   if (plan.intent === "export_excel") {
     return `Preparé la última consulta para descarga en Excel. Hay ${rows.length} registros en el resultado actual.`;
+  }
+
+  if (plan.answerHint) {
+    return `${plan.answerHint} Encontré ${rows.length} registros. Monto Devolución total aproximado: ${money(totalMonto)}.`;
   }
 
   return `Encontré ${rows.length} registros según tu solicitud. Monto Devolución total aproximado: ${money(totalMonto)}.`;
@@ -615,14 +700,14 @@ router.post("/message", async (req, res) => {
       });
     }
 
-    const fields = getLmRecordFields();
+    const fields = CRM_FIELDS;
     const previous = memory.get(userId);
 
     let plan = await interpretWithOpenAI(message, fields, previous);
     plan = sanitizePlan(plan, fields);
 
     if (
-      message.toLowerCase().includes("ahora") &&
+      normalize(message).includes("ahora") &&
       previous?.lastPlan &&
       plan.filters.length === 0
     ) {
@@ -663,10 +748,14 @@ router.post("/message", async (req, res) => {
   } catch (error) {
     console.error("ERROR IA CHAT:", error);
 
-    return res.status(500).json({
+    return res.status(200).json({
       success: false,
-      answer: "No pude procesar la solicitud del CRM.",
+      answer:
+        "No pude procesar la solicitud del CRM. Revisa que OPENAI_API_KEY o crm esté configurada y que existan las tablas lm_records/tp_records.",
       error: error instanceof Error ? error.message : "Error desconocido",
+      rows: [],
+      columns: [],
+      canExport: false,
     });
   }
 });
