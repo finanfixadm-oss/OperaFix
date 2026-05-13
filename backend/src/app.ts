@@ -19,6 +19,7 @@ import usersRouter from "./routes/users.js";
 import portalRouter from "./routes/portal.js";
 import reportBuilderRouter from "./routes/report-builder.js";
 import auditRouter from "./routes/audit.js";
+import aiChatRoutes from "./routes/ai-chat.js";
 
 import dashboardRoutes from "./routes/dashboard.js";
 import automationRoutes from "./routes/automation.js";
@@ -50,6 +51,7 @@ app.use("/api/automation", automationRoutes);
 app.use("/api/ai-actions", aiExecuteRoutes);
 app.use("/api/ai-suggestions", aiSuggestionsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/ai-chat", aiChatRoutes);
 
 app.get("/", (_req, res) => {
   res.json({ status: "OK DESDE SERVER" });
