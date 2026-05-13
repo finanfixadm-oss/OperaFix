@@ -1,364 +1,312 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 
 const API_BASE = "https://operafix-production.up.railway.app";
+const USER_ID = "default";
 
-type AiPreviewRecord = {
-  id: string;
-  management_id?: string | null;
-  mandante?: string | null;
-  business_name?: string | null;
-  rut?: string | null;
-  request_number?: string | null;
-  refund_amount?: number | string | null;
-  management_status?: string | null;
-  entity?: string | null;
-  confirmation_cc?: boolean | null;
-  confirmation_power?: boolean | null;
+type AIColumn = {
+  field: string;
+  label: string;
 };
 
-type AiResult = {
-  success?: boolean;
-  mode?: string;
-  message?: string;
-  previewCount?: number;
-  totalAmount?: number;
-  preview?: AiPreviewRecord[];
-  error?: unknown;
-  where?: unknown;
+type AIMessage = {
+  role: "user" | "assistant";
+  text: string;
+  rows?: Record<string, unknown>[];
+  columns?: AIColumn[];
+  canExport?: boolean;
 };
 
-type SuggestionRecord = {
-  id: string;
-  management_id?: string | null;
-  mandante: string;
-  business_name: string;
-  rut: string;
-  request_number: string;
-  refund_amount: number;
-  management_status: string;
-  entity: string;
-  confirmation_cc: boolean;
-  confirmation_power: boolean;
-  document_count: number;
-  document_categories: string[];
-  score: number;
-  suggestedAction: string;
-  reason: string;
-  nextSteps: string[];
-  checklist: Record<string, boolean>;
-};
-
-export default function AICommandCenterPage() {
-  const [prompt, setPrompt] = useState("");
-  const [result, setResult] = useState<AiResult | null>(null);
-  const [suggestions, setSuggestions] = useState<SuggestionRecord[]>([]);
-  const [savedPrompts, setSavedPrompts] = useState<string[]>([]);
+export default function AIChatCRMPage() {
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState<AIMessage[]>([
+    {
+      role: "assistant",
+      text:
+        "Hola. Soy la IA conversacional de OperaFix. Puedes pedirme casos, filtros, agrupaciones, análisis y luego decirme: “ahora descárgalo en Excel”.",
+    },
+  ]);
   const [loading, setLoading] = useState(false);
-  const [selectedSuggestion, setSelectedSuggestion] = useState<SuggestionRecord | null>(null);
 
-  useEffect(() => {
-    loadSuggestions();
-    const stored = localStorage.getItem("operafix_prompts");
-    if (stored) {
-      setSavedPrompts(JSON.parse(stored));
-    }
-  }, []);
+  const send = async () => {
+    const text = input.trim();
+    if (!text) return;
 
-  const formatCLP = (value: unknown) =>
-    Number(value || 0).toLocaleString("es-CL", {
-      style: "currency",
-      currency: "CLP",
-      maximumFractionDigits: 0,
-    });
-
-  const topSuggestions = useMemo(() => suggestions.slice(0, 30), [suggestions]);
-
-  const loadSuggestions = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/ai-suggestions/suggestions`);
-      const json = await res.json();
-      if (!res.ok) {
-        setResult({ success: false, error: json });
-        return;
-      }
-      if (json.success) {
-        setSuggestions(json.suggestions || []);
-        setSelectedSuggestion(json.suggestions?.[0] || null);
-      }
-    } catch (err) {
-      setResult({ success: false, error: err instanceof Error ? err.message : "Error cargando sugerencias" });
-    }
-  };
-
-  const executeAI = async () => {
-    if (!prompt.trim()) return;
+    setInput("");
     setLoading(true);
+
+    setMessages((prev) => [...prev, { role: "user", text }]);
+
     try {
-      const res = await fetch(`${API_BASE}/api/ai-actions/execute`, {
+      const res = await fetch(`${API_BASE}/api/ai-chat/message`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          text: prompt,
-          action: "get",
-          limit: 100,
+          message: text,
+          userId: USER_ID,
         }),
       });
+
       const json = await res.json();
-      if (!res.ok) {
-        setResult({ success: false, error: json });
-        return;
-      }
-      setResult(json);
-    } catch (err) {
-      setResult({ success: false, error: err instanceof Error ? err.message : "Error ejecutando consulta IA" });
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: json.answer || "No pude generar una respuesta.",
+          rows: json.rows || [],
+          columns: json.columns || [],
+          canExport: json.canExport,
+        },
+      ]);
+    } catch (error) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: "No pude conectar con el motor IA del CRM.",
+        },
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
-  const savePrompt = () => {
-    if (!prompt.trim()) return;
-    const cleaned = prompt.trim();
-    const updated = [cleaned, ...savedPrompts.filter((item) => item !== cleaned)].slice(0, 30);
-    setSavedPrompts(updated);
-    localStorage.setItem("operafix_prompts", JSON.stringify(updated));
-  };
-
-  const removePrompt = (index: number) => {
-    const updated = savedPrompts.filter((_, i) => i !== index);
-    setSavedPrompts(updated);
-    localStorage.setItem("operafix_prompts", JSON.stringify(updated));
-  };
-
-  const prepareSuggestion = (suggestion: SuggestionRecord) => {
-    setSelectedSuggestion(suggestion);
-    setResult({
-      success: true,
-      mode: "suggestion-detail",
-      message: "Detalle de gestión sugerida. No se ejecutó ningún cambio automático.",
-      previewCount: 1,
-      totalAmount: suggestion.refund_amount,
-      preview: [
-        {
-          id: suggestion.id,
-          management_id: suggestion.management_id,
-          mandante: suggestion.mandante,
-          business_name: suggestion.business_name,
-          rut: suggestion.rut,
-          request_number: suggestion.request_number,
-          refund_amount: suggestion.refund_amount,
-          management_status: suggestion.management_status,
-          entity: suggestion.entity,
-          confirmation_cc: suggestion.confirmation_cc,
-          confirmation_power: suggestion.confirmation_power,
-        },
-      ],
-    });
+  const downloadExcel = () => {
+    window.open(`${API_BASE}/api/ai-chat/export?userId=${USER_ID}`, "_blank");
   };
 
   return (
     <div style={page}>
       <aside style={sidebar}>
-        <h2 style={{ marginTop: 0 }}>🧠 Prompts IA</h2>
-        <button onClick={savePrompt} style={saveBtn}>➕ Guardar prompt</button>
+        <h2>🧠 OperaFix IA</h2>
 
-        <div style={{ display: "grid", gap: 10 }}>
-          {savedPrompts.map((p, i) => (
-            <div key={`${p}-${i}`} style={promptCard} onClick={() => setPrompt(p)}>
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>{p.slice(0, 80)}</div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removePrompt(i);
-                }}
-                style={deleteBtn}
-              >
-                Eliminar
-              </button>
-            </div>
-          ))}
-        </div>
+        <button
+          style={promptBtn}
+          onClick={() =>
+            setInput(
+              "Muéstrame todos los casos con Confirmación CC sí, Confirmación Poder sí y Estado Gestión Pendiente Gestión, con Razón Social, RUT, Entidad, Monto Devolución y N° Solicitud"
+            )
+          }
+        >
+          Casos listos para gestionar
+        </button>
+
+        <button
+          style={promptBtn}
+          onClick={() =>
+            setInput(
+              "Dame los casos pendientes de Mundo Previsional ordenados por mayor Monto Devolución"
+            )
+          }
+        >
+          Pendientes Mundo Previsional
+        </button>
+
+        <button
+          style={promptBtn}
+          onClick={() =>
+            setInput("Qué casos están en mejores condiciones para gestionar")
+          }
+        >
+          Sugerencias de gestión
+        </button>
       </aside>
 
       <main style={main}>
-        <section style={card}>
-          <h1 style={{ margin: 0 }}>🚀 AI Command Center</h1>
-          <p style={muted}>Consulta datos reales del CRM. La IA muestra detalle; no hace cambios masivos automáticos.</p>
+        <section style={chatBox}>
+          {messages.map((message, index) => (
+            <div
+              key={index}
+              style={{
+                ...bubble,
+                alignSelf: message.role === "user" ? "flex-end" : "flex-start",
+                background: message.role === "user" ? "#dbeafe" : "#ffffff",
+              }}
+            >
+              <strong>{message.role === "user" ? "Tú" : "IA OperaFix"}</strong>
+              <p>{message.text}</p>
 
+              {message.rows && message.rows.length > 0 && (
+                <div style={tableWrap}>
+                  <table style={table}>
+                    <thead>
+                      <tr>
+                        {(message.columns || Object.keys(message.rows[0]).map((field) => ({ field, label: field }))).map(
+                          (column) => (
+                            <th key={column.field} style={th}>
+                              {column.label}
+                            </th>
+                          )
+                        )}
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {message.rows.slice(0, 50).map((row, rowIndex) => (
+                        <tr key={rowIndex}>
+                          {(message.columns || Object.keys(row).map((field) => ({ field, label: field }))).map(
+                            (column) => (
+                              <td key={column.field} style={td}>
+                                {String(row[column.field] ?? "—")}
+                              </td>
+                            )
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {message.canExport && (
+                <button style={downloadBtn} onClick={downloadExcel}>
+                  Descargar resultado en Excel
+                </button>
+              )}
+            </div>
+          ))}
+
+          {loading && <div style={loadingBox}>Pensando con IA...</div>}
+        </section>
+
+        <footer style={composer}>
           <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Ej: dame los casos pendientes de gestión de Mundo Previsional con monto, CC y poder"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Escribe como en ChatGPT: dame pendientes de Mundo Previsional con CC sí y poder sí..."
             style={textarea}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
           />
 
-          <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
-            <button onClick={executeAI} disabled={loading || !prompt.trim()} style={primaryBtn}>🔎 Consultar</button>
-            <button
-              onClick={() => setPrompt("dame los casos pendientes de gestión de Mundo Previsional con monto, CC, poder y AFP")}
-              style={secondaryBtn}
-            >
-              ⚡ Ejemplo consulta
-            </button>
-            <button
-              onClick={() => setPrompt("qué casos están listos para gestionar esta semana")}
-              style={secondaryBtn}
-            >
-              ✅ Ejemplo sugerencias
-            </button>
-          </div>
-
-          {loading && <p style={muted}>Procesando IA...</p>}
-        </section>
-
-        {result && (
-          <section style={card}>
-            <h2>Resultado</h2>
-            {result.message && <p style={muted}>{result.message}</p>}
-            {typeof result.totalAmount !== "undefined" && <h3>Total monto: {formatCLP(result.totalAmount)}</h3>}
-            {typeof result.previewCount !== "undefined" && <p>Registros encontrados: <strong>{result.previewCount}</strong></p>}
-            {result.error ? <pre style={pre}>{JSON.stringify(result.error, null, 2)}</pre> : null}
-            {result.preview?.length ? <PreviewTable records={result.preview} /> : null}
-          </section>
-        )}
-
-        <section style={card}>
-          <h2>🤖 Sugerencias IA: gestiones listas</h2>
-          <p style={muted}>
-            Se sugieren solo casos con condiciones operativas favorables: monto, CC en Sí, poder en Sí, AFP asignada, estado pendiente y documentos/detalle cargados.
-          </p>
-
-          <div style={suggestionLayout}>
-            <div style={{ overflowX: "auto" }}>
-              <table style={table}>
-                <thead>
-                  <tr>
-                    <th style={th}>Empresa</th>
-                    <th style={th}>Mandante</th>
-                    <th style={th}>AFP</th>
-                    <th style={th}>Monto</th>
-                    <th style={th}>CC</th>
-                    <th style={th}>Poder</th>
-                    <th style={th}>Docs</th>
-                    <th style={th}>Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topSuggestions.map((s) => (
-                    <tr
-                      key={s.id}
-                      onClick={() => setSelectedSuggestion(s)}
-                      style={{ cursor: "pointer", background: selectedSuggestion?.id === s.id ? "#eef6ff" : "transparent" }}
-                    >
-                      <td style={td}>{s.business_name}</td>
-                      <td style={td}>{s.mandante}</td>
-                      <td style={td}>{s.entity}</td>
-                      <td style={td}>{formatCLP(s.refund_amount)}</td>
-                      <td style={td}>{s.confirmation_cc ? "Sí" : "No"}</td>
-                      <td style={td}>{s.confirmation_power ? "Sí" : "No"}</td>
-                      <td style={td}>{s.document_count}</td>
-                      <td style={td}>{Math.round(s.score)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <aside style={sidePanel}>
-              {selectedSuggestion ? (
-                <>
-                  <h3>{selectedSuggestion.suggestedAction}</h3>
-                  <p style={muted}>{selectedSuggestion.reason}</p>
-                  <Row label="Empresa" value={selectedSuggestion.business_name} />
-                  <Row label="RUT" value={selectedSuggestion.rut || "—"} />
-                  <Row label="Mandante" value={selectedSuggestion.mandante} />
-                  <Row label="AFP" value={selectedSuggestion.entity} />
-                  <Row label="Estado" value={selectedSuggestion.management_status} />
-                  <Row label="Monto" value={formatCLP(selectedSuggestion.refund_amount)} />
-                  <Row label="N° Solicitud" value={selectedSuggestion.request_number || "—"} />
-                  <Row label="Documentos" value={`${selectedSuggestion.document_count}`} />
-                  <Row label="Categorías" value={selectedSuggestion.document_categories.join(", ") || "—"} />
-                  <h4>Próximos pasos</h4>
-                  <ul>
-                    {selectedSuggestion.nextSteps.map((step) => <li key={step}>{step}</li>)}
-                  </ul>
-                  <button style={primaryBtn} onClick={() => prepareSuggestion(selectedSuggestion)}>Ver detalle</button>
-                </>
-              ) : (
-                <p style={muted}>Selecciona una sugerencia.</p>
-              )}
-            </aside>
-          </div>
-        </section>
+          <button style={sendBtn} onClick={send} disabled={loading}>
+            Enviar
+          </button>
+        </footer>
       </main>
     </div>
   );
 }
 
-function PreviewTable({ records }: { records: AiPreviewRecord[] }) {
-  const formatCLP = (value: unknown) =>
-    Number(value || 0).toLocaleString("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
+const page: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "300px 1fr",
+  minHeight: "calc(100vh - 80px)",
+  background: "#f8fafc",
+};
 
-  return (
-    <div style={{ overflowX: "auto" }}>
-      <table style={table}>
-        <thead>
-          <tr>
-            <th style={th}>Empresa</th>
-            <th style={th}>Mandante</th>
-            <th style={th}>RUT</th>
-            <th style={th}>AFP</th>
-            <th style={th}>Estado</th>
-            <th style={th}>Monto</th>
-            <th style={th}>CC</th>
-            <th style={th}>Poder</th>
-            <th style={th}>N° Solicitud</th>
-          </tr>
-        </thead>
-        <tbody>
-          {records.map((record) => (
-            <tr key={record.id}>
-              <td style={td}>{record.business_name || "—"}</td>
-              <td style={td}>{record.mandante || "—"}</td>
-              <td style={td}>{record.rut || "—"}</td>
-              <td style={td}>{record.entity || "—"}</td>
-              <td style={td}>{record.management_status || "—"}</td>
-              <td style={td}>{formatCLP(record.refund_amount)}</td>
-              <td style={td}>{record.confirmation_cc ? "Sí" : "No"}</td>
-              <td style={td}>{record.confirmation_power ? "Sí" : "No"}</td>
-              <td style={td}>{record.request_number || "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+const sidebar: React.CSSProperties = {
+  background: "#0f172a",
+  color: "#fff",
+  padding: 20,
+};
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={row}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
+const promptBtn: React.CSSProperties = {
+  width: "100%",
+  marginBottom: 10,
+  padding: 12,
+  borderRadius: 10,
+  border: "1px solid #334155",
+  background: "#1e293b",
+  color: "#fff",
+  cursor: "pointer",
+  textAlign: "left",
+};
 
-const page: React.CSSProperties = { display: "grid", gridTemplateColumns: "300px 1fr", minHeight: "100vh", background: "#f1f5f9" };
-const sidebar: React.CSSProperties = { background: "#0f172a", color: "#fff", padding: 20, overflowY: "auto" };
-const main: React.CSSProperties = { padding: 24, overflowY: "auto" };
-const card: React.CSSProperties = { background: "#fff", borderRadius: 16, padding: 24, marginBottom: 20, border: "1px solid #ddd", boxShadow: "0 10px 25px rgba(15,23,42,0.05)" };
-const muted: React.CSSProperties = { color: "#64748b" };
-const textarea: React.CSSProperties = { width: "100%", minHeight: 115, padding: 16, borderRadius: 12, border: "1px solid #cbd5e1", marginTop: 16 };
-const primaryBtn: React.CSSProperties = { border: 0, borderRadius: 10, padding: "10px 14px", background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 700 };
-const secondaryBtn: React.CSSProperties = { border: "1px solid #cbd5e1", borderRadius: 10, padding: "10px 14px", background: "#fff", color: "#0f172a", cursor: "pointer", fontWeight: 600 };
-const saveBtn: React.CSSProperties = { width: "100%", marginBottom: 20, padding: 10, borderRadius: 10, border: "none", background: "#2563eb", color: "#fff", cursor: "pointer" };
-const deleteBtn: React.CSSProperties = { marginTop: 6, background: "transparent", border: "none", color: "#f87171", cursor: "pointer" };
-const promptCard: React.CSSProperties = { background: "#1e293b", padding: 12, borderRadius: 10, cursor: "pointer" };
-const pre: React.CSSProperties = { background: "#0f172a", color: "#fff", padding: 20, borderRadius: 12, overflowX: "auto" };
-const table: React.CSSProperties = { width: "100%", borderCollapse: "collapse" };
-const th: React.CSSProperties = { textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 10, color: "#475569", whiteSpace: "nowrap" };
-const td: React.CSSProperties = { borderBottom: "1px solid #f1f5f9", padding: 10, verticalAlign: "top" };
-const suggestionLayout: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 390px", gap: 16, marginTop: 16 };
-const sidePanel: React.CSSProperties = { border: "1px solid #e5e7eb", borderRadius: 14, padding: 16, background: "#f8fafc" };
-const row: React.CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, borderBottom: "1px solid #e5e7eb", padding: "9px 0" };
+const main: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  height: "calc(100vh - 80px)",
+};
+
+const chatBox: React.CSSProperties = {
+  flex: 1,
+  display: "flex",
+  flexDirection: "column",
+  gap: 18,
+  padding: 24,
+  overflowY: "auto",
+};
+
+const bubble: React.CSSProperties = {
+  maxWidth: "92%",
+  border: "1px solid #dbe3ef",
+  borderRadius: 16,
+  padding: 16,
+  boxShadow: "0 8px 20px rgba(15,23,42,0.04)",
+};
+
+const tableWrap: React.CSSProperties = {
+  marginTop: 14,
+  overflowX: "auto",
+  border: "1px solid #e2e8f0",
+  borderRadius: 12,
+};
+
+const table: React.CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  background: "#fff",
+};
+
+const th: React.CSSProperties = {
+  padding: 10,
+  borderBottom: "1px solid #e2e8f0",
+  textAlign: "left",
+  fontSize: 13,
+  whiteSpace: "nowrap",
+};
+
+const td: React.CSSProperties = {
+  padding: 10,
+  borderBottom: "1px solid #f1f5f9",
+  fontSize: 13,
+  whiteSpace: "nowrap",
+};
+
+const composer: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 120px",
+  gap: 12,
+  padding: 16,
+  borderTop: "1px solid #e2e8f0",
+  background: "#fff",
+};
+
+const textarea: React.CSSProperties = {
+  minHeight: 70,
+  padding: 12,
+  borderRadius: 12,
+  border: "1px solid #cbd5e1",
+  resize: "vertical",
+};
+
+const sendBtn: React.CSSProperties = {
+  border: 0,
+  borderRadius: 12,
+  background: "#2563eb",
+  color: "#fff",
+  fontWeight: 700,
+  cursor: "pointer",
+};
+
+const downloadBtn: React.CSSProperties = {
+  marginTop: 12,
+  padding: "10px 14px",
+  border: 0,
+  borderRadius: 10,
+  background: "#16a34a",
+  color: "#fff",
+  fontWeight: 700,
+  cursor: "pointer",
+};
+
+const loadingBox: React.CSSProperties = {
+  color: "#64748b",
+};
