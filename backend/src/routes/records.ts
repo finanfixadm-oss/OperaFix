@@ -1070,69 +1070,148 @@ async function ensureRecordContext(body: any) {
   };
 }
 
-recordsRouter.get("/", async (req, res, next) => {
+recordsRouter.get("/", async (req, res) => {
   try {
-    const mandanteId =
-      typeof req.query.mandante_id === "string"
-        ? req.query.mandante_id
-        : undefined;
-
     const search =
       typeof req.query.search === "string"
-        ? req.query.search.trim()
+        ? req.query.search.trim().toLowerCase()
         : "";
 
-    const where: any = {};
+    const [lmRows, tpRows] = await Promise.all([
+      prisma.$queryRawUnsafe<any[]>(`
+        SELECT *
+        FROM lm_records
+        ORDER BY created_at DESC NULLS LAST
+        LIMIT 5000
+      `),
 
-    // 🔥 SOLO agregamos si existe (clave)
-    if (mandanteId) {
-      where.mandante_id = mandanteId;
-    }
+      prisma.$queryRawUnsafe<any[]>(`
+        SELECT *
+        FROM tp_records
+        ORDER BY created_at DESC NULLS LAST
+        LIMIT 5000
+      `),
+    ]);
+
+    let rows = [
+      ...lmRows.map((row: any) => ({
+        id: row.management_id || row.id,
+        management_type: "LM",
+        mandante: row.mandante ? { name: row.mandante } : null,
+        mandante_id: row.mandante_id || null,
+        entidad: row.entity,
+        rut: row.rut,
+        estado_gestion: row.management_status,
+        monto_devolucion: row.refund_amount,
+        monto_pagado: row.actual_paid_amount,
+        monto_cliente: row.client_amount,
+        monto_finanfix_solutions: row.finanfix_amount,
+        monto_real_cliente: row.actual_client_amount,
+        monto_real_finanfix_solutions: row.actual_finanfix_amount,
+        fee: row.fee,
+        razon_social: row.business_name,
+        numero_solicitud: row.request_number,
+        grupo_empresa: row.search_group,
+        confirmacion_cc: row.confirmation_cc,
+        confirmacion_poder: row.confirmation_power,
+        banco: row.bank_name,
+        tipo_cuenta: row.account_type,
+        numero_cuenta: row.account_number,
+        acceso_portal: row.portal_access,
+        motivo_tipo_exceso: row.excess_type_reason,
+        mes_produccion_2026: row.production_months,
+        estado_contrato_cliente: row.client_contract_status,
+        fecha_rechazo: row.rejection_date,
+        motivo_rechazo: row.rejection_reason,
+        envio_afp: row.afp_shipment,
+        fecha_ingreso_afp: row.afp_entry_date,
+        fecha_presentacion_afp: row.afp_submission_date,
+        fecha_pago_afp: row.afp_payment_date,
+        fecha_factura_finanfix: row.finanfix_invoice_date,
+        fecha_pago_factura_finanfix: row.finanfix_invoice_payment_date,
+        fecha_notificacion_cliente: row.client_notification_date,
+        numero_factura: row.invoice_number,
+        numero_oc: row.oc_number,
+        consulta_cen: row.cen_query,
+        contenido_cen: row.cen_content,
+        respuesta_cen: row.cen_response,
+        estado_trabajador: row.worker_status,
+        comment: row.comment,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        last_activity_at: row.last_activity_at,
+        company: {
+          razon_social: row.business_name,
+          rut: row.rut,
+        },
+        lineAfp: {
+          afp_name: row.entity,
+        },
+        documents: [],
+        notes: [],
+        activities: [],
+      })),
+
+      ...tpRows.map((row: any) => ({
+        id: row.management_id || row.id,
+        management_type: "TP",
+        mandante: row.mandante ? { name: row.mandante } : null,
+        mandante_id: row.mandante_id || null,
+        entidad: row.entity,
+        rut: row.rut,
+        estado_gestion: row.management_status,
+        monto_devolucion: row.refund_amount,
+        razon_social: row.business_name,
+        numero_solicitud: row.request_number,
+        grupo_empresa: row.search_group,
+        banco: row.bank_name,
+        tipo_cuenta: row.account_type,
+        numero_cuenta: row.account_number,
+        acceso_portal: row.portal_access,
+        mes_produccion_2026: row.production_months,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        last_activity_at: row.last_activity_at,
+        company: {
+          razon_social: row.business_name,
+          rut: row.rut,
+        },
+        lineAfp: {
+          afp_name: row.entity,
+        },
+        documents: [],
+        notes: [],
+        activities: [],
+      })),
+    ];
 
     if (search) {
-      where.OR = [
-        { razon_social: { contains: search, mode: "insensitive" } },
-        { rut: { contains: search, mode: "insensitive" } },
-        { entidad: { contains: search, mode: "insensitive" } },
-        { estado_gestion: { contains: search, mode: "insensitive" } },
-        { numero_solicitud: { contains: search, mode: "insensitive" } },
-        { grupo_empresa: { contains: search, mode: "insensitive" } },
-      ];
-    }
+      rows = rows.filter((row: any) => {
+        const text = [
+          row.razon_social,
+          row.rut,
+          row.entidad,
+          row.estado_gestion,
+          row.numero_solicitud,
+          row.grupo_empresa,
+          row.mandante?.name,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
 
-    try {
-      const rows = await prisma.management.findMany({
-        where,
-        include: { mandante: true, group: true, company: true, line: true, lineAfp: true, documents: true },
-        orderBy: { created_at: "desc" },
+        return text.includes(search);
       });
-      return res.json(rows);
-    } catch (managementError: any) {
-      console.error("ERROR /api/records usando managements:", managementError?.message || managementError);
-      const [lmRows, tpRows] = await Promise.all([
-  prisma.$queryRawUnsafe<any[]>(`
-    SELECT *
-    FROM lm_records
-    ORDER BY created_at DESC NULLS LAST
-    LIMIT 5000
-  `),
-
-  prisma.$queryRawUnsafe<any[]>(`
-    SELECT *
-    FROM tp_records
-    ORDER BY created_at DESC NULLS LAST
-    LIMIT 5000
-  `),
-]);
-      const legacyRows = [
-        ...lmRows.map((row: any) => ({ id: row.management_id || row.id, management_type: "LM", entidad: row.entity, rut: row.rut, estado_gestion: row.management_status, monto_devolucion: row.refund_amount, razon_social: row.business_name, numero_solicitud: row.request_number, grupo_empresa: row.search_group, confirmacion_cc: row.confirmation_cc, confirmacion_poder: row.confirmation_power, banco: row.bank_name, tipo_cuenta: row.account_type, numero_cuenta: row.account_number, acceso_portal: row.portal_access, motivo_tipo_exceso: row.motivo_tipo_exceso || row.excess_type_reason, mes_produccion_2026: row.mes_produccion_2026, mandante: row.mandante ? { name: row.mandante } : null, company: { razon_social: row.business_name, rut: row.rut }, lineAfp: { afp_name: row.entity }, documents: [] })),
-        ...tpRows.map((row: any) => ({ id: row.management_id || row.id, management_type: "TP", entidad: row.entity, rut: row.rut, estado_gestion: row.management_status, monto_devolucion: row.refund_amount, razon_social: row.business_name, numero_solicitud: row.request_number, grupo_empresa: row.search_group, banco: row.bank_name, tipo_cuenta: row.account_type, numero_cuenta: row.account_number, acceso_portal: row.acceso_portal || row.portal_access, mes_produccion_2026: row.mes_produccion_2026, mandante: row.mandante ? { name: row.mandante } : null, company: { razon_social: row.business_name, rut: row.rut }, lineAfp: { afp_name: row.entity }, documents: [] })),
-      ];
-      return res.json(legacyRows);
     }
+
+    return res.json(rows);
   } catch (error: any) {
-    console.error("ERROR FINAL /api/records:", error?.message || error);
-    res.status(500).json({ message: "No se pudieron cargar los registros de empresas.", detail: process.env.NODE_ENV === "production" ? undefined : String(error?.message || error) });
+    console.error("ERROR /api/records SQL directo:", error?.message || error);
+
+    return res.status(500).json({
+      message: "No se pudieron cargar los registros de empresas.",
+      detail: String(error?.message || error),
+    });
   }
 });
 
