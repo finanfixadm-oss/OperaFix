@@ -75,14 +75,8 @@ export default function App() {
             }
           />
 
-          <Route
-            path="/ia-gestiones"
-            element={
-              <ProtectedRoute roles={["admin", "interno", "kam"]}>
-                <AiGestionesPage />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/ia-gestiones" element={<Navigate to="/ai-command-center" replace />} />
+                       
 
           <Route
             path="/carga-masiva"
