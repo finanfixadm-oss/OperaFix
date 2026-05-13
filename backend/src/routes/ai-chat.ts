@@ -109,18 +109,6 @@ const DEFAULT_COLUMNS = [
   "request_number",
 ];
 
-const MONEY_FIELDS = new Set([
-  "refund_amount",
-  "actual_paid_amount",
-  "monto_cliente",
-  "monto_finanfix_solutions",
-  "monto_real_cliente",
-  "monto_real_finanfix_solutions",
-  "fee",
-]);
-
-const BOOLEAN_FIELDS = new Set(["confirmation_cc", "confirmation_power"]);
-
 function getLmRecordFieldMeta(): FieldMeta[] {
   const model = Prisma.dmmf.datamodel.models.find((m) => m.name === "LmRecord");
 
@@ -217,209 +205,101 @@ function normalizeBooleanValue(value: unknown): boolean | null {
   return null;
 }
 
-function parseLocalIntent(message: string, fields: string[]): Partial<AIQueryPlan> {
-  const q = normalize(message);
-  const filters: AIFieldFilter[] = [];
-
-  if (q.includes("pendiente")) {
-    filters.push({ field: "management_status", operator: "contains", value: "pendiente" });
-  }
-
-  if (q.includes("pagado") || q.includes("pagada")) {
-    filters.push({ field: "management_status", operator: "contains", value: "pag" });
-  }
-
-  if (q.includes("rechaz")) {
-    filters.push({ field: "management_status", operator: "contains", value: "rechaz" });
-  }
-
-  if (
-    q.includes("cc si") ||
-    q.includes("cc = si") ||
-    q.includes("confirmacion cc si") ||
-    q.includes("confirmacion cc = si") ||
-    q.includes("cuenta corriente si") ||
-    q.includes("con cc")
-  ) {
-    filters.push({ field: "confirmation_cc", operator: "equals", value: true });
-  }
-
-  if (
-    q.includes("poder si") ||
-    q.includes("poder = si") ||
-    q.includes("confirmacion poder si") ||
-    q.includes("confirmacion poder = si") ||
-    q.includes("con poder")
-  ) {
-    filters.push({ field: "confirmation_power", operator: "equals", value: true });
-  }
-
-  const amountMatch = q.match(/(?:sobre|mayor a|mas de|más de|>=|>)\s*\$?\s*([\d\.]+)/);
-  if (amountMatch) {
-    const amount = parseNumber(amountMatch[1]);
-    if (amount !== null) {
-      filters.push({ field: "refund_amount", operator: "gt", value: amount });
-    }
-  }
-
-  const afps = ["modelo", "capital", "habitat", "provida", "cuprum", "planvital", "uno"];
-  for (const afp of afps) {
-    if (q.includes(afp)) {
-      filters.push({ field: "entity", operator: "contains", value: afp });
-    }
-  }
-
-  const possibleMandantes = [
-    "mundo previsional",
-    "mundo",
-    "previsional",
-    "optimiza",
-    "optmiza",
-    "optimisa",
-    "finanfix",
-  ];
-
-  for (const mandante of possibleMandantes) {
-    if (q.includes(mandante)) {
-      const value =
-        mandante.includes("mundo") || mandante.includes("previsional")
-          ? "mundo previsional"
-          : mandante.includes("optim")
-            ? "optimiza"
-            : mandante;
-
-      filters.push({ field: "mandante", operator: "contains", value });
-      break;
-    }
-  }
-
-  const columns = [...DEFAULT_COLUMNS].filter((field) => fields.includes(field));
-
-  return {
-    intent:
-      q.includes("excel") || q.includes("descarg")
-        ? "export_excel"
-        : q.includes("gestionar primero") ||
-            q.includes("listos para gestionar") ||
-            q.includes("mejores condiciones") ||
-            q.includes("sugerencias")
-          ? "suggest_management"
-          : "query_records",
-    filters: filters.filter((filter) => fields.includes(filter.field)),
-    columns,
-    orderBy: fields.includes("refund_amount")
-      ? { field: "refund_amount", direction: "desc" }
-      : undefined,
-    limit: 100,
-  };
-}
-
 async function interpretWithOpenAI(
   message: string,
   fields: string[],
   previous?: ChatMemory
 ): Promise<AIQueryPlan> {
-  const local = parseLocalIntent(message, fields);
-
   if (!apiKey) {
-    return {
-      intent: local.intent || "query_records",
-      filters: local.filters || [],
-      columns: local.columns || DEFAULT_COLUMNS.filter((field) => fields.includes(field)),
-      orderBy: local.orderBy,
-      limit: local.limit || 100,
-      answerHint: "OpenAI no está configurado; se usó interpretación local.",
-    };
+    throw new Error("OPENAI_API_KEY, crm o CRM no está configurada en Railway.");
   }
 
   const system = `
 Eres el chat inteligente de OperaFix, un CRM de recuperación previsional.
 
-Tu trabajo es conversar como ChatGPT, pero conectado al CRM.
+Tu trabajo es conversar como ChatGPT, interpretar exactamente lo que el usuario pide y convertirlo en una consulta segura al CRM.
 
-Debes interpretar la solicitud del usuario y devolver SOLO JSON válido.
-
-Puedes entender errores ortográficos:
-- "mundo", "previsional", "mundo previsonal" => Mandante Mundo Previsional
-- "optmiza", "optimisa" => Optimiza
-- "cc" => Confirmación CC
-- "poder" => Confirmación Poder
-- "plata", "lucas", "monto" => Monto Devolución
+IMPORTANTE:
+- No uses reglas locales.
+- No inventes campos.
+- No cambies la intención del usuario.
+- No conviertas una búsqueda normal en sugerencia.
+- Solo usa suggest_management si el usuario pide explícitamente: "sugerencias", "prioriza", "qué gestiono primero", "casos listos", "mejores condiciones para gestionar".
+- Si el usuario pide "poder no", filtra confirmation_power = false.
+- Si el usuario pide "poder sí", filtra confirmation_power = true.
+- Si el usuario pide "cc no", filtra confirmation_cc = false.
+- Si el usuario pide "cc sí", filtra confirmation_cc = true.
+- Si el usuario escribe mal, interpreta semánticamente.
+- Si dice "ahora", usa el contexto anterior.
 
 Campos disponibles reales:
 ${fields.join(", ")}
 
-Campos recomendados de salida si el usuario no especifica:
-${DEFAULT_COLUMNS.filter((field) => fields.includes(field)).join(", ")}
+Equivalencias importantes:
+- Confirmación CC, CC, cuenta corriente => confirmation_cc
+- Confirmación Poder, poder => confirmation_power
+- Estado Gestión, estado, gestión => management_status
+- AFP, entidad => entity
+- Monto, plata, devolución, lucas => refund_amount
+- Razón Social, empresa => business_name
+- N° Solicitud, número solicitud => request_number
+- Mundo, Previsional, Mundo Previsional, mundo previsonal => mandante contiene "Mundo Previsional"
+- Optimiza, Optmiza, Optimisa => mandante contiene "Optimiza"
 
-Nunca inventes campos. Si el usuario pide "todos los campos", usa todos los campos disponibles.
+Devuelve SOLO JSON válido con esta estructura:
 
-Devuelve este JSON:
 {
   "intent": "query_records" | "aggregate" | "export_excel" | "suggest_management" | "general_answer",
   "filters": [
-    { "field": "campo_real", "operator": "contains|equals|gt|gte|lt|lte", "value": "valor" }
+    {
+      "field": "campo_real",
+      "operator": "contains" | "equals" | "gt" | "gte" | "lt" | "lte",
+      "value": "valor"
+    }
   ],
   "columns": ["campo_real"],
-  "orderBy": { "field": "campo_real", "direction": "asc|desc" },
+  "orderBy": {
+    "field": "campo_real",
+    "direction": "asc" | "desc"
+  },
   "groupBy": ["campo_real"],
   "limit": 100,
   "answerHint": "respuesta breve en español natural"
 }
 
-Reglas:
-- Si el usuario dice "ahora", usa el contexto anterior.
-- Si pide Excel, intent debe ser export_excel.
-- Si pide casos listos para gestionar, intent debe ser suggest_management.
-- Casos listos para gestionar = pendiente + CC sí + poder sí + monto devolución mayor a 0 + entidad asignada.
-- Si el usuario dice Confirmación CC Sí, cc sí, CC = Sí o cuenta corriente sí, usa field "confirmation_cc", operator "equals", value true.
-- Si el usuario dice Confirmación Poder Sí, poder sí o poder = Sí, usa field "confirmation_power", operator "equals", value true.
+Reglas de columnas:
+- Si el usuario pide campos específicos, usa esos campos.
+- Si el usuario pide todos los campos, usa todos los campos disponibles.
+- Si no pide campos, usa estas columnas principales:
+  mandante, business_name, rut, entity, management_status, refund_amount, confirmation_cc, confirmation_power, request_number.
+
+Reglas de filtros:
+- Para campos booleanos usa true o false, nunca "Sí" ni "No".
+- Para montos usa números.
+- Para textos usa contains.
+- Para estados usa contains.
+- Si la consulta es "quiero casos con confirmación cc sí y confirmación poder no", debe ser query_records, NO suggest_management.
 `;
 
-  try {
-    const response = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-      temperature: 0.1,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        {
-          role: "user",
-          content: JSON.stringify({
-            message,
-            previousPlan: previous?.lastPlan || null,
-            previousColumns: previous?.lastColumns || null,
-          }),
-        },
-      ],
-    });
+  const response = await openai.chat.completions.create({
+    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+    temperature: 0,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: system },
+      {
+        role: "user",
+        content: JSON.stringify({
+          message,
+          previousPlan: previous?.lastPlan || null,
+          previousColumns: previous?.lastColumns || null,
+        }),
+      },
+    ],
+  });
 
-    const raw = response.choices[0]?.message?.content || "{}";
-    const parsed = JSON.parse(raw) as AIQueryPlan;
-
-    // Mezcla interpretación local + OpenAI para no perder filtros explícitos como poder/CC.
-    return {
-      ...parsed,
-      filters: [...(parsed.filters || []), ...(local.filters || [])],
-      columns:
-        parsed.columns && parsed.columns.length
-          ? parsed.columns
-          : local.columns || DEFAULT_COLUMNS.filter((field) => fields.includes(field)),
-      orderBy: parsed.orderBy || local.orderBy,
-      limit: parsed.limit || local.limit || 100,
-    };
-  } catch (error) {
-    console.error("ERROR OPENAI IA CHAT, usando fallback local:", error);
-
-    return {
-      intent: local.intent || "query_records",
-      filters: local.filters || [],
-      columns: local.columns || DEFAULT_COLUMNS.filter((field) => fields.includes(field)),
-      orderBy: local.orderBy,
-      limit: local.limit || 100,
-      answerHint: "OpenAI falló; se usó interpretación local segura.",
-    };
-  }
+  const raw = response.choices[0]?.message?.content || "{}";
+  return JSON.parse(raw) as AIQueryPlan;
 }
 
 function sanitizePlan(plan: AIQueryPlan, fields: string[]): AIQueryPlan {
@@ -442,6 +322,7 @@ function sanitizePlan(plan: AIQueryPlan, fields: string[]): AIQueryPlan {
       if (meta?.type === "Decimal" || meta?.type === "Int" || meta?.type === "Float") {
         const numeric = parseNumber(filter.value);
         if (numeric === null) return null;
+
         return {
           ...filter,
           operator: filter.operator === "contains" ? ("equals" as const) : filter.operator,
@@ -493,6 +374,7 @@ function buildWhere(filters: AIFieldFilter[]): Record<string, unknown> {
     if (meta.type === "Boolean") {
       const boolValue = normalizeBooleanValue(filter.value);
       if (boolValue === null) continue;
+
       AND.push({ [field]: boolValue });
       continue;
     }
@@ -506,6 +388,7 @@ function buildWhere(filters: AIFieldFilter[]): Record<string, unknown> {
       } else {
         AND.push({ [field]: numeric });
       }
+
       continue;
     }
 
@@ -733,7 +616,8 @@ router.post("/message", async (req, res) => {
 
     return res.status(200).json({
       success: false,
-      answer: "No pude procesar la solicitud del CRM, pero el módulo IA sigue activo. Revisa logs Railway para el detalle técnico.",
+      answer:
+        "No pude procesar la solicitud del CRM. Verifica que OPENAI_API_KEY o crm esté configurada en Railway y revisa los logs.",
       error: error instanceof Error ? error.message : "Error desconocido",
       rows: [],
       columns: [],
