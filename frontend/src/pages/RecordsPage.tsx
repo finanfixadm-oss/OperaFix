@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type DragEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import ModuleFilterPanel from "../components/ModuleFilterPanel";
 import ZohoModal from "../components/ZohoModal";
 import { fetchJson, postJson } from "../api";
@@ -251,6 +251,7 @@ function saveRecordsScopedSettings(view: string, settings: RecordsScopedSettings
 
 export default function RecordsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [rows, setRows] = useState<RecordItem[]>([]);
   const [mandantes, setMandantes] = useState<MandanteOption[]>([]);
@@ -270,6 +271,8 @@ export default function RecordsPage() {
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const selectedRecordId =
+  searchParams.get("id") || searchParams.get("recordId");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -313,6 +316,19 @@ export default function RecordsPage() {
     loadMandantes();
     loadAfps();
   }, []);
+
+  useEffect(() => {
+  if (!selectedRecordId) return;
+  if (!rows.length) return;
+
+  const found = rows.find(
+    (row) => String(row.id) === String(selectedRecordId)
+  );
+
+  if (found) {
+    navigate(`/records/${found.id}`);
+  }
+}, [rows, selectedRecordId, navigate]);
 
   useEffect(() => {
     saveRecordsScopedSettings(activeView, { activeRules, quickSearch, visibleColumns, columnOrder, sort });
