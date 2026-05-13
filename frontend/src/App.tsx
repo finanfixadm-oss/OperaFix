@@ -13,8 +13,8 @@ import ReportsBuilderPage from "./pages/ReportsBuilderPage";
 import LoginPage from "./pages/LoginPage";
 import { defaultPathForUser, getCurrentUser } from "./auth";
 import V66AutomationPage from "./pages/V66AutomationPage";
+import AICommandCenterPage from "./pages/AICommandCenterPage";
 import "./styles/zoho-modules.css";
-
 
 function RootRedirect() {
   return <Navigate to={defaultPathForUser(getCurrentUser())} replace />;
@@ -29,15 +29,96 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
 
           <Route path="/v66-automation" element={<V66AutomationPage />} />
-          <Route path="/dashboard" element={<ProtectedRoute roles={["admin", "interno", "kam"]}><DashboardExecutivePage /></ProtectedRoute>} />
-          <Route path="/records" element={<ProtectedRoute roles={["admin", "interno", "kam"]}><RecordsPage /></ProtectedRoute>} />
-          <Route path="/records/:id" element={<ProtectedRoute roles={["admin", "interno", "kam"]}><RecordDetailPage /></ProtectedRoute>} />
-          <Route path="/portal-cliente" element={<ProtectedRoute roles={["admin", "interno", "kam", "cliente"]}><ClientPortalPage /></ProtectedRoute>} />
-          <Route path="/ia-gestiones" element={<ProtectedRoute roles={["admin", "interno", "kam"]}><AiGestionesPage /></ProtectedRoute>} />
-          <Route path="/carga-masiva" element={<ProtectedRoute roles={["admin", "interno"]}><MassImportPage /></ProtectedRoute>} />
-          <Route path="/informes" element={<ProtectedRoute roles={["admin", "interno", "kam", "cliente"]}><ReportsBuilderPage /></ProtectedRoute>} />
-          <Route path="/usuarios" element={<ProtectedRoute roles={["admin", "interno"]}><UsersPage /></ProtectedRoute>} />
-          <Route path="/mandantes" element={<ProtectedRoute roles={["admin", "interno"]}><MandantesPage /></ProtectedRoute>} />
+
+          <Route
+            path="/ai-command-center"
+            element={
+              <ProtectedRoute roles={["admin", "interno", "kam"]}>
+                <AICommandCenterPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute roles={["admin", "interno", "kam"]}>
+                <DashboardExecutivePage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/records"
+            element={
+              <ProtectedRoute roles={["admin", "interno", "kam"]}>
+                <RecordsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/records/:id"
+            element={
+              <ProtectedRoute roles={["admin", "interno", "kam"]}>
+                <RecordDetailPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/portal-cliente"
+            element={
+              <ProtectedRoute roles={["admin", "interno", "kam", "cliente"]}>
+                <ClientPortalPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/ia-gestiones"
+            element={
+              <ProtectedRoute roles={["admin", "interno", "kam"]}>
+                <AiGestionesPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/carga-masiva"
+            element={
+              <ProtectedRoute roles={["admin", "interno"]}>
+                <MassImportPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/informes"
+            element={
+              <ProtectedRoute roles={["admin", "interno", "kam", "cliente"]}>
+                <ReportsBuilderPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/usuarios"
+            element={
+              <ProtectedRoute roles={["admin", "interno"]}>
+                <UsersPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/mandantes"
+            element={
+              <ProtectedRoute roles={["admin", "interno"]}>
+                <MandantesPage />
+              </ProtectedRoute>
+            }
+          />
 
           <Route path="/company-records" element={<Navigate to="/records" replace />} />
           <Route path="/company-records/:id" element={<Navigate to="/records" replace />} />
