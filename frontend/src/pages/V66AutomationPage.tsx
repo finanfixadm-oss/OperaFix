@@ -11,6 +11,17 @@ type PriorityRecord = {
   pension_entity: string;
 };
 
+type SuggestionRecord = {
+  id: string;
+  refund_amount: number;
+  management_status: string;
+  entity: string;
+  score: number;
+  suggestedAction: string;
+  suggestedData: Record<string, unknown>;
+  reason: string;
+};
+
 type DashboardMetric = {
   estado?: string;
   entidad?: string;
@@ -23,16 +34,19 @@ type DashboardResponse = {
   byEntidad: DashboardMetric[];
 };
 
-type TabKey = "overview" | "priorities" | "ai" | "automation";
+type TabKey = "overview" | "priorities" | "suggestions" | "ai" | "automation";
 
 export default function V66AutomationPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [priorities, setPriorities] = useState<PriorityRecord[]>([]);
+  const [suggestions, setSuggestions] = useState<SuggestionRecord[]>([]);
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [aiText, setAiText] = useState("");
   const [aiResult, setAiResult] = useState<unknown>(null);
   const [cronResult, setCronResult] = useState<unknown>(null);
   const [selected, setSelected] = useState<PriorityRecord | null>(null);
+  const [selectedSuggestion, setSelectedSuggestion] =
+    useState<SuggestionRecord | null>(null);
   const [loading, setLoading] = useState(false);
 
   const formatCLP = (value: number) =>
@@ -52,6 +66,16 @@ export default function V66AutomationPage() {
     }
   };
 
+  const loadSuggestions = async () => {
+    const res = await fetch(`${API_BASE}/api/ai-suggestions/suggestions`);
+    const json = await res.json();
+
+    if (json.success) {
+      setSuggestions(json.suggestions || []);
+      setSelectedSuggestion(json.suggestions?.[0] || null);
+    }
+  };
+
   const loadDashboard = async () => {
     const res = await fetch(`${API_BASE}/api/dashboard/metrics`);
     const json = await res.json();
@@ -59,7 +83,7 @@ export default function V66AutomationPage() {
   };
 
   const refreshAll = async () => {
-    await Promise.all([loadPriorities(), loadDashboard()]);
+    await Promise.all([loadPriorities(), loadSuggestions(), loadDashboard()]);
   };
 
   const runCron = async () => {
@@ -79,7 +103,7 @@ export default function V66AutomationPage() {
   const runAI = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/ai/nl`, {
+      const res = await fetch(`${API_BASE}/api/ai-actions/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: aiText, action: "get" }),
@@ -92,11 +116,64 @@ export default function V66AutomationPage() {
     }
   };
 
+  const runAIAction = async (dryRun: boolean) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/ai-actions/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: aiText, dryRun, limit: 100 }),
+      });
+
+      const json = await res.json();
+      setAiResult(json);
+
+      if (!dryRun && json.success) {
+        await refreshAll();
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const applySuggestion = async (suggestion: SuggestionRecord) => {
+    const confirmed = window.confirm(
+      `Aplicar sugerencia IA?\n\n${suggestion.suggestedAction}\n${suggestion.reason}`
+    );
+
+    if (!confirmed) return;
+
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/ai-actions/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: `id ${suggestion.id}`,
+          action: "update",
+          data: suggestion.suggestedData,
+          limit: 1,
+        }),
+      });
+
+      const json = await res.json();
+      setAiResult(json);
+      await refreshAll();
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     refreshAll().catch(console.error);
   }, []);
 
   const top20 = useMemo(() => priorities.slice(0, 20), [priorities]);
+  const topSuggestions = useMemo(
+    () => suggestions.slice(0, 30),
+    [suggestions]
+  );
 
   return (
     <div style={page}>
@@ -115,6 +192,9 @@ export default function V66AutomationPage() {
         <NavButton active={activeTab === "priorities"} onClick={() => setActiveTab("priorities")}>
           Prioridades
         </NavButton>
+        <NavButton active={activeTab === "suggestions"} onClick={() => setActiveTab("suggestions")}>
+          Sugerencias IA
+        </NavButton>
         <NavButton active={activeTab === "ai"} onClick={() => setActiveTab("ai")}>
           IA Operativa
         </NavButton>
@@ -127,7 +207,7 @@ export default function V66AutomationPage() {
         <header style={header}>
           <div>
             <h1 style={{ margin: 0 }}>Centro de Automatización</h1>
-            <p style={muted}>Prioridades, IA, cron manual y métricas reales.</p>
+            <p style={muted}>Prioridades, sugerencias IA, cron manual y métricas reales.</p>
           </div>
 
           <div style={{ display: "flex", gap: 10 }}>
@@ -143,8 +223,8 @@ export default function V66AutomationPage() {
         <section style={kpiGrid}>
           <Kpi title="Total recuperación" value={formatCLP(dashboard?.total || 0)} />
           <Kpi title="Registros priorizados" value={String(priorities.length)} />
+          <Kpi title="Sugerencias IA" value={String(suggestions.length)} />
           <Kpi title="Top prioridad" value={formatCLP(top20[0]?.refund_amount || 0)} />
-          <Kpi title="Estado sistema" value="Operativo" />
         </section>
 
         {activeTab === "overview" && (
@@ -227,22 +307,106 @@ export default function V66AutomationPage() {
           </section>
         )}
 
+        {activeTab === "suggestions" && (
+          <section style={contentLayout}>
+            <Card title="Sugerencias IA">
+              <div style={{ overflowX: "auto" }}>
+                <table style={table}>
+                  <thead>
+                    <tr>
+                      <th style={th}>Acción sugerida</th>
+                      <th style={th}>Monto</th>
+                      <th style={th}>Estado</th>
+                      <th style={th}>Entidad</th>
+                      <th style={th}>Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topSuggestions.map((item) => (
+                      <tr
+                        key={item.id}
+                        onClick={() => setSelectedSuggestion(item)}
+                        style={{
+                          cursor: "pointer",
+                          background:
+                            selectedSuggestion?.id === item.id ? "#f0f7ff" : "transparent",
+                        }}
+                      >
+                        <td style={td}>{item.suggestedAction}</td>
+                        <td style={td}>{formatCLP(item.refund_amount)}</td>
+                        <td style={td}>{item.management_status || "Sin estado"}</td>
+                        <td style={td}>{item.entity || "Sin entidad"}</td>
+                        <td style={td}>{Number(item.score).toFixed(0)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            <Card title="Detalle sugerencia">
+              {selectedSuggestion ? (
+                <>
+                  <Row label="ID" value={selectedSuggestion.id} />
+                  <Row label="Acción" value={selectedSuggestion.suggestedAction} />
+                  <Row label="Monto" value={formatCLP(selectedSuggestion.refund_amount)} />
+                  <Row label="Estado" value={selectedSuggestion.management_status || "Sin estado"} />
+                  <Row label="Entidad" value={selectedSuggestion.entity || "Sin entidad"} />
+                  <Row label="Score" value={Number(selectedSuggestion.score).toFixed(0)} />
+
+                  <p style={{ ...muted, marginTop: 12 }}>{selectedSuggestion.reason}</p>
+
+                  <pre style={pre}>
+                    {JSON.stringify(selectedSuggestion.suggestedData, null, 2)}
+                  </pre>
+
+                  <button
+                    style={dangerBtn}
+                    disabled={loading}
+                    onClick={() => applySuggestion(selectedSuggestion)}
+                  >
+                    {loading ? "Aplicando..." : "Aplicar sugerencia"}
+                  </button>
+                </>
+              ) : (
+                <p style={muted}>Selecciona una sugerencia.</p>
+              )}
+            </Card>
+          </section>
+        )}
+
         {activeTab === "ai" && (
           <Card title="IA Operativa">
             <textarea
               value={aiText}
               onChange={(e) => setAiText(e.target.value)}
-              placeholder="Ej: pendientes de AFP Modelo sobre $1.000.000"
+              placeholder="Ej: cambia pendientes de AFP Modelo sobre $1.000.000 a En gestión"
               style={textarea}
             />
 
-            <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+            <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
               <button style={primaryBtn} onClick={runAI} disabled={loading || !aiText.trim()}>
                 Consultar IA
               </button>
               <button
                 style={secondaryBtn}
-                onClick={() => setAiText("pendientes de AFP Modelo sobre $1.000.000")}
+                onClick={() => runAIAction(true)}
+                disabled={loading || !aiText.trim()}
+              >
+                Preview acción
+              </button>
+              <button
+                style={dangerBtn}
+                onClick={() => runAIAction(false)}
+                disabled={loading || !aiText.trim()}
+              >
+                Ejecutar acción
+              </button>
+              <button
+                style={secondaryBtn}
+                onClick={() =>
+                  setAiText("cambia pendientes de AFP Modelo sobre $1.000.000 a En gestión")
+                }
               >
                 Ejemplo
               </button>
@@ -426,6 +590,16 @@ const secondaryBtn: React.CSSProperties = {
   color: "#0f172a",
   cursor: "pointer",
   fontWeight: 600,
+};
+
+const dangerBtn: React.CSSProperties = {
+  border: 0,
+  borderRadius: 10,
+  padding: "10px 14px",
+  background: "#dc2626",
+  color: "#fff",
+  cursor: "pointer",
+  fontWeight: 700,
 };
 
 const table: React.CSSProperties = {
