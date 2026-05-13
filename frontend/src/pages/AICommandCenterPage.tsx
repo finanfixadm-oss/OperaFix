@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 
-const API_BASE =
-  import.meta.env.VITE_API_URL ||
-  "https://operafix-production.up.railway.app";
+const API_BASE = "https://operafix-production.up.railway.app";
+
 
 export default function AICommandCenterPage() {
   const [prompt, setPrompt] = useState("");
