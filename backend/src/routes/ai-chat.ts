@@ -5,10 +5,8 @@ import { Prisma, PrismaClient } from "@prisma/client";
 const router = express.Router();
 const prisma = new PrismaClient();
 
-const apiKey = process.env.OPENAI_API_KEY || process.env.crm || "";
-const openai = new OpenAI({
-  apiKey: apiKey || "dummy",
-});
+const apiKey = process.env.OPENAI_API_KEY || process.env.crm || process.env.CRM || "";
+const openai = new OpenAI({ apiKey: apiKey || "dummy" });
 
 type FilterOperator = "contains" | "equals" | "gt" | "gte" | "lt" | "lte";
 
@@ -40,6 +38,13 @@ type ChatMemory = {
   lastPlan?: AIQueryPlan;
   lastRows?: Record<string, unknown>[];
   lastColumns?: string[];
+};
+
+type FieldMeta = {
+  name: string;
+  type: string;
+  kind: string;
+  isList: boolean;
 };
 
 const memory = new Map<string, ChatMemory>();
@@ -104,9 +109,39 @@ const DEFAULT_COLUMNS = [
   "request_number",
 ];
 
-function getLmRecordFields(): string[] {
+const MONEY_FIELDS = new Set([
+  "refund_amount",
+  "actual_paid_amount",
+  "monto_cliente",
+  "monto_finanfix_solutions",
+  "monto_real_cliente",
+  "monto_real_finanfix_solutions",
+  "fee",
+]);
+
+const BOOLEAN_FIELDS = new Set(["confirmation_cc", "confirmation_power"]);
+
+function getLmRecordFieldMeta(): FieldMeta[] {
   const model = Prisma.dmmf.datamodel.models.find((m) => m.name === "LmRecord");
-  return model?.fields.map((f) => f.name) || [];
+
+  return (
+    model?.fields
+      .filter((field) => field.kind === "scalar")
+      .map((field) => ({
+        name: field.name,
+        type: field.type,
+        kind: field.kind,
+        isList: field.isList,
+      })) || []
+  );
+}
+
+function getLmRecordFields(): string[] {
+  return getLmRecordFieldMeta().map((field) => field.name);
+}
+
+function getFieldTypeMap(): Map<string, FieldMeta> {
+  return new Map(getLmRecordFieldMeta().map((field) => [field.name, field]));
 }
 
 function normalize(value: unknown): string {
@@ -128,33 +163,43 @@ function money(value: unknown): string {
   }).format(Number.isFinite(n) ? n : 0);
 }
 
+function parseNumber(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+
+  const cleaned = String(value || "")
+    .replace(/\$/g, "")
+    .replace(/\./g, "")
+    .replace(/,/g, ".")
+    .replace(/[^0-9.-]/g, "");
+
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function isTruthySi(value: unknown): boolean {
   const v = normalize(value);
 
   return (
+    value === true ||
     v === "si" ||
-    v === "sí" ||
     v === "true" ||
     v === "1" ||
-    v.includes("si")
+    v.includes("confirmado") ||
+    v.includes("vigente")
   );
 }
 
-function normalizeBooleanValue(field: string, value: unknown): unknown {
-  const booleanFields = ["confirmation_cc", "confirmation_power"];
-
-  if (!booleanFields.includes(field)) {
-    return value;
-  }
+function normalizeBooleanValue(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value;
 
   const normalized = normalize(value);
 
   if (
     normalized === "si" ||
-    normalized === "sí" ||
     normalized === "true" ||
     normalized === "1" ||
-    normalized.includes("confirmado")
+    normalized.includes("confirmado") ||
+    normalized.includes("vigente")
   ) {
     return true;
   }
@@ -163,12 +208,13 @@ function normalizeBooleanValue(field: string, value: unknown): unknown {
     normalized === "no" ||
     normalized === "false" ||
     normalized === "0" ||
-    normalized.includes("pendiente")
+    normalized.includes("pendiente") ||
+    normalized.includes("sin")
   ) {
     return false;
   }
 
-  return value;
+  return null;
 }
 
 function parseLocalIntent(message: string, fields: string[]): Partial<AIQueryPlan> {
@@ -176,27 +222,15 @@ function parseLocalIntent(message: string, fields: string[]): Partial<AIQueryPla
   const filters: AIFieldFilter[] = [];
 
   if (q.includes("pendiente")) {
-    filters.push({
-      field: "management_status",
-      operator: "contains",
-      value: "pendiente",
-    });
+    filters.push({ field: "management_status", operator: "contains", value: "pendiente" });
   }
 
   if (q.includes("pagado") || q.includes("pagada")) {
-    filters.push({
-      field: "management_status",
-      operator: "contains",
-      value: "pag",
-    });
+    filters.push({ field: "management_status", operator: "contains", value: "pag" });
   }
 
   if (q.includes("rechaz")) {
-    filters.push({
-      field: "management_status",
-      operator: "contains",
-      value: "rechaz",
-    });
+    filters.push({ field: "management_status", operator: "contains", value: "rechaz" });
   }
 
   if (
@@ -204,57 +238,34 @@ function parseLocalIntent(message: string, fields: string[]): Partial<AIQueryPla
     q.includes("cc = si") ||
     q.includes("confirmacion cc si") ||
     q.includes("confirmacion cc = si") ||
-    q.includes("cuenta corriente si")
+    q.includes("cuenta corriente si") ||
+    q.includes("con cc")
   ) {
-    filters.push({
-      field: "confirmation_cc",
-      operator: "equals",
-      value: true,
-    });
+    filters.push({ field: "confirmation_cc", operator: "equals", value: true });
   }
 
   if (
     q.includes("poder si") ||
     q.includes("poder = si") ||
     q.includes("confirmacion poder si") ||
-    q.includes("confirmacion poder = si")
+    q.includes("confirmacion poder = si") ||
+    q.includes("con poder")
   ) {
-    filters.push({
-      field: "confirmation_power",
-      operator: "equals",
-      value: true,
-    });
+    filters.push({ field: "confirmation_power", operator: "equals", value: true });
   }
 
-  const amountMatch = q.match(
-    /(?:sobre|mayor a|mas de|más de|>=|>)\s*\$?\s*([\d\.]+)/
-  );
-
+  const amountMatch = q.match(/(?:sobre|mayor a|mas de|más de|>=|>)\s*\$?\s*([\d\.]+)/);
   if (amountMatch) {
-    filters.push({
-      field: "refund_amount",
-      operator: "gt",
-      value: Number(amountMatch[1].replace(/\./g, "")),
-    });
+    const amount = parseNumber(amountMatch[1]);
+    if (amount !== null) {
+      filters.push({ field: "refund_amount", operator: "gt", value: amount });
+    }
   }
 
-  const afps = [
-    "modelo",
-    "capital",
-    "habitat",
-    "provida",
-    "cuprum",
-    "planvital",
-    "uno",
-  ];
-
+  const afps = ["modelo", "capital", "habitat", "provida", "cuprum", "planvital", "uno"];
   for (const afp of afps) {
     if (q.includes(afp)) {
-      filters.push({
-        field: "entity",
-        operator: "contains",
-        value: afp,
-      });
+      filters.push({ field: "entity", operator: "contains", value: afp });
     }
   }
 
@@ -277,12 +288,7 @@ function parseLocalIntent(message: string, fields: string[]): Partial<AIQueryPla
             ? "optimiza"
             : mandante;
 
-      filters.push({
-        field: "mandante",
-        operator: "contains",
-        value,
-      });
-
+      filters.push({ field: "mandante", operator: "contains", value });
       break;
     }
   }
@@ -293,10 +299,13 @@ function parseLocalIntent(message: string, fields: string[]): Partial<AIQueryPla
     intent:
       q.includes("excel") || q.includes("descarg")
         ? "export_excel"
-        : q.includes("gestionar primero") || q.includes("listos para gestionar")
+        : q.includes("gestionar primero") ||
+            q.includes("listos para gestionar") ||
+            q.includes("mejores condiciones") ||
+            q.includes("sugerencias")
           ? "suggest_management"
           : "query_records",
-    filters: filters.filter((f) => fields.includes(f.field)),
+    filters: filters.filter((filter) => fields.includes(filter.field)),
     columns,
     orderBy: fields.includes("refund_amount")
       ? { field: "refund_amount", direction: "desc" }
@@ -310,13 +319,13 @@ async function interpretWithOpenAI(
   fields: string[],
   previous?: ChatMemory
 ): Promise<AIQueryPlan> {
-  if (!apiKey) {
-    const local = parseLocalIntent(message, fields);
+  const local = parseLocalIntent(message, fields);
 
+  if (!apiKey) {
     return {
       intent: local.intent || "query_records",
       filters: local.filters || [],
-      columns: local.columns || DEFAULT_COLUMNS.filter((f) => fields.includes(f)),
+      columns: local.columns || DEFAULT_COLUMNS.filter((field) => fields.includes(field)),
       orderBy: local.orderBy,
       limit: local.limit || 100,
       answerHint: "OpenAI no está configurado; se usó interpretación local.",
@@ -341,7 +350,7 @@ Campos disponibles reales:
 ${fields.join(", ")}
 
 Campos recomendados de salida si el usuario no especifica:
-${DEFAULT_COLUMNS.filter((f) => fields.includes(f)).join(", ")}
+${DEFAULT_COLUMNS.filter((field) => fields.includes(field)).join(", ")}
 
 Nunca inventes campos. Si el usuario pide "todos los campos", usa todos los campos disponibles.
 
@@ -367,33 +376,86 @@ Reglas:
 - Si el usuario dice Confirmación Poder Sí, poder sí o poder = Sí, usa field "confirmation_power", operator "equals", value true.
 `;
 
-  const response = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-    temperature: 0.1,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: system },
-      {
-        role: "user",
-        content: JSON.stringify({
-          message,
-          previousPlan: previous?.lastPlan || null,
-          previousColumns: previous?.lastColumns || null,
-        }),
-      },
-    ],
-  });
+  try {
+    const response = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: system },
+        {
+          role: "user",
+          content: JSON.stringify({
+            message,
+            previousPlan: previous?.lastPlan || null,
+            previousColumns: previous?.lastColumns || null,
+          }),
+        },
+      ],
+    });
 
-  const raw = response.choices[0]?.message?.content || "{}";
-  return JSON.parse(raw) as AIQueryPlan;
+    const raw = response.choices[0]?.message?.content || "{}";
+    const parsed = JSON.parse(raw) as AIQueryPlan;
+
+    // Mezcla interpretación local + OpenAI para no perder filtros explícitos como poder/CC.
+    return {
+      ...parsed,
+      filters: [...(parsed.filters || []), ...(local.filters || [])],
+      columns:
+        parsed.columns && parsed.columns.length
+          ? parsed.columns
+          : local.columns || DEFAULT_COLUMNS.filter((field) => fields.includes(field)),
+      orderBy: parsed.orderBy || local.orderBy,
+      limit: parsed.limit || local.limit || 100,
+    };
+  } catch (error) {
+    console.error("ERROR OPENAI IA CHAT, usando fallback local:", error);
+
+    return {
+      intent: local.intent || "query_records",
+      filters: local.filters || [],
+      columns: local.columns || DEFAULT_COLUMNS.filter((field) => fields.includes(field)),
+      orderBy: local.orderBy,
+      limit: local.limit || 100,
+      answerHint: "OpenAI falló; se usó interpretación local segura.",
+    };
+  }
 }
 
 function sanitizePlan(plan: AIQueryPlan, fields: string[]): AIQueryPlan {
   const fieldSet = new Set(fields);
+  const typeMap = getFieldTypeMap();
 
-  const filters = (plan.filters || []).filter((filter) =>
-    fieldSet.has(filter.field)
-  );
+  const filters = (plan.filters || [])
+    .filter((filter) => fieldSet.has(filter.field))
+    .map((filter) => {
+      const meta = typeMap.get(filter.field);
+
+      if (meta?.type === "Boolean") {
+        return {
+          ...filter,
+          operator: "equals" as const,
+          value: normalizeBooleanValue(filter.value) ?? Boolean(filter.value),
+        };
+      }
+
+      if (meta?.type === "Decimal" || meta?.type === "Int" || meta?.type === "Float") {
+        const numeric = parseNumber(filter.value);
+        if (numeric === null) return null;
+        return {
+          ...filter,
+          operator: filter.operator === "contains" ? ("equals" as const) : filter.operator,
+          value: numeric,
+        };
+      }
+
+      if (meta?.type === "DateTime") {
+        return null;
+      }
+
+      return filter;
+    })
+    .filter(Boolean) as AIFieldFilter[];
 
   const columns =
     plan.columns && plan.columns.length
@@ -420,37 +482,49 @@ function sanitizePlan(plan: AIQueryPlan, fields: string[]): AIQueryPlan {
 
 function buildWhere(filters: AIFieldFilter[]): Record<string, unknown> {
   const AND: Record<string, unknown>[] = [];
+  const typeMap = getFieldTypeMap();
 
   for (const filter of filters || []) {
     const { field, operator } = filter;
-    const value = normalizeBooleanValue(field, filter.value);
+    const meta = typeMap.get(field);
 
-    if (operator === "contains") {
-      AND.push({
-        [field]: {
-          contains: String(value),
-          mode: "insensitive",
-        },
-      });
+    if (!meta) continue;
+
+    if (meta.type === "Boolean") {
+      const boolValue = normalizeBooleanValue(filter.value);
+      if (boolValue === null) continue;
+      AND.push({ [field]: boolValue });
+      continue;
     }
 
-    if (operator === "equals") {
-      AND.push({
-        [field]: value,
-      });
+    if (meta.type === "Decimal" || meta.type === "Int" || meta.type === "Float") {
+      const numeric = parseNumber(filter.value);
+      if (numeric === null) continue;
+
+      if (operator === "gt" || operator === "gte" || operator === "lt" || operator === "lte") {
+        AND.push({ [field]: { [operator]: numeric } });
+      } else {
+        AND.push({ [field]: numeric });
+      }
+      continue;
     }
 
-    if (
-      operator === "gt" ||
-      operator === "gte" ||
-      operator === "lt" ||
-      operator === "lte"
-    ) {
-      AND.push({
-        [field]: {
-          [operator]: Number(value),
-        },
-      });
+    if (meta.type === "String") {
+      if (operator === "contains") {
+        AND.push({
+          [field]: {
+            contains: String(filter.value),
+            mode: "insensitive",
+          },
+        });
+      } else if (operator === "equals") {
+        AND.push({
+          [field]: {
+            equals: String(filter.value),
+            mode: "insensitive",
+          },
+        });
+      }
     }
   }
 
@@ -465,13 +539,8 @@ async function runQuery(
   plan: AIQueryPlan,
   fields: string[]
 ): Promise<Record<string, unknown>[]> {
-  const safeFilters = (plan.filters || []).filter((filter) =>
-    fields.includes(filter.field)
-  );
-
-  const safeColumns = (plan.columns || []).filter((column) =>
-    fields.includes(column)
-  );
+  const safeFilters = (plan.filters || []).filter((filter) => fields.includes(filter.field));
+  const safeColumns = (plan.columns || []).filter((column) => fields.includes(column));
 
   const safeOrderBy =
     plan.orderBy && fields.includes(plan.orderBy.field)
@@ -503,7 +572,6 @@ async function runQuery(
     return rows as unknown as Record<string, unknown>[];
   } catch (error) {
     console.error("ERROR RUNQUERY IA:", error);
-
     return [];
   }
 }
@@ -562,7 +630,6 @@ async function runSuggestions(fields: string[]): Promise<Record<string, unknown>
       .slice(0, 100);
   } catch (error) {
     console.error("ERROR RUNSUGGESTIONS IA:", error);
-
     return [];
   }
 }
@@ -572,6 +639,10 @@ function buildAnswer(plan: AIQueryPlan, rows: Record<string, unknown>[]): string
     (acc, row) => acc + Number(row.refund_amount || 0),
     0
   );
+
+  if (plan.answerHint && rows.length === 0) {
+    return `${plan.answerHint} No encontré registros con esos filtros.`;
+  }
 
   if (plan.intent === "suggest_management") {
     return `Encontré ${rows.length} casos que están en mejores condiciones para gestionar. Priorizo los que tienen monto, estado pendiente, entidad asignada, Confirmación CC y Confirmación Poder. Monto total aproximado: ${money(totalMonto)}.`;
@@ -660,10 +731,13 @@ router.post("/message", async (req, res) => {
   } catch (error) {
     console.error("ERROR IA CHAT:", error);
 
-    return res.status(500).json({
+    return res.status(200).json({
       success: false,
-      answer: "No pude procesar la solicitud del CRM.",
+      answer: "No pude procesar la solicitud del CRM, pero el módulo IA sigue activo. Revisa logs Railway para el detalle técnico.",
       error: error instanceof Error ? error.message : "Error desconocido",
+      rows: [],
+      columns: [],
+      canExport: false,
     });
   }
 });
