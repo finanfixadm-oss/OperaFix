@@ -52,6 +52,7 @@ app.use("/api/ai-actions", aiExecuteRoutes);
 app.use("/api/ai-suggestions", aiSuggestionsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/ai-chat", aiChatRoutes);
+app.use("/api/users", usersRouter);
 
 app.get("/", (_req, res) => {
   res.json({ status: "OK DESDE SERVER" });
