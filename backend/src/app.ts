@@ -23,6 +23,7 @@ import auditRouter from "./routes/audit.js";
 import dashboardRoutes from "./routes/dashboard.js";
 import automationRoutes from "./routes/automation.js";
 import aiExecuteRoutes from "./modules/ai/ai.execute.routes.js";
+import aiSuggestionsRoutes from "./modules/ai/ai.suggestions.routes.js";
 
 import { requireAuth, requireRoles } from "./middleware/security.js";
 
@@ -47,6 +48,7 @@ app.use("/storage", express.static(path.resolve(process.cwd(), "storage")));
 // Rutas públicas / operativas V66
 app.use("/api/automation", automationRoutes);
 app.use("/api/ai-actions", aiExecuteRoutes);
+app.use("/api/ai-suggestions", aiSuggestionsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 
 app.get("/", (_req, res) => {
