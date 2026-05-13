@@ -77,6 +77,30 @@ export default function AIChatCRMPage() {
     window.open(`${API_BASE}/api/ai-chat/export?userId=${USER_ID}`, "_blank");
   };
 
+  const openRecord = (row: Record<string, unknown>) => {
+    if (!row.id) return;
+
+    window.open(`/records?id=${row.id}`, "_blank");
+  };
+
+  const getVisibleColumns = (
+    rows: Record<string, unknown>[],
+    columns?: AIColumn[]
+  ): AIColumn[] => {
+    if (columns && columns.length > 0) {
+      return columns.filter((column) => column.field !== "id");
+    }
+
+    if (!rows.length) return [];
+
+    return Object.keys(rows[0])
+      .filter((field) => field !== "id")
+      .map((field) => ({
+        field,
+        label: field,
+      }));
+  };
+
   return (
     <div style={page}>
       <aside style={sidebar}>
@@ -116,57 +140,79 @@ export default function AIChatCRMPage() {
 
       <main style={main}>
         <section style={chatBox}>
-          {messages.map((message, index) => (
-            <div
-              key={index}
-              style={{
-                ...bubble,
-                alignSelf: message.role === "user" ? "flex-end" : "flex-start",
-                background: message.role === "user" ? "#dbeafe" : "#ffffff",
-              }}
-            >
-              <strong>{message.role === "user" ? "Tú" : "IA OperaFix"}</strong>
-              <p>{message.text}</p>
+          {messages.map((message, index) => {
+            const visibleColumns = getVisibleColumns(
+              message.rows || [],
+              message.columns
+            );
 
-              {message.rows && message.rows.length > 0 && (
-                <div style={tableWrap}>
-                  <table style={table}>
-                    <thead>
-                      <tr>
-                        {(message.columns || Object.keys(message.rows[0]).map((field) => ({ field, label: field }))).map(
-                          (column) => (
+            return (
+              <div
+                key={index}
+                style={{
+                  ...bubble,
+                  alignSelf:
+                    message.role === "user" ? "flex-end" : "flex-start",
+                  background: message.role === "user" ? "#dbeafe" : "#ffffff",
+                }}
+              >
+                <strong>{message.role === "user" ? "Tú" : "IA OperaFix"}</strong>
+                <p>{message.text}</p>
+
+                {message.rows && message.rows.length > 0 && (
+                  <div style={tableWrap}>
+                    <table style={table}>
+                      <thead>
+                        <tr>
+                          {visibleColumns.map((column) => (
                             <th key={column.field} style={th}>
                               {column.label}
                             </th>
-                          )
-                        )}
-                      </tr>
-                    </thead>
+                          ))}
+                        </tr>
+                      </thead>
 
-                    <tbody>
-                      {message.rows.slice(0, 50).map((row, rowIndex) => (
-                        <tr key={rowIndex}>
-                          {(message.columns || Object.keys(row).map((field) => ({ field, label: field }))).map(
-                            (column) => (
+                      <tbody>
+                        {message.rows.slice(0, 50).map((row, rowIndex) => (
+                          <tr
+                            key={rowIndex}
+                            onClick={() => openRecord(row)}
+                            style={{
+                              cursor: row.id ? "pointer" : "default",
+                              transition: "all 0.2s ease",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = "#f8fafc";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = "";
+                            }}
+                            title={
+                              row.id
+                                ? "Abrir este registro en una nueva pestaña"
+                                : ""
+                            }
+                          >
+                            {visibleColumns.map((column) => (
                               <td key={column.field} style={td}>
                                 {String(row[column.field] ?? "—")}
                               </td>
-                            )
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
-              {message.canExport && (
-                <button style={downloadBtn} onClick={downloadExcel}>
-                  Descargar resultado en Excel
-                </button>
-              )}
-            </div>
-          ))}
+                {message.canExport && (
+                  <button style={downloadBtn} onClick={downloadExcel}>
+                    Descargar resultado en Excel
+                  </button>
+                )}
+              </div>
+            );
+          })}
 
           {loading && <div style={loadingBox}>Pensando con IA...</div>}
         </section>
@@ -223,6 +269,7 @@ const main: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   height: "calc(100vh - 80px)",
+  minHeight: 0,
 };
 
 const chatBox: React.CSSProperties = {
@@ -232,6 +279,10 @@ const chatBox: React.CSSProperties = {
   gap: 18,
   padding: 24,
   overflowY: "auto",
+  overflowX: "hidden",
+  height: "calc(100vh - 190px)",
+  maxHeight: "calc(100vh - 190px)",
+  scrollBehavior: "smooth",
 };
 
 const bubble: React.CSSProperties = {

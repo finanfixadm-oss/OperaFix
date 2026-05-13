@@ -458,7 +458,10 @@ function buildWhere(filters: AIFieldFilter[]): Record<string, unknown> {
 }
 
 function buildSelect(columns: string[]): Record<string, boolean> {
-  return Object.fromEntries(columns.map((column) => [column, true]));
+  return {
+    id: true,
+    ...Object.fromEntries(columns.map((column) => [column, true])),
+  };
 }
 
 async function runQuery(
