@@ -289,8 +289,7 @@ model LmRecord {
   mandante           String?
   portal_access      String?
   direccion          String?
-  confirmation_cc    Boolean? @default(false)
-  confirmation_power Boolean? @default(false)
+
 
   estado_contrato_cliente     String?
   fecha_termino_contrato      DateTime?
@@ -361,8 +360,7 @@ model TpRecord {
   mandante           String?
   portal_access      String?
   direccion          String?
-  confirmation_cc    Boolean? @default(false)
-  confirmation_power Boolean? @default(false)
+
 
   estado_contrato_cliente String?
   fecha_termino_contrato  DateTime?
