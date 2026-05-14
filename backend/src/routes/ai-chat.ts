@@ -5,7 +5,12 @@ import { PrismaClient } from "@prisma/client";
 const router = express.Router();
 const prisma = new PrismaClient();
 
-const apiKey = process.env.OPENAI_API_KEY || process.env.crm || process.env.CRM || "";
+const apiKey =
+  process.env.OPENAI_API_KEY ||
+  process.env.crm ||
+  process.env.CRM ||
+  "";
+
 const openai = new OpenAI({
   apiKey: apiKey || "dummy",
 });
@@ -120,6 +125,20 @@ const NUMBER_FIELDS = new Set([
   "fee",
 ]);
 
+const DATE_FIELDS = new Set([
+  "contract_end_date",
+  "afp_submission_date",
+  "afp_entry_date",
+  "afp_payment_date",
+  "finanfix_invoice_date",
+  "finanfix_invoice_payment_date",
+  "client_notification_date",
+  "rejection_date",
+  "created_at",
+  "updated_at",
+  "last_activity_at",
+]);
+
 function normalize(value: unknown): string {
   return String(value || "")
     .toLowerCase()
@@ -179,14 +198,22 @@ function fuzzyIncludes(source: unknown, search: unknown): boolean {
 
   if (!sourceParts.length || !searchParts.length) return false;
 
-  return searchParts.every((part) => {
-    return sourceParts.some((candidate) => {
+  return searchParts.every((part) =>
+    sourceParts.some((candidate) => {
       if (candidate.includes(part) || part.includes(candidate)) return true;
-
       const maxDistance = part.length <= 4 ? 1 : 2;
       return levenshtein(candidate, part) <= maxDistance;
-    });
-  });
+    })
+  );
+}
+
+function strictTextIncludes(source: unknown, search: unknown): boolean {
+  const s1 = normalize(source);
+  const s2 = normalize(search);
+
+  if (!s1 || !s2) return false;
+
+  return s1.includes(s2);
 }
 
 function money(value: unknown): string {
@@ -210,6 +237,24 @@ function parseNumber(value: unknown): number {
 
   const parsed = Number(cleaned);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseDateValue(value: unknown): number | null {
+  if (!value) return null;
+
+  const raw = String(value).trim();
+
+  const direct = new Date(raw);
+  if (!Number.isNaN(direct.getTime())) return direct.getTime();
+
+  const match = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (match) {
+    const [, dd, mm, yyyy] = match;
+    const parsed = new Date(`${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`);
+    if (!Number.isNaN(parsed.getTime())) return parsed.getTime();
+  }
+
+  return null;
 }
 
 function normalizeBooleanValue(value: unknown): boolean | null {
@@ -244,8 +289,7 @@ function normalizeBooleanValue(value: unknown): boolean | null {
 
 function isTruthySi(value: unknown): boolean {
   const normalized = normalizeBooleanValue(value);
-  if (normalized !== null) return normalized;
-  return false;
+  return normalized === true;
 }
 
 function normalizePlanValue(field: string, value: unknown): string | number | boolean {
@@ -277,13 +321,15 @@ Tu trabajo es interpretar exactamente lo que el usuario pide y convertirlo en un
 Reglas críticas:
 - Debes comportarte como ChatGPT conversando con el CRM.
 - Entiende errores ortográficos, frases incompletas y sinónimos.
+- Puedes interpretar cualquier filtro sobre cualquier campo disponible.
 - No inventes campos: usa SOLO los campos disponibles.
 - No cambies la intención del usuario.
 - No conviertas una búsqueda normal en sugerencia.
 - Usa suggest_management solo si el usuario pide explícitamente: "sugerencias", "prioriza", "qué gestiono primero", "casos listos", "mejores condiciones para gestionar".
-- Para textos usa SIEMPRE operator "contains".
+- Para textos usa operator "contains".
 - Para booleanos usa operator "equals" con true o false.
 - Para montos usa gt/gte/lt/lte cuando corresponda.
+- Para fechas usa gt/gte/lt/lte cuando el usuario pida antes/después/desde/hasta.
 - Si el usuario dice "ahora", usa el contexto anterior.
 
 Campos disponibles reales:
@@ -339,8 +385,8 @@ Reglas de columnas:
 - Si no pide campos, usa columnas principales:
   mandante, business_name, rut, entity, management_status, refund_amount, confirmation_cc, confirmation_power, request_number.
 
-Ejemplos:
-Usuario: "muestrame mundo capital gestionado"
+Ejemplo 1:
+Usuario: "Mandante = Mundo previsional, entidad = AFP Capital y Estado Gestión = Gestionado"
 JSON:
 {
   "intent": "query_records",
@@ -355,18 +401,20 @@ JSON:
   "answerHint": "Busqué casos gestionados de Mundo Previsional en AFP Capital."
 }
 
-Usuario: "casos con cc si y poder no"
+Ejemplo 2:
+Usuario: "casos de optimiza con monto menor a 500000 y poder si"
 JSON:
 {
   "intent": "query_records",
   "filters": [
-    { "field": "confirmation_cc", "operator": "equals", "value": true },
-    { "field": "confirmation_power", "operator": "equals", "value": false }
+    { "field": "mandante", "operator": "contains", "value": "Optimiza" },
+    { "field": "refund_amount", "operator": "lt", "value": 500000 },
+    { "field": "confirmation_power", "operator": "equals", "value": true }
   ],
   "columns": ["mandante", "business_name", "rut", "entity", "management_status", "refund_amount", "confirmation_cc", "confirmation_power", "request_number"],
   "orderBy": { "field": "refund_amount", "direction": "desc" },
   "limit": 100,
-  "answerHint": "Busqué casos con cuenta corriente confirmada y poder pendiente."
+  "answerHint": "Busqué casos de Optimiza con monto menor a 500.000 y poder confirmado."
 }
 `;
 
@@ -407,7 +455,7 @@ function sanitizePlan(plan: AIQueryPlan, fields: string[]): AIQueryPlan {
         };
       }
 
-      if (NUMBER_FIELDS.has(filter.field)) {
+      if (NUMBER_FIELDS.has(filter.field) || DATE_FIELDS.has(filter.field)) {
         return {
           ...filter,
           value,
@@ -441,48 +489,6 @@ function sanitizePlan(plan: AIQueryPlan, fields: string[]): AIQueryPlan {
     groupBy: (plan.groupBy || []).filter((group) => fieldSet.has(group)),
     limit: Math.min(Math.max(Number(plan.limit || 100), 1), 500),
     answerHint: plan.answerHint,
-  };
-}
-
-function buildWhere(filters: AIFieldFilter[]): Record<string, unknown> {
-  const AND: Record<string, unknown>[] = [];
-
-  for (const filter of filters || []) {
-    const { field, operator } = filter;
-    const value = normalizePlanValue(field, filter.value);
-
-    if (BOOLEAN_FIELDS.has(field)) {
-      AND.push({ [field]: value });
-      continue;
-    }
-
-    if (NUMBER_FIELDS.has(field)) {
-      const numericValue = parseNumber(value);
-
-      if (operator === "gt" || operator === "gte" || operator === "lt" || operator === "lte") {
-        AND.push({ [field]: { [operator]: numericValue } });
-      } else {
-        AND.push({ [field]: numericValue });
-      }
-
-      continue;
-    }
-
-    AND.push({
-      [field]: {
-        contains: String(value),
-        mode: "insensitive",
-      },
-    });
-  }
-
-  return AND.length ? { AND } : {};
-}
-
-function buildSelect(columns: string[]): Record<string, boolean> {
-  return {
-    id: true,
-    ...Object.fromEntries(columns.map((column) => [column, true])),
   };
 }
 
@@ -582,6 +588,28 @@ function rowMatchesFilter(row: Record<string, unknown>, filter: AIFieldFilter): 
     return n1 === n2;
   }
 
+  if (DATE_FIELDS.has(filter.field)) {
+    const d1 = parseDateValue(fieldValue);
+    const d2 = parseDateValue(value);
+
+    if (d1 === null || d2 === null) return false;
+
+    if (filter.operator === "gt") return d1 > d2;
+    if (filter.operator === "gte") return d1 >= d2;
+    if (filter.operator === "lt") return d1 < d2;
+    if (filter.operator === "lte") return d1 <= d2;
+
+    return d1 === d2;
+  }
+
+  if (filter.field === "management_status") {
+    return strictTextIncludes(fieldValue, value);
+  }
+
+  if (filter.operator === "equals") {
+    return strictTextIncludes(fieldValue, value);
+  }
+
   return fuzzyIncludes(fieldValue, value);
 }
 
@@ -632,7 +660,7 @@ async function runSuggestions(fields: string[]): Promise<Record<string, unknown>
 
   const filtered = rows
     .filter((row) => {
-      const isPending = fuzzyIncludes(row.management_status, "Pendiente");
+      const isPending = strictTextIncludes(row.management_status, "Pendiente");
       const hasCc = isTruthySi(row.confirmation_cc);
       const hasPower = isTruthySi(row.confirmation_power);
       const hasEntity = Boolean(normalize(row.entity));
