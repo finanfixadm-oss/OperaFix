@@ -4,25 +4,20 @@ import { publicBaseUrl, fetchJson } from "../api";
 import type { RecordItem } from "../types-records";
 
 function money(value: unknown) {
-  const n = Number(value || 0);
   return new Intl.NumberFormat("es-CL", {
     style: "currency",
     currency: "CLP",
     maximumFractionDigits: 0,
-  }).format(Number.isFinite(n) ? n : 0);
+  }).format(Number(value || 0));
 }
 
 function safe(value: unknown, fallback = "—") {
-  const text = String(value || "").trim();
+  const text = String(value ?? "").trim();
   return text || fallback;
 }
 
-function normalize(value: unknown) {
-  return String(value || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
+function norm(value: unknown) {
+  return safe(value, "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
 function publicDocUrl(fileUrl?: string | null) {
@@ -32,21 +27,9 @@ function publicDocUrl(fileUrl?: string | null) {
 }
 
 function exportCsv(filename: string, rows: RecordItem[]) {
-  const headers = [
-    "Mandante",
-    "Empresa",
-    "RUT",
-    "AFP",
-    "Estado",
-    "Monto devolución",
-    "Solicitud",
-    "Poder",
-    "CC",
-    "Documentos",
-  ];
-
-  const body = rows.map((row: any) => [
-    row.mandante?.name || row.mandante || "",
+  const headers = ["Mandante", "Empresa", "RUT", "AFP", "Estado", "Monto", "Solicitud", "Poder", "CC", "Documentos"];
+  const body = rows.map((row) => [
+    row.mandante?.name || (row as any).mandante || "",
     row.razon_social || row.company?.razon_social || "",
     row.rut || row.company?.rut || "",
     row.entidad || row.lineAfp?.afp_name || "",
@@ -57,11 +40,7 @@ function exportCsv(filename: string, rows: RecordItem[]) {
     row.confirmacion_cc ? "Sí" : "No",
     String((row.documents || []).length),
   ]);
-
-  const csv = [headers, ...body]
-    .map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";"))
-    .join("\n");
-
+  const csv = [headers, ...body].map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";")).join("\n");
   const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -72,38 +51,32 @@ function exportCsv(filename: string, rows: RecordItem[]) {
 }
 
 function stageIndex(status?: string | null) {
-  const text = normalize(status);
+  const text = norm(status);
   if (/rechaz/.test(text)) return 1;
-  if (/pag|factur|cerr/.test(text)) return 4;
-  if (/respuesta|respond|confirm/.test(text)) return 3;
-  if (/ingreso|enviad|present|afp/.test(text)) return 2;
+  if (/pag|factur|cerrad/.test(text)) return 4;
+  if (/respuesta|confirm|gestionado|solicitud/.test(text)) return 3;
+  if (/ingreso|enviad|present/.test(text)) return 2;
   return 1;
 }
 
-function statusBucket(status?: string | null) {
-  const text = normalize(status);
-  if (/pag|factur|cerr/.test(text)) return "Cierre / pago";
-  if (/rechaz/.test(text)) return "Rechazados";
-  if (/respuesta|respond|confirm/.test(text)) return "Respuesta AFP";
-  if (/ingreso|enviad|present|afp/.test(text)) return "Ingresados AFP";
+function stageName(row: RecordItem) {
+  const status = norm(row.estado_gestion);
+  if (/rechaz/.test(status)) return "Observados / rechazados";
+  if (/pag|factur|cerrad/.test(status)) return "Pago / cierre";
+  if (/respuesta|confirm|gestionado|solicitud/.test(status)) return "Respuesta / seguimiento";
+  if (/ingreso|enviad|present/.test(status)) return "Ingresados AFP";
   return "Preparación";
 }
 
-function recordAmount(row: RecordItem) {
-  return Number((row as any).monto_devolucion || 0);
+function semaforo(row: RecordItem) {
+  if (!row.confirmacion_poder) return { label: "Falta poder", tone: "danger" };
+  if (!row.confirmacion_cc) return { label: "Falta CC", tone: "warning" };
+  if (!(row.documents || []).length) return { label: "Faltan docs", tone: "warning" };
+  if (Number(row.monto_devolucion || 0) <= 0) return { label: "Sin monto", tone: "muted" };
+  return { label: "Listo", tone: "success" };
 }
 
-function recordCompany(row: RecordItem) {
-  return safe((row as any).razon_social || row.company?.razon_social, "Empresa sin razón social");
-}
-
-function recordRut(row: RecordItem) {
-  return safe((row as any).rut || row.company?.rut, "Sin RUT");
-}
-
-function recordEntity(row: RecordItem) {
-  return safe((row as any).entidad || row.lineAfp?.afp_name, "Sin entidad");
-}
+type PortalView = "cards" | "kanban" | "table";
 
 export default function ClientPortalPage() {
   const navigate = useNavigate();
@@ -111,9 +84,9 @@ export default function ClientPortalPage() {
   const [loading, setLoading] = useState(true);
   const [selectedMandante, setSelectedMandante] = useState("todos");
   const [selectedEstado, setSelectedEstado] = useState("todos");
-  const [selectedAfp, setSelectedAfp] = useState("todos");
-  const [viewMode, setViewMode] = useState<"cards" | "kanban" | "table">("cards");
+  const [selectedEntity, setSelectedEntity] = useState("todos");
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<PortalView>("cards");
 
   async function load() {
     setLoading(true);
@@ -139,228 +112,167 @@ export default function ClientPortalPage() {
     }
   }, []);
 
-  const mandantes = useMemo(
-    () => Array.from(new Set(rows.map((row: any) => safe(row.mandante?.name || row.mandante, "Sin mandante")))).sort(),
-    [rows]
-  );
+  const mandantes = useMemo(() => Array.from(new Set(rows.map((row) => safe(row.mandante?.name || (row as any).mandante, "Sin mandante")))).sort(), [rows]);
+  const estados = useMemo(() => Array.from(new Set(rows.map((row) => safe(row.estado_gestion, "Sin estado")))).sort(), [rows]);
+  const entities = useMemo(() => Array.from(new Set(rows.map((row) => safe(row.entidad || row.lineAfp?.afp_name, "Sin entidad")))).sort(), [rows]);
 
-  const estados = useMemo(
-    () => Array.from(new Set(rows.map((row: any) => safe(row.estado_gestion, "Sin estado")))).sort(),
-    [rows]
-  );
+  const visibleRows = useMemo(() => rows.filter((row) => {
+    const mandante = safe(row.mandante?.name || (row as any).mandante, "Sin mandante");
+    const estado = safe(row.estado_gestion, "Sin estado");
+    const entity = safe(row.entidad || row.lineAfp?.afp_name, "Sin entidad");
+    const matchesMandante = selectedMandante === "todos" || mandante === selectedMandante;
+    const matchesEstado = selectedEstado === "todos" || estado === selectedEstado;
+    const matchesEntity = selectedEntity === "todos" || entity === selectedEntity;
+    const q = norm(search);
+    const matchesSearch = !q || [row.razon_social, row.company?.razon_social, row.rut, row.company?.rut, row.entidad, row.estado_gestion, row.numero_solicitud, row.grupo_empresa]
+      .filter(Boolean).some((value) => norm(value).includes(q));
+    return matchesMandante && matchesEstado && matchesEntity && matchesSearch;
+  }), [rows, selectedMandante, selectedEstado, selectedEntity, search]);
 
-  const afps = useMemo(
-    () => Array.from(new Set(rows.map(recordEntity))).sort(),
-    [rows]
-  );
-
-  const visibleRows = useMemo(() => {
-    return rows.filter((row: any) => {
-      const mandante = safe(row.mandante?.name || row.mandante, "Sin mandante");
-      const estado = safe(row.estado_gestion, "Sin estado");
-      const afp = recordEntity(row);
-      const q = normalize(search);
-
-      const matchesMandante = selectedMandante === "todos" || mandante === selectedMandante;
-      const matchesEstado = selectedEstado === "todos" || estado === selectedEstado;
-      const matchesAfp = selectedAfp === "todos" || afp === selectedAfp;
-      const matchesSearch =
-        !q ||
-        [
-          recordCompany(row),
-          recordRut(row),
-          afp,
-          estado,
-          row.numero_solicitud,
-          row.grupo_empresa,
-        ]
-          .filter(Boolean)
-          .some((value) => normalize(value).includes(q));
-
-      return matchesMandante && matchesEstado && matchesAfp && matchesSearch;
-    });
-  }, [rows, selectedMandante, selectedEstado, selectedAfp, search]);
-
-  const totals = useMemo(() => {
-    const totalAmount = visibleRows.reduce((sum, row) => sum + recordAmount(row), 0);
-    const docs = visibleRows.reduce((sum, row: any) => sum + (row.documents || []).length, 0);
-    const ready = visibleRows.filter((row: any) => row.confirmacion_cc && row.confirmacion_poder && recordAmount(row) > 0).length;
-    const blocked = visibleRows.filter((row: any) => !row.confirmacion_cc || !row.confirmacion_poder).length;
-    const paid = visibleRows.filter((row: any) => /pag|factur|cerr/i.test(String(row.estado_gestion || ""))).length;
-
-    return { count: visibleRows.length, amount: totalAmount, docs, ready, blocked, paid };
-  }, [visibleRows]);
+  const totals = useMemo(() => ({
+    count: visibleRows.length,
+    amount: visibleRows.reduce((sum, row) => sum + Number(row.monto_devolucion || 0), 0),
+    paid: visibleRows.reduce((sum, row) => sum + Number((row as any).monto_pagado || 0), 0),
+    docs: visibleRows.reduce((sum, row) => sum + (row.documents || []).length, 0),
+    ready: visibleRows.filter((row) => row.confirmacion_cc && row.confirmacion_poder && Number(row.monto_devolucion || 0) > 0).length,
+    blockedPower: visibleRows.filter((row) => !row.confirmacion_poder).length,
+    blockedCc: visibleRows.filter((row) => !row.confirmacion_cc).length,
+  }), [visibleRows]);
 
   const kanbanGroups = useMemo(() => {
-    const groups = ["Preparación", "Ingresados AFP", "Respuesta AFP", "Cierre / pago", "Rechazados"];
-    return groups.map((group) => ({
-      group,
-      rows: visibleRows.filter((row: any) => statusBucket(row.estado_gestion) === group),
+    const stages = ["Preparación", "Ingresados AFP", "Respuesta / seguimiento", "Pago / cierre", "Observados / rechazados"];
+    return stages.map((stage) => ({
+      stage,
+      rows: visibleRows.filter((row) => stageName(row) === stage),
     }));
   }, [visibleRows]);
 
-  function openRecord(row: RecordItem) {
-    if (!row.id) return;
-    navigate(`/records/${row.id}`);
-  }
-
   return (
-    <div className="zoho-module-page client-portal-page">
-      <div className="portal-hero">
+    <div className="zoho-module-page client-portal-page portal-pro-page">
+      <div className="portal-hero portal-pro-hero">
         <div>
           <p className="eyebrow">Portal cliente PRO</p>
           <h1>Seguimiento ejecutivo de gestiones LM / TP</h1>
-          <p>Vista consultiva para revisar avance, documentos, pagos, bloqueos y trazabilidad visible por mandante.</p>
+          <p>Estado operacional, documentos, montos, trazabilidad visible y semáforo de avance para cada caso.</p>
         </div>
         <div className="portal-hero-actions">
-          <select
-            className="zoho-select"
-            value={selectedMandante}
-            onChange={(e) => setSelectedMandante(e.target.value)}
-            disabled={Boolean(user?.role === "cliente")}
-          >
+          <select className="zoho-select" value={selectedMandante} onChange={(e) => setSelectedMandante(e.target.value)} disabled={user?.role === "cliente"}>
             <option value="todos">Todos los mandantes</option>
-            {mandantes.map((name) => (
-              <option key={name} value={name}>{name}</option>
-            ))}
+            {mandantes.map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
           <select className="zoho-select" value={selectedEstado} onChange={(e) => setSelectedEstado(e.target.value)}>
             <option value="todos">Todos los estados</option>
-            {estados.map((name) => (
-              <option key={name} value={name}>{name}</option>
-            ))}
+            {estados.map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
-          <select className="zoho-select" value={selectedAfp} onChange={(e) => setSelectedAfp(e.target.value)}>
+          <select className="zoho-select" value={selectedEntity} onChange={(e) => setSelectedEntity(e.target.value)}>
             <option value="todos">Todas las AFP</option>
-            {afps.map((name) => (
-              <option key={name} value={name}>{name}</option>
-            ))}
+            {entities.map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
-          <input className="zoho-input" placeholder="Buscar RUT, empresa, AFP, solicitud..." value={search} onChange={(e) => setSearch(e.target.value)} />
-          <button className="zoho-btn" onClick={() => exportCsv("portal_cliente_operafix.csv", visibleRows)}>Exportar vista</button>
-          <button className="zoho-btn" onClick={load}>Actualizar</button>
+          <input className="zoho-input" placeholder="Buscar RUT, empresa, AFP o solicitud..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <button className="zoho-btn" onClick={load}>{loading ? "Cargando..." : "Actualizar"}</button>
+          <button className="zoho-btn zoho-btn-primary" onClick={() => exportCsv("portal_cliente_operafix.csv", visibleRows)}>Exportar</button>
         </div>
       </div>
 
-      <section className="portal-summary-strip">
+      <section className="portal-summary-strip portal-pro-summary">
         <div><span>Gestiones visibles</span><strong>{totals.count}</strong></div>
         <div><span>Monto devolución</span><strong>{money(totals.amount)}</strong></div>
-        <div><span>Documentos</span><strong>{totals.docs}</strong></div>
+        <div><span>Monto pagado</span><strong>{money(totals.paid)}</strong></div>
         <div><span>Listas</span><strong>{totals.ready}</strong></div>
-        <div><span>Bloqueadas</span><strong>{totals.blocked}</strong></div>
-        <div><span>Pagadas / cerradas</span><strong>{totals.paid}</strong></div>
+        <div><span>Falta poder</span><strong>{totals.blockedPower}</strong></div>
+        <div><span>Falta CC</span><strong>{totals.blockedCc}</strong></div>
       </section>
 
-      <section className="portal-view-switch">
-        <button className={viewMode === "cards" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setViewMode("cards")}>Tarjetas</button>
-        <button className={viewMode === "kanban" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setViewMode("kanban")}>Kanban</button>
-        <button className={viewMode === "table" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setViewMode("table")}>Tabla</button>
-      </section>
+      <div className="portal-view-tabs">
+        <button className={view === "cards" ? "active" : ""} onClick={() => setView("cards")}>Tarjetas</button>
+        <button className={view === "kanban" ? "active" : ""} onClick={() => setView("kanban")}>Kanban</button>
+        <button className={view === "table" ? "active" : ""} onClick={() => setView("table")}>Tabla</button>
+      </div>
 
-      {loading ? <div className="zoho-empty">Cargando portal...</div> : null}
+      {loading ? <div className="zoho-empty">Cargando portal...</div> : (
+        <>
+          {view === "cards" && <div className="portal-record-grid">
+            {visibleRows.length === 0 ? <div className="zoho-empty">No hay gestiones para el filtro seleccionado.</div> : visibleRows.map((row) => <PortalCard key={row.id} row={row} />)}
+          </div>}
 
-      {!loading && viewMode === "cards" && (
-        <div className="portal-record-grid">
-          {visibleRows.length === 0 ? <div className="zoho-empty">No hay gestiones para el filtro seleccionado.</div> : null}
-          {visibleRows.map((row: any) => {
-            const currentStage = stageIndex(row.estado_gestion);
-            return (
-              <article className="portal-card" key={row.id}>
-                <div className="portal-card-head">
-                  <div>
-                    <h2>{recordCompany(row)}</h2>
-                    <p>{recordRut(row)} · {recordEntity(row)}</p>
-                  </div>
-                  <span className="status-pill">{row.estado_gestion || "Pendiente"}</span>
-                </div>
+          {view === "kanban" && <div className="portal-kanban-board">
+            {kanbanGroups.map((group) => <div className="portal-kanban-column" key={group.stage}>
+              <div className="portal-kanban-title"><strong>{group.stage}</strong><span>{group.rows.length}</span></div>
+              {group.rows.map((row) => {
+                const alert = semaforo(row);
+                return <button key={row.id} className="portal-kanban-card" onClick={() => navigate(`/records/${row.id}`)}>
+                  <strong>{row.razon_social || row.company?.razon_social || "Empresa"}</strong>
+                  <span>{row.rut || row.company?.rut || "Sin RUT"}</span>
+                  <small>{row.entidad || row.lineAfp?.afp_name || "Sin AFP"} · {money(row.monto_devolucion)}</small>
+                  <em className={`portal-chip ${alert.tone}`}>{alert.label}</em>
+                </button>;
+              })}
+            </div>)}
+          </div>}
 
-                <div className="portal-progress">
-                  {["Preparación", "Ingreso", "Respuesta", "Pago/Cierre"].map((label, index) => (
-                    <div key={label} className={index + 1 <= currentStage ? "active" : ""}><span>{index + 1}</span><small>{label}</small></div>
-                  ))}
-                </div>
-
-                <div className="portal-card-metrics">
-                  <div><span>Monto devolución</span><strong>{money(row.monto_devolucion)}</strong></div>
-                  <div><span>N° solicitud</span><strong>{row.numero_solicitud || "—"}</strong></div>
-                  <div><span>Tipo</span><strong>{row.management_type || row.motivo_tipo_exceso || "—"}</strong></div>
-                </div>
-
-                <div className="portal-card-metrics portal-card-metrics-secondary">
-                  <div><span>Poder</span><strong>{row.confirmacion_poder ? "Confirmado" : "Pendiente"}</strong></div>
-                  <div><span>Cuenta CC</span><strong>{row.confirmacion_cc ? "Confirmada" : "Pendiente"}</strong></div>
-                  <div><span>Fecha pago</span><strong>{row.fecha_pago_afp ? new Date(row.fecha_pago_afp).toLocaleDateString("es-CL") : "—"}</strong></div>
-                </div>
-
-                <div className="portal-documents">
-                  <strong>Documentos disponibles</strong>
-                  {(row.documents || []).length === 0 ? <p>Sin documentos visibles.</p> : (row.documents || []).slice(0, 7).map((doc: any) => (
-                    <a key={doc.id} href={publicDocUrl(doc.file_url)} target="_blank" rel="noreferrer"><span>{doc.category || "Documento"}</span>{doc.file_name}</a>
-                  ))}
-                </div>
-
-                <div className="portal-card-actions">
-                  <button className="zoho-btn" onClick={() => openRecord(row)}>Abrir ficha</button>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
-
-      {!loading && viewMode === "kanban" && (
-        <div className="portal-kanban-grid">
-          {kanbanGroups.map((group) => (
-            <section className="portal-kanban-column" key={group.group}>
-              <h2>{group.group} <span>{group.rows.length}</span></h2>
-              {group.rows.map((row: any) => (
-                <button className="portal-kanban-card" key={row.id} onClick={() => openRecord(row)}>
-                  <strong>{recordCompany(row)}</strong>
-                  <span>{recordRut(row)} · {recordEntity(row)}</span>
-                  <b>{money(row.monto_devolucion)}</b>
-                </button>
-              ))}
-            </section>
-          ))}
-        </div>
-      )}
-
-      {!loading && viewMode === "table" && (
-        <section className="zoho-card portal-table-card">
-          <div className="zoho-table-scroll">
-            <table className="zoho-table compact">
-              <thead>
-                <tr>
-                  <th>Mandante</th>
-                  <th>Empresa</th>
-                  <th>RUT</th>
-                  <th>AFP</th>
-                  <th>Estado</th>
-                  <th>Monto</th>
-                  <th>Poder</th>
-                  <th>CC</th>
-                  <th>Documentos</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleRows.map((row: any) => (
-                  <tr key={row.id} className="clickable-row" onClick={() => openRecord(row)}>
-                    <td>{row.mandante?.name || row.mandante || "—"}</td>
-                    <td>{recordCompany(row)}</td>
-                    <td>{recordRut(row)}</td>
-                    <td>{recordEntity(row)}</td>
-                    <td><span className="status-pill">{row.estado_gestion || "—"}</span></td>
+          {view === "table" && <div className="zoho-card portal-table-card">
+            <div className="zoho-table-scroll">
+              <table className="zoho-table compact">
+                <thead><tr><th>Empresa</th><th>RUT</th><th>AFP</th><th>Estado</th><th>Monto</th><th>Poder</th><th>CC</th><th>Docs</th></tr></thead>
+                <tbody>{visibleRows.map((row) => {
+                  const alert = semaforo(row);
+                  return <tr key={row.id} onClick={() => navigate(`/records/${row.id}`)} className="clickable-row">
+                    <td>{row.razon_social || row.company?.razon_social || "—"}</td>
+                    <td>{row.rut || row.company?.rut || "—"}</td>
+                    <td>{row.entidad || row.lineAfp?.afp_name || "—"}</td>
+                    <td><span className="status-pill">{row.estado_gestion || "Pendiente"}</span></td>
                     <td>{money(row.monto_devolucion)}</td>
                     <td>{row.confirmacion_poder ? "Sí" : "No"}</td>
                     <td>{row.confirmacion_cc ? "Sí" : "No"}</td>
-                    <td>{(row.documents || []).length}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                    <td><span className={`portal-chip ${alert.tone}`}>{alert.label}</span></td>
+                  </tr>;
+                })}</tbody>
+              </table>
+            </div>
+          </div>}
+        </>
       )}
     </div>
+  );
+}
+
+function PortalCard({ row }: { row: RecordItem }) {
+  const currentStage = stageIndex(row.estado_gestion);
+  const alert = semaforo(row);
+  return (
+    <article className="portal-card portal-pro-card">
+      <div className="portal-card-head">
+        <div>
+          <h2>{row.razon_social || row.company?.razon_social || "Empresa sin razón social"}</h2>
+          <p>{row.rut || row.company?.rut || "Sin RUT"} · {row.entidad || row.lineAfp?.afp_name || "Sin entidad"}</p>
+        </div>
+        <span className={`portal-chip ${alert.tone}`}>{alert.label}</span>
+      </div>
+
+      <div className="portal-progress">
+        {["Preparación", "Ingreso", "Respuesta", "Pago/Cierre"].map((label, index) => (
+          <div key={label} className={index + 1 <= currentStage ? "active" : ""}><span>{index + 1}</span><small>{label}</small></div>
+        ))}
+      </div>
+
+      <div className="portal-card-metrics">
+        <div><span>Monto devolución</span><strong>{money(row.monto_devolucion)}</strong></div>
+        <div><span>N° solicitud</span><strong>{row.numero_solicitud || "—"}</strong></div>
+        <div><span>Tipo</span><strong>{row.management_type || row.motivo_tipo_exceso || "—"}</strong></div>
+      </div>
+
+      <div className="portal-card-metrics portal-card-metrics-secondary">
+        <div><span>Poder</span><strong>{row.confirmacion_poder ? "Confirmado" : "Pendiente"}</strong></div>
+        <div><span>Cuenta CC</span><strong>{row.confirmacion_cc ? "Confirmada" : "Pendiente"}</strong></div>
+        <div><span>Fecha pago</span><strong>{row.fecha_pago_afp ? new Date(row.fecha_pago_afp).toLocaleDateString("es-CL") : "—"}</strong></div>
+      </div>
+
+      <div className="portal-documents">
+        <strong>Documentos disponibles</strong>
+        {(row.documents || []).length === 0 ? <p>Sin documentos visibles.</p> : (row.documents || []).slice(0, 7).map((doc) => (
+          <a key={doc.id} href={publicDocUrl(doc.file_url)} target="_blank" rel="noreferrer"><span>{doc.category || "Documento"}</span>{doc.file_name}</a>
+        ))}
+      </div>
+    </article>
   );
 }

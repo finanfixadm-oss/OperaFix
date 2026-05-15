@@ -22,6 +22,7 @@ import auditRouter from "./routes/audit.js";
 import aiChatRoutes from "./routes/ai-chat.js";
 
 import dashboardRoutes from "./routes/dashboard.js";
+import intelligenceRouter from "./routes/intelligence.js";
 import automationRoutes from "./routes/automation.js";
 import aiExecuteRoutes from "./modules/ai/ai.execute.routes.js";
 import aiSuggestionsRoutes from "./modules/ai/ai.suggestions.routes.js";
@@ -51,6 +52,7 @@ app.use("/api/automation", automationRoutes);
 app.use("/api/ai-actions", aiExecuteRoutes);
 app.use("/api/ai-suggestions", aiSuggestionsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/intelligence", requireAuth, requireRoles(["admin", "interno", "kam"]), intelligenceRouter);
 app.use("/api/ai-chat", aiChatRoutes);
 app.use("/api/users", usersRouter);
 

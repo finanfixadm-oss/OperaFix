@@ -2378,5 +2378,284 @@
   .zoho-pagination-bar { justify-content: center; flex-wrap: wrap; }
 }
 
-/* OperaFix Portal Cliente PRO - V71 */
-.portal-view-switch{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 16px}.portal-card-actions{display:flex;justify-content:flex-end;border-top:1px solid #f1f5f9;margin-top:12px;padding-top:12px}.portal-kanban-grid{display:grid;grid-template-columns:repeat(5,minmax(220px,1fr));gap:14px;align-items:start}.portal-kanban-column{background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:12px;min-height:320px}.portal-kanban-column h2{margin:0 0 12px;font-size:15px;color:#0f172a;display:flex;justify-content:space-between;align-items:center}.portal-kanban-column h2 span{background:#e2e8f0;color:#334155;border-radius:999px;padding:3px 8px;font-size:12px}.portal-kanban-card{width:100%;text-align:left;border:1px solid #e5e7eb;background:#fff;border-radius:14px;padding:12px;margin-bottom:10px;cursor:pointer;box-shadow:0 8px 18px rgba(15,23,42,.05);display:grid;gap:6px}.portal-kanban-card:hover{border-color:#2563eb;transform:translateY(-1px)}.portal-kanban-card strong{color:#0f172a}.portal-kanban-card span{color:#64748b;font-size:12px}.portal-kanban-card b{color:#1d4ed8}.portal-table-card{margin-top:6px}.client-portal-page .portal-hero-actions{grid-template-columns:1fr;min-width:360px}@media(max-width:1200px){.portal-kanban-grid{grid-template-columns:repeat(2,minmax(220px,1fr))}}@media(max-width:760px){.portal-kanban-grid{grid-template-columns:1fr}.client-portal-page .portal-hero-actions{min-width:0}}
+/* ==============================
+   OperaFix V72 - Inteligencia Operacional + Portal Cliente PRO
+   ============================== */
+.ai-executive-panel {
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 48%, #2563eb 100%);
+  color: #fff;
+  border-radius: 22px;
+  padding: 22px;
+  margin: 18px 0;
+  box-shadow: 0 18px 45px rgba(37, 99, 235, 0.22);
+}
+
+.ai-executive-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.ai-eyebrow {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.14);
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.ai-executive-header h2 {
+  margin: 0;
+  font-size: 25px;
+}
+
+.ai-executive-header p {
+  margin: 6px 0 0;
+  color: rgba(255,255,255,.78);
+}
+
+.ai-executive-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ai-insight-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.ai-insight-grid > div {
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.ai-insight-grid span,
+.ai-insight-grid small {
+  color: rgba(255,255,255,.76);
+}
+
+.ai-insight-grid strong {
+  display: block;
+  font-size: 28px;
+  margin: 6px 0 2px;
+}
+
+.ai-insight-body {
+  display: grid;
+  grid-template-columns: minmax(280px, .9fr) minmax(360px, 1.1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.ai-narrative-card,
+.ai-priority-card {
+  background: #fff;
+  color: #0f172a;
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.ai-narrative-card h3,
+.ai-priority-card h3 {
+  margin-top: 0;
+}
+
+.ai-narrative-card ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+  color: #334155;
+}
+
+.ai-priority-row {
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: .18s ease;
+}
+
+.ai-priority-row:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, .10);
+}
+
+.ai-priority-row span,
+.ai-priority-row small {
+  display: block;
+  color: #64748b;
+  margin-top: 3px;
+}
+
+.ai-score-box {
+  min-width: 58px;
+  text-align: center;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 12px;
+  padding: 8px;
+}
+
+.ai-score-box strong {
+  display: block;
+  font-size: 22px;
+}
+
+.ai-score-box span {
+  color: #1d4ed8;
+  font-size: 11px;
+  margin: 0;
+}
+
+.portal-pro-hero {
+  background: radial-gradient(circle at top left, #e0f2fe 0%, #ffffff 42%, #f8fafc 100%);
+  border: 1px solid #e2e8f0;
+}
+
+.portal-pro-summary {
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+}
+
+.portal-view-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+  flex-wrap: wrap;
+}
+
+.portal-view-tabs button {
+  border: 1px solid #dbe3ef;
+  background: #fff;
+  padding: 10px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  color: #334155;
+}
+
+.portal-view-tabs button.active {
+  background: #0f172a;
+  color: #fff;
+  border-color: #0f172a;
+}
+
+.portal-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #eef2ff;
+  color: #3730a3;
+  white-space: nowrap;
+}
+
+.portal-chip.success { background: #dcfce7; color: #166534; }
+.portal-chip.warning { background: #fef3c7; color: #92400e; }
+.portal-chip.danger { background: #fee2e2; color: #991b1b; }
+.portal-chip.muted { background: #f1f5f9; color: #475569; }
+
+.portal-pro-card {
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, .06);
+}
+
+.portal-kanban-board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(230px, 1fr));
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.portal-kanban-column {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 12px;
+  min-height: 360px;
+}
+
+.portal-kanban-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  color: #0f172a;
+}
+
+.portal-kanban-title span {
+  background: #e2e8f0;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.portal-kanban-card {
+  width: 100%;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+  margin-bottom: 10px;
+  display: grid;
+  gap: 4px;
+  transition: .18s ease;
+}
+
+.portal-kanban-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(15,23,42,.10);
+}
+
+.portal-kanban-card span,
+.portal-kanban-card small {
+  color: #64748b;
+}
+
+.portal-kanban-card em {
+  justify-self: start;
+  font-style: normal;
+  margin-top: 6px;
+}
+
+.portal-table-card {
+  overflow: hidden;
+}
+
+@media (max-width: 1100px) {
+  .ai-executive-header,
+  .ai-insight-body {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+  .ai-insight-grid,
+  .portal-pro-summary {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
+  .portal-kanban-board {
+    grid-template-columns: repeat(5, 260px);
+  }
+}

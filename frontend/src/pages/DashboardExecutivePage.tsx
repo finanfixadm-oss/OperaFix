@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchJson } from "../api";
 import ZohoModal from "../components/ZohoModal";
+import IntelligenceSummaryPanel from "../components/intelligence/IntelligenceSummaryPanel";
 import type { FilterRule } from "../types";
 import type { RecordItem } from "../types-records";
 import { defaultRecordColumnFields, formatCellValue, getValueByPath, recordColumns, type RecordColumnDefinition } from "../utils-record-fields";
@@ -705,6 +706,8 @@ export default function DashboardExecutivePage() {
           <div className="dashboard-filter-help">
             <strong>Constructor de paneles:</strong> crea componentes como los de Zoho seleccionando el módulo, una medida, varios agrupamientos y filtros con patrón <strong>{"((1 y 2) y 3)"}</strong>.
           </div>
+
+          <IntelligenceSummaryPanel mandante={mandante} />
 
           {loading ? <div className="zoho-empty">Cargando dashboard...</div> : (
             <>
