@@ -1,2754 +1,732 @@
-.crm-shell {
-  min-height: 100vh;
-  background: #f5f7fb;
-  color: #14213d;
-  font-family: Arial, sans-serif;
-}
+/* =========================================================
+   OPERAFIX PRO UI FIX - PORTAL CLIENTE + DASHBOARD IA
+   Pegar al final de: frontend/src/styles/zoho-modules.css
+   ========================================================= */
 
-.crm-topbar {
-  height: 52px;
-  background: #4d95db;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-}
-
-.crm-topbar-left {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  width: 100%;
-}
-
-.crm-brand {
-  font-size: 28px;
-  font-weight: 700;
-}
-
-.crm-main-nav {
-  display: flex;
-  gap: 18px;
-}
-
-.crm-main-nav a,
-.crm-side-nav a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.crm-main-nav a.active,
-.crm-side-nav a.active {
-  font-weight: 700;
-}
-
-.crm-body {
-  display: grid;
-  grid-template-columns: 240px 1fr;
-  min-height: calc(100vh - 52px);
-}
-
-.crm-sidebar {
-  background: #fff;
-  border-right: 1px solid #dfe5ef;
-  padding: 12px;
-}
-
-.crm-sidebar-search {
-  margin-bottom: 14px;
-}
-
-.crm-side-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.crm-content {
-  padding: 18px;
-}
-
-.zoho-module-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.zoho-module-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-}
-
-.zoho-module-header h1 {
-  margin: 0;
-  font-size: 28px;
-}
-
-.zoho-module-header p {
-  margin: 4px 0 0;
-  color: #5d6b82;
-}
-
-.zoho-module-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.zoho-module-layout {
-  display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 16px;
-}
-
-.zoho-filter-panel {
-  background: #fff;
-  border: 1px solid #dfe5ef;
-  border-radius: 8px;
-  padding: 14px;
-  height: fit-content;
-}
-
-.zoho-filter-title {
-  font-size: 24px;
-  font-weight: 700;
-  margin-bottom: 12px;
-}
-
-.zoho-filter-search {
-  margin-bottom: 12px;
-}
-
-.zoho-filter-section-title {
-  font-weight: 700;
-  margin-bottom: 10px;
-}
-
-.zoho-filter-item {
-  padding: 8px 0;
-  border-bottom: 1px solid #eef2f7;
-}
-
-.zoho-filter-item-label {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  font-size: 14px;
-}
-
-.zoho-filter-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 8px;
-  margin-left: 24px;
-}
-
-.zoho-filter-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.zoho-input,
-.zoho-select {
-  width: 100%;
-  height: 36px;
-  border: 1px solid #cfd7e6;
-  border-radius: 6px;
-  padding: 0 10px;
-  background: #fff;
-}
-
-.zoho-btn {
-  height: 36px;
-  padding: 0 14px;
-  border: 1px solid #cfd7e6;
-  border-radius: 6px;
-  background: #fff;
-  cursor: pointer;
-}
-
-.zoho-btn-primary {
-  background: #2f8de4;
-  color: #fff;
-  border-color: #2f8de4;
-}
-
-.zoho-table-wrap {
-  background: #fff;
-  border: 1px solid #dfe5ef;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.zoho-table-toolbar {
-  padding: 12px 14px;
-  border-bottom: 1px solid #eef2f7;
-  font-weight: 700;
-}
-
-.zoho-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.zoho-table th,
-.zoho-table td {
-  padding: 12px 14px;
-  border-bottom: 1px solid #eef2f7;
-  text-align: left;
-  font-size: 14px;
-}
-
-.zoho-table tbody tr:hover {
-  background: #f8fbff;
-}
-
-.zoho-empty {
+.client-portal-pro,
+.client-portal-page {
   padding: 24px;
-  color: #5d6b82;
-}
-.zoho-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(12, 18, 32, 0.42);
-  z-index: 999;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 30px 20px;
-  overflow-y: auto;
+  background: #f5f7fb;
+  min-height: calc(100vh - 64px);
+  color: #0f172a;
 }
 
-.zoho-modal {
-  background: #fff;
-  width: min(980px, 100%);
-  max-height: calc(100vh - 60px);
-  border-radius: 10px;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
-  border: 1px solid #dfe5ef;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.zoho-modal-header {
-  height: 58px;
-  padding: 0 18px;
-  border-bottom: 1px solid #eef2f7;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-}
-
-.zoho-modal-body {
-  padding: 18px;
-  overflow-y: auto;
-  max-height: calc(100vh - 118px);
-}
-
-.zoho-form-grid {
+.client-portal-hero,
+.portal-client-hero,
+.portal-hero {
   display: grid;
-  grid-template-columns: repeat(2, minmax(220px, 1fr));
-  gap: 14px;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+  align-items: start;
+  padding: 26px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #10244f 0%, #1d4ed8 100%);
+  color: #ffffff;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.16);
+  margin-bottom: 24px;
 }
 
-.zoho-form-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.client-portal-hero h1,
+.portal-client-hero h1,
+.portal-hero h1 {
+  margin: 4px 0 8px;
+  font-size: 28px;
+  letter-spacing: -0.03em;
 }
 
-.zoho-form-field label {
-  font-weight: 700;
-  font-size: 14px;
-}
-
-.zoho-form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 18px;
-}
-
-.zoho-checkbox-row {
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-}
-
-.zoho-textarea {
-  min-height: 90px;
-  resize: vertical;
-  padding: 10px;
-}
-
-.zoho-form-section {
-  border: 1px solid #e4e9f2;
-  border-radius: 8px;
-  padding: 14px;
-  margin-bottom: 16px;
-  background: #fbfdff;
-}
-
-.zoho-form-section h3 {
-  margin: 0 0 12px;
-  font-size: 17px;
-  color: #1d4f8f;
-}
-
-.zoho-detail-card {
-  background: #fff;
-  border: 1px solid #dfe5ef;
-  border-radius: 8px;
-  padding: 18px;
-}
-
-.zoho-detail-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.zoho-detail-title h2 {
+.client-portal-hero p,
+.portal-client-hero p,
+.portal-hero p {
   margin: 0;
-  font-size: 22px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 15px;
 }
 
-.zoho-status-pill {
-  background: #e8f3ff;
-  color: #1d4f8f;
-  border: 1px solid #b9d9ff;
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-weight: 700;
-}
-
-.zoho-detail-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(170px, 1fr));
-  gap: 12px;
-}
-
-.zoho-info-field {
-  border: 1px solid #eef2f7;
-  border-radius: 6px;
-  padding: 10px;
-  background: #fbfdff;
-}
-
-.zoho-info-field span {
+.portal-eyebrow,
+.client-portal-eyebrow {
   display: block;
-  color: #64748b;
-  font-size: 13px;
-  margin-bottom: 4px;
-}
-
-.zoho-info-field strong {
-  color: #0f1f3d;
-  font-size: 14px;
-}
-
-.zoho-doc-stage-list {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.zoho-doc-stage {
-  border: 1px solid #e4e9f2;
-  border-radius: 8px;
-  padding: 14px;
-  background: #fbfdff;
-}
-
-.zoho-doc-stage-header h3 {
-  margin: 0;
-  color: #1d4f8f;
-}
-
-.zoho-doc-stage-header p {
-  margin: 4px 0 12px;
-  color: #64748b;
-}
-
-.zoho-doc-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.zoho-doc-slot {
-  background: #fff;
-  border: 1px solid #dfe5ef;
-  border-radius: 8px;
-  padding: 12px;
-}
-
-.zoho-doc-slot-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.zoho-small-btn {
-  border: 1px solid #2f8de4;
-  background: #fff;
-  color: #2f8de4;
-  border-radius: 6px;
-  padding: 4px 8px;
-  cursor: pointer;
-}
-
-.zoho-doc-empty {
-  color: #94a3b8;
-  font-size: 14px;
-}
-
-.zoho-doc-link {
-  display: block;
-  color: #1d4f8f;
-  text-decoration: none;
-  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: #bfdbfe;
   margin-bottom: 6px;
 }
-.zoho-view-tabs {
-  display: flex;
-  gap: 8px;
-  border-bottom: 1px solid #dfe5ef;
-  padding-bottom: 8px;
-  overflow-x: auto;
+
+.client-portal-filters,
+.portal-client-filters,
+.portal-filters {
+  display: grid;
+  gap: 10px;
 }
 
-.zoho-view-tabs button {
-  border: 1px solid #dfe5ef;
-  background: #fff;
-  border-radius: 6px;
-  padding: 8px 12px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.zoho-view-tabs button.active {
-  background: #e8f3ff;
-  border-color: #2f8de4;
-  color: #1d4f8f;
-  font-weight: 700;
-}
-
-.zoho-table-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-}
-
-.zoho-table-range {
-  color: #64748b;
-  font-size: 13px;
-  font-weight: 400;
-}
-
-.zoho-link-cell {
-  color: #1d4f8f;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.record-hero-card {
-  background: #fff;
-  border: 1px solid #dfe5ef;
+.client-portal-filters select,
+.client-portal-filters input,
+.client-portal-filters button,
+.portal-client-filters select,
+.portal-client-filters input,
+.portal-client-filters button,
+.portal-filters select,
+.portal-filters input,
+.portal-filters button {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 10px;
-  padding: 16px;
-  display: grid;
-  grid-template-columns: 170px 1fr auto;
-  gap: 18px;
-  align-items: center;
-}
-
-.record-hero-logo img {
-  max-width: 140px;
-  max-height: 70px;
-  object-fit: contain;
-}
-
-.record-hero-main h1 {
-  margin: 0;
-  font-size: 26px;
-}
-
-.record-hero-main p {
-  margin: 4px 0 0;
-  color: #1d4f8f;
-  font-weight: 700;
-}
-
-.record-hero-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.record-tabs-card {
-  background: #fff;
-  border: 1px solid #dfe5ef;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.record-tabs {
-  display: flex;
-  gap: 18px;
-  border-bottom: 1px solid #eef2f7;
-  padding: 0 14px;
-}
-
-.record-tabs button {
-  border: none;
-  background: transparent;
-  padding: 14px 0;
-  cursor: pointer;
-  font-weight: 700;
-  color: #334155;
-}
-
-.record-tabs button.active {
-  color: #1d4f8f;
-  border-bottom: 3px solid #2f8de4;
-}
-
-.record-tab-content {
-  padding: 16px;
-}
-
-.record-tab-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.record-small-select {
-  width: 160px;
-}
-
-.record-timeline-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.record-timeline-item {
-  border: 1px solid #e4e9f2;
-  border-radius: 8px;
-  padding: 10px;
-  background: #fbfdff;
-}
-
-.record-timeline-item p {
-  margin: 6px 0;
-}
-
-.record-timeline-item span {
-  color: #64748b;
-  font-size: 12px;
-}
-
-.record-email-tabs {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.record-email-tabs button {
-  border: 1px solid #dfe5ef;
-  background: #fff;
-  border-radius: 6px;
-  padding: 8px 12px;
-}
-
-.record-file-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.record-file-list a {
-  color: #1d4f8f;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.record-detail-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(320px, 1fr));
-  gap: 16px;
-}
-
-.record-detail-section {
-  background: #fff;
-  border: 1px solid #b9d9ff;
-  border-radius: 10px;
-  padding: 14px;
-}
-
-.record-detail-section.wide {
-  grid-column: 1 / -1;
-}
-
-.record-detail-section h2 {
-  background: #0a4bc4;
-  color: #fff;
-  border-radius: 999px;
-  text-align: center;
-  padding: 6px 14px;
-  font-size: 15px;
-  margin: 0 0 14px;
-}
-
-.record-info-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(180px, 1fr));
-  gap: 10px;
-}
-
-.record-detail-section.wide .record-info-grid {
-  grid-template-columns: 1fr;
-}
-
-.record-info-field {
-  padding: 7px 8px;
-  border-bottom: 1px solid #eef2f7;
-}
-
-.record-info-field span {
-  display: block;
-  color: #1d4f8f;
-  font-size: 12px;
-  font-weight: 700;
-  margin-bottom: 3px;
-}
-
-.record-info-field strong {
-  font-size: 13px;
-  color: #0f1f3d;
-}
-
-.record-doc-matrix {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.record-doc-slot {
-  border: 1px solid #dfe5ef;
-  border-radius: 8px;
-  background: #fbfdff;
-  padding: 10px;
-}
-
-.record-doc-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.record-doc-slot a {
-  display: block;
-  color: #1d4f8f;
-  text-decoration: none;
-  font-weight: 700;
-  margin: 4px 0;
-}
-
-.record-doc-empty {
-  color: #94a3b8;
-  font-size: 13px;
-}
-
-@media (max-width: 1100px) {
-  .record-hero-card,
-  .record-detail-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .record-doc-matrix {
-    grid-template-columns: 1fr;
-  }
-}
-
-
-/* Ajustes Registros de empresas / Mandantes */
-.mandantes-layout {
-  display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 16px;
-}
-
-.zoho-help-text {
-  color: #64748b;
-  font-size: 13px;
-  line-height: 1.35;
-}
-
-.zoho-view-tabs {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  border-bottom: 1px solid #dfe5ef;
-  padding-bottom: 10px;
-}
-
-.zoho-view-tabs button {
-  border: 1px solid #cfd7e6;
-  background: #fff;
-  border-radius: 6px;
-  padding: 10px 16px;
-  cursor: pointer;
-}
-
-.zoho-view-tabs button.active {
-  border-color: #2f8de4;
-  color: #0c4da2;
-  background: #eef6ff;
-  font-weight: 700;
-}
-
-.zoho-link-cell {
-  color: #0b55b7;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.zoho-table-range {
-  float: right;
-  color: #64748b;
-  font-size: 13px;
-}
-
-.zoho-textarea {
-  min-height: 90px;
-  padding-top: 10px;
-}
-
-.record-detail-page {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.record-header-card,
-.record-tab-card,
-.record-detail-section {
-  background: #fff;
-  border: 1px solid #b9d7ff;
-  border-radius: 8px;
-  padding: 14px;
-}
-
-.record-header-card {
-  display: grid;
-  grid-template-columns: auto 180px 1fr;
-  gap: 12px;
-  align-items: start;
-}
-
-.record-logo {
-  color: #0a42b8;
-  font-size: 26px;
-  line-height: 1;
-  padding: 10px 0;
-}
-
-.record-logo span {
-  display: block;
-  color: #3467a9;
-  font-size: 12px;
-}
-
-.record-header-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.record-title-lines {
-  grid-column: 2 / 4;
-  color: #0f1f3d;
-}
-
-.record-title-lines span {
-  color: #0b4aa5;
-}
-
-.record-tabs {
-  display: flex;
-  gap: 18px;
-  background: #fff;
-  border-bottom: 1px solid #dfe5ef;
-  padding: 0 14px;
-}
-
-.record-tabs button {
-  border: none;
-  background: transparent;
-  padding: 14px 0 12px;
-  cursor: pointer;
-  font-weight: 700;
-  color: #0f1f3d;
-}
-
-.record-tabs button.active {
-  color: #0b55d9;
-  border-bottom: 3px solid #2f8de4;
-}
-
-.record-small-select {
-  max-width: 160px;
-  margin-bottom: 8px;
-}
-
-.record-note-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.record-mail-folders {
-  display: flex;
-  gap: 20px;
-  font-weight: 700;
-  color: #0b4aa5;
-}
-
-.record-timeline-item {
-  border-left: 3px solid #2f8de4;
-  background: #f7fbff;
   padding: 10px 12px;
-  margin: 8px 0;
-}
-
-.record-sections-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(320px, 1fr));
-  gap: 14px;
-}
-
-.record-detail-section.wide {
-  grid-column: 1 / -1;
-}
-
-.record-detail-section h2 {
-  margin: 0 0 12px;
-  background: #074dd0;
-  color: #fff;
-  border-radius: 999px;
-  text-align: center;
-  padding: 7px 10px;
-  font-size: 15px;
-}
-
-.record-info-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(180px, 1fr));
-  gap: 10px 18px;
-}
-
-.record-info-field {
-  border-bottom: 1px solid #e5eaf3;
-  padding: 9px 8px;
-  min-height: 52px;
-}
-
-.record-info-field span {
-  display: block;
-  color: #04449e;
-  font-size: 12px;
-  font-weight: 700;
-  margin-bottom: 5px;
-}
-
-.record-info-field strong {
-  color: #0f1f3d;
-  font-size: 14px;
-}
-
-.record-info-field.editable {
-  cursor: pointer;
-}
-
-.record-info-field.editable:hover {
-  background: #f0f7ff;
-  border-radius: 6px;
-}
-
-.record-pencil {
-  border: none;
-  background: transparent;
-  color: #0b7cff;
-  cursor: pointer;
-  font-weight: 700;
-}
-
-.record-doc-links {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.record-doc-matrix {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.record-doc-slot {
-  border: 1px solid #dfe5ef;
-  background: #fbfdff;
-  border-radius: 8px;
-  padding: 10px;
-}
-
-.record-doc-title {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.record-doc-empty {
-  color: #64748b;
-}
-
-.zoho-small-btn {
-  border: 1px solid #2f8de4;
-  background: #fff;
-  color: #2f8de4;
-  border-radius: 6px;
-  padding: 4px 8px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-@media (max-width: 1100px) {
-  .crm-body,
-  .zoho-module-layout,
-  .mandantes-layout,
-  .record-sections-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .record-info-grid,
-  .record-doc-matrix,
-  .zoho-form-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.record-bulk-edit-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  background: #fff8e6;
-  border: 1px solid #f5c86b;
-  border-radius: 10px;
-  padding: 12px 14px;
-  color: #513c00;
-}
-
-.record-bulk-edit-bar span {
-  color: #6f5b1d;
-  flex: 1;
-  min-width: 240px;
-}
-
-.record-info-field-form {
-  background: #f8fbff;
-  border: 1px solid #d7e7fb;
-  border-radius: 8px;
-}
-
-.record-info-field-form .zoho-input,
-.record-info-field-form .zoho-select,
-.record-info-field-form .zoho-textarea {
-  min-height: 34px;
-  font-size: 13px;
-}
-
-.record-info-field-form .zoho-textarea {
-  height: 82px;
-  padding-top: 8px;
-  resize: vertical;
-}
-
-/* v16 - Envío de correo de gestión con checklist de adjuntos */
-.record-mail-panel {
-  display: grid;
-  gap: 12px;
-}
-
-.record-email-warning {
-  padding: 10px 12px;
-  border: 1px solid #f4c56b;
-  border-radius: 10px;
-  background: #fff8e6;
-  color: #7a4b00;
-  font-size: 13px;
-  margin-bottom: 12px;
-}
-
-.zoho-form-field-wide {
-  grid-column: 1 / -1;
-}
-
-.record-email-body {
-  min-height: 190px;
-  resize: vertical;
-  white-space: pre-wrap;
-}
-
-.record-email-attachments {
-  margin-top: 14px;
-  border: 1px solid #d9e2f2;
-  border-radius: 12px;
-  padding: 12px;
-  background: #f8fbff;
-}
-
-.record-email-attachments-title {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin-bottom: 10px;
-}
-
-.record-email-attachments-title strong {
-  color: #001b44;
-}
-
-.record-email-attachments-title span {
-  color: #5c6b82;
-  font-size: 12px;
-}
-
-.record-email-doc-check {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-  padding: 9px 8px;
-  border-bottom: 1px solid #e4ebf5;
-  cursor: pointer;
-}
-
-.record-email-doc-check:last-child {
-  border-bottom: none;
-}
-
-.record-email-doc-check span {
-  font-weight: 600;
-  color: #001b44;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.record-email-doc-check small {
-  color: #6b7a90;
-  font-size: 11px;
-  background: #eef4ff;
-  padding: 3px 7px;
-  border-radius: 999px;
-}
-
-.record-template-help {
-  display: block;
-  margin-top: 6px;
-  color: #475569;
-  font-size: 12px;
-}
-
-/* v19 - documentos visibles con opción eliminar */
-.record-doc-link-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 3px 8px 3px 0;
-  padding: 3px 6px;
-  border: 1px solid #d7e7ff;
-  border-radius: 8px;
-  background: #f8fbff;
-}
-
-.record-doc-delete {
-  border: 1px solid #f3b2b2;
-  background: #fff7f7;
-  color: #b42318;
-  border-radius: 6px;
-  padding: 2px 6px;
-  font-size: 11px;
-  cursor: pointer;
-}
-
-.record-doc-delete:hover {
-  background: #fee4e2;
-}
-
-/* v20 - preview de documentos */
-.record-doc-link-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.record-doc-preview,
-.record-doc-download,
-.record-doc-delete {
-  border: 1px solid #cfe0ff;
   background: #ffffff;
-  border-radius: 6px;
-  padding: 3px 8px;
-  font-size: 12px;
-  cursor: pointer;
-  color: #005bd3;
-  text-decoration: none;
-}
-.record-doc-delete {
-  border-color: #ffd2d2;
-  color: #c62828;
-}
-.record-doc-preview:disabled {
-  opacity: .55;
-  cursor: not-allowed;
-}
-.record-document-preview {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: min(1000px, 86vw);
-}
-.record-document-preview-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.record-document-preview-actions span {
-  margin-right: auto;
-}
-.record-document-preview-frame {
-  width: 100%;
-  height: 72vh;
-  border: 1px solid #d8e4f7;
-  border-radius: 10px;
-  background: #fff;
-}
-.record-document-preview-image {
-  width: 100%;
-  max-height: 72vh;
-  object-fit: contain;
-  border: 1px solid #d8e4f7;
-  border-radius: 10px;
-  background: #fff;
-}
-.zoho-btn-danger {
-  border-color: #ffd2d2 !important;
-  color: #c62828 !important;
-  background: #fff7f7 !important;
-}
-
-/* ===== OperaFix v23: Dashboard, Portal Cliente e IA para gestiones ===== */
-.dashboard-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin:18px 0}.dashboard-kpi{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:16px;box-shadow:0 10px 28px rgba(15,23,42,.06);display:flex;flex-direction:column;gap:7px}.dashboard-kpi span{color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:.04em;font-weight:700}.dashboard-kpi strong{color:#0f172a;font-size:24px;line-height:1.1}.dashboard-kpi small{color:#64748b}.dashboard-kpi.danger{border-color:#fecaca;background:#fff7f7}.dashboard-kpi.warning{border-color:#fde68a;background:#fffbeb}.dashboard-grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:18px}.zoho-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:16px;box-shadow:0 10px 28px rgba(15,23,42,.06)}.zoho-card-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.zoho-card-title-row h2{margin:0;font-size:17px;color:#0f172a}.ranking-row{display:grid;gap:7px;padding:10px 0;border-bottom:1px solid #f1f5f9}.ranking-row:last-child{border-bottom:0}.ranking-head{display:flex;justify-content:space-between;gap:12px;font-size:13px;color:#334155}.ranking-head strong{color:#0f172a}.ranking-bar{height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden}.ranking-bar div{height:100%;border-radius:99px;background:linear-gradient(90deg,#2563eb,#38bdf8)}.zoho-table.compact th,.zoho-table.compact td{padding:10px 12px}.clickable-row{cursor:pointer}.clickable-row:hover{background:#f8fafc}.status-pill{display:inline-flex;align-items:center;border-radius:999px;padding:5px 10px;background:#eff6ff;color:#1d4ed8;font-weight:700;font-size:12px}.portal-hero{display:flex;justify-content:space-between;gap:18px;padding:24px;border-radius:20px;background:linear-gradient(135deg,#0f172a,#1d4ed8);color:#fff;margin-bottom:18px}.portal-hero h1{margin:0 0 8px;font-size:28px}.portal-hero p{margin:0;color:#dbeafe}.eyebrow{text-transform:uppercase;letter-spacing:.08em;font-weight:800;font-size:12px;color:#bae6fd!important;margin-bottom:8px!important}.portal-hero-actions{min-width:320px;display:grid;gap:10px;align-content:start}.portal-record-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}.portal-card{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:16px;box-shadow:0 12px 30px rgba(15,23,42,.07)}.portal-card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.portal-card h2{margin:0 0 6px;font-size:17px;color:#0f172a}.portal-card p{margin:0;color:#64748b}.portal-card-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}.portal-card-metrics div{border:1px solid #e2e8f0;border-radius:12px;padding:10px;background:#f8fafc}.portal-card-metrics span{display:block;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase}.portal-card-metrics strong{color:#0f172a;font-size:13px}.portal-documents{display:grid;gap:8px;border-top:1px solid #f1f5f9;padding-top:12px}.portal-documents strong{color:#0f172a}.portal-documents a{color:#2563eb;text-decoration:none;font-weight:700;font-size:13px}.portal-documents a:hover{text-decoration:underline}.ai-suggestion-list{display:grid;gap:14px}.ai-card{background:#fff;border:1px solid #e5e7eb;border-left:6px solid #2563eb;border-radius:16px;padding:16px;box-shadow:0 10px 28px rgba(15,23,42,.06)}.ai-card.priority-alta{border-left-color:#dc2626}.ai-card.priority-media{border-left-color:#f59e0b}.ai-card.priority-baja{border-left-color:#2563eb}.ai-card-top{display:flex;justify-content:space-between;align-items:center;gap:12px}.priority-badge{display:inline-flex;padding:6px 10px;border-radius:999px;background:#f1f5f9;color:#0f172a;font-weight:800;font-size:12px}.ai-card h2{margin:12px 0 8px;color:#0f172a;font-size:18px}.ai-card p{color:#475569;margin:0 0 12px}.ai-reason,.ai-action{border-radius:12px;padding:10px 12px;margin-top:8px;background:#f8fafc;color:#334155}.zoho-empty.small{padding:10px;font-size:13px}@media(max-width:800px){.portal-hero{flex-direction:column}.portal-hero-actions{min-width:0}.portal-card-metrics{grid-template-columns:1fr}}
-
-/* ===== OperaFix v24: versión ejecutiva con filtros, meta mensual, portal avanzado e IA accionable ===== */
-.dashboard-filter-card{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px;margin:14px 0;box-shadow:0 10px 28px rgba(15,23,42,.05)}
-.dashboard-goal-input{display:grid;gap:5px}.dashboard-goal-input span{font-size:12px;color:#64748b;font-weight:800;text-transform:uppercase;letter-spacing:.04em}.dashboard-progress{height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin-top:5px}.dashboard-progress div{height:100%;background:linear-gradient(90deg,#16a34a,#22c55e);border-radius:999px}.dashboard-grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px;margin-bottom:18px}.portal-summary-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:16px}.portal-summary-strip div{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px;box-shadow:0 8px 22px rgba(15,23,42,.05)}.portal-summary-strip span{display:block;color:#64748b;font-size:12px;text-transform:uppercase;font-weight:800;letter-spacing:.04em}.portal-summary-strip strong{display:block;margin-top:6px;font-size:22px;color:#0f172a}.portal-progress{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}.portal-progress div{display:grid;place-items:center;gap:5px;padding:8px;border-radius:12px;background:#f1f5f9;color:#64748b;text-align:center}.portal-progress div.active{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}.portal-progress span{display:grid;place-items:center;width:22px;height:22px;border-radius:999px;background:#cbd5e1;color:#fff;font-weight:900;font-size:12px}.portal-progress div.active span{background:#2563eb}.portal-progress small{font-size:11px;font-weight:800}.portal-card-metrics-secondary div{background:#fff}.portal-documents a{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center}.portal-documents a span{background:#eef4ff;color:#1d4ed8;border-radius:999px;padding:3px 7px;font-size:11px;font-weight:800}.ai-card-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.ai-template{border-radius:12px;padding:10px 12px;margin-top:8px;background:#eff6ff;color:#1d4ed8}.ai-plan-card{margin-bottom:16px}.ai-plan-card pre{margin:0;white-space:pre-wrap;background:#0f172a;color:#e2e8f0;border-radius:12px;padding:14px;line-height:1.5;font-size:13px;max-height:420px;overflow:auto}@media(max-width:900px){.dashboard-grid-2{grid-template-columns:1fr}.portal-progress{grid-template-columns:repeat(2,1fr)}}
-
-/* v25: selector dinámico de campos y filtros avanzados */
-.column-picker-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-  margin-bottom: 14px;
-  flex-wrap: wrap;
-}
-
-.column-picker-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 8px;
-  max-height: 520px;
-  overflow: auto;
-  padding: 4px;
-}
-
-.column-picker-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid #d8e2f1;
-  border-radius: 8px;
-  padding: 9px 10px;
-  background: #fff;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.column-picker-item:hover {
-  border-color: #2f80ed;
-  background: #f5f9ff;
-}
-
-.zoho-table-scroll {
-  width: 100%;
-  overflow: auto;
-}
-
-.zoho-table th,
-.zoho-table td {
-  white-space: nowrap;
-}
-
-.dashboard-advanced-layout {
-  display: grid;
-  grid-template-columns: minmax(260px, 340px) 1fr;
-  gap: 16px;
-  align-items: start;
-  margin-bottom: 16px;
-}
-
-.dashboard-filter-help {
-  border: 1px solid #d8e2f1;
-  background: #f8fbff;
-  border-radius: 12px;
-  padding: 16px;
-  color: #344563;
+  color: #0f172a;
   font-size: 14px;
 }
 
-.dashboard-records-card {
-  margin-top: 16px;
+.client-portal-filters button,
+.portal-client-filters button,
+.portal-filters button {
+  cursor: pointer;
+  font-weight: 700;
 }
 
-@media (max-width: 900px) {
-  .dashboard-advanced-layout {
-    grid-template-columns: 1fr;
-  }
+.client-portal-filters .primary,
+.portal-client-filters .primary,
+.portal-filters .primary {
+  background: #38bdf8;
+  color: #06233f;
+  border-color: transparent;
 }
 
-/* V26 - tablas dinámicas con scroll horizontal y orden de columnas */
-.zoho-table-wrap-scroll {
-  min-width: 0;
-  overflow: hidden;
-}
-
-.zoho-table-horizontal-scroll {
-  width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  border-top: 1px solid #e5eef9;
-}
-
-.zoho-table-wide {
-  min-width: max-content;
-  width: max-content;
-}
-
-.zoho-table-wide th,
-.zoho-table-wide td,
-.zoho-table-scroll .zoho-table th,
-.zoho-table-scroll .zoho-table td {
-  min-width: 140px;
-  white-space: nowrap;
-}
-
-.zoho-table-wide th:first-child,
-.zoho-table-wide td:first-child {
-  min-width: 44px;
-  width: 44px;
-  position: sticky;
-  left: 0;
-  background: #fff;
-  z-index: 2;
-}
-
-.zoho-table-wide thead th:first-child {
-  background: #f8fbff;
-  z-index: 3;
-}
-
-.column-order-help {
-  margin: 10px 0 12px;
-  padding: 10px 12px;
-  background: #f4f8ff;
-  border: 1px solid #d7e7ff;
-  border-radius: 10px;
-  color: #24415f;
-  font-size: 13px;
-}
-
-.column-picker-grid-orderable {
+.portal-kpi-grid,
+.client-portal-kpis,
+.portal-summary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 10px;
-  max-height: 60vh;
-  overflow: auto;
-  padding-right: 4px;
+  grid-template-columns: repeat(6, minmax(150px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
 }
 
-.column-picker-order-item {
+.portal-kpi,
+.client-portal-kpi,
+.portal-summary-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+}
+
+.portal-kpi span,
+.client-portal-kpi span,
+.portal-summary-card span {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+  color: #64748b;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.portal-kpi strong,
+.client-portal-kpi strong,
+.portal-summary-card strong {
+  display: block;
+  font-size: 22px;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+}
+
+.portal-view-tabs,
+.client-portal-tabs {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  border: 1px solid #e3ecf7;
-  border-radius: 10px;
-  padding: 9px 10px;
-  background: #fff;
-}
-
-.column-picker-order-item.active {
-  border-color: #1f7ae0;
-  background: #f4f9ff;
-}
-
-.column-picker-order-item label {
-  display: flex;
-  align-items: center;
   gap: 8px;
-  min-width: 0;
-  flex: 1;
+  margin: 8px 0 18px;
+  flex-wrap: wrap;
+}
+
+.portal-view-tabs button,
+.client-portal-tabs button {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 8px 13px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.portal-view-tabs button.active,
+.client-portal-tabs button.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.portal-card-grid,
+.client-portal-card-grid,
+.portal-record-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+.portal-record-card,
+.client-portal-card,
+.portal-management-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.07);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 280px;
+}
+
+.portal-record-card:hover,
+.client-portal-card:hover,
+.portal-management-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.11);
+}
+
+.portal-record-head,
+.client-portal-card-head,
+.portal-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.portal-record-head h3,
+.client-portal-card-head h3,
+.portal-card-header h3 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.15;
+  color: #0f172a;
+}
+
+.portal-record-head p,
+.client-portal-card-head p,
+.portal-card-header p {
+  margin: 6px 0 0;
+  color: #64748b;
   font-size: 13px;
 }
 
-.column-picker-order-item label span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.column-order-controls {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  flex-shrink: 0;
-}
-
-.column-position {
-  min-width: 28px;
-  height: 24px;
+.portal-status-pill,
+.portal-stage-pill,
+.client-status-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: #eaf2ff;
-  color: #0b4e9c;
-  font-weight: 700;
-  font-size: 12px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #1d4ed8;
+  background: #dbeafe;
+  white-space: nowrap;
 }
 
-.mini-order-btn {
-  width: 28px;
-  height: 26px;
-  border: 1px solid #b9d3f5;
-  border-radius: 7px;
-  background: #fff;
-  color: #0b63ce;
-  cursor: pointer;
+.portal-status-pill.rejected,
+.portal-stage-pill.rejected,
+.client-status-pill.rejected {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.portal-status-pill.paid,
+.portal-stage-pill.paid,
+.client-status-pill.paid {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.portal-progress-steps,
+.client-portal-steps,
+.portal-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.portal-step,
+.client-portal-step {
+  background: #f1f5f9;
+  border-radius: 12px;
+  padding: 10px 6px;
+  text-align: center;
+  font-size: 11px;
+  color: #64748b;
   font-weight: 800;
 }
 
-.mini-order-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.35;
-}
-
-.zoho-scope-hint {
-  margin: -6px 0 12px 0;
-  color: #476079;
-  font-size: 12px;
-}
-
-/* V28 - ordenar campos con drag & drop */
-.draggable-column-item {
-  cursor: grab;
-  user-select: none;
-}
-
-.draggable-column-item:active {
-  cursor: grabbing;
-}
-
-.draggable-column-item.dragging {
-  opacity: 0.55;
-  transform: scale(0.985);
-  border-style: dashed;
-  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.14);
-}
-
-.drag-handle {
-  width: 26px;
-  height: 26px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  background: #eaf2ff;
-  color: #0b63ce;
-  font-weight: 900;
-  flex-shrink: 0;
-  cursor: grab;
-}
-
-.draggable-column-item:hover .drag-handle {
+.portal-step.active,
+.client-portal-step.active {
   background: #dbeafe;
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
 }
 
-.column-picker-grid-orderable {
-  align-items: start;
+.portal-record-fields,
+.client-portal-fields,
+.portal-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
 }
 
-/* V29 filtros y orden reales */
-.modal-helper-text,
-.sort-preview-box {
-  border: 1px solid #d7e6fb;
-  background: #f5f9ff;
-  border-radius: 10px;
-  padding: 12px 14px;
-  margin-bottom: 12px;
-  color: #14345c;
+.portal-field,
+.client-portal-field {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.portal-field span,
+.client-portal-field span {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.portal-field strong,
+.client-portal-field strong {
+  display: block;
+  font-size: 13px;
+  color: #0f172a;
+  word-break: break-word;
+}
+
+.portal-documents,
+.client-portal-docs,
+.portal-docs {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 12px;
+}
+
+.portal-documents h4,
+.client-portal-docs h4,
+.portal-docs h4 {
+  margin: 0 0 6px;
   font-size: 14px;
 }
 
-.sort-panel-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(220px, 1fr));
-  gap: 14px;
-  margin-bottom: 12px;
-}
-
-@media (max-width: 720px) {
-  .sort-panel-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* v30 - Constructor de paneles tipo Zoho */
-.dashboard-builder-section {
-  margin: 18px 0;
-}
-
-.dashboard-builder-title {
-  margin-bottom: 10px;
-}
-
-.dashboard-builder-title p {
-  margin: 4px 0 0;
+.portal-documents p,
+.client-portal-docs p,
+.portal-docs p {
+  margin: 0;
   color: #64748b;
   font-size: 13px;
+}
+
+.portal-kanban,
+.client-portal-kanban {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(240px, 1fr));
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+}
+
+.portal-kanban-column,
+.client-portal-kanban-column {
+  background: #eef2f7;
+  border: 1px solid #dbe3ef;
+  border-radius: 16px;
+  padding: 12px;
+  min-height: 360px;
+}
+
+.portal-kanban-column h3,
+.client-portal-kanban-column h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: #334155;
+}
+
+.portal-kanban-card,
+.client-portal-kanban-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 10px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+}
+
+.portal-table-wrap,
+.client-portal-table-wrap {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  overflow: auto;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+}
+
+.portal-table,
+.client-portal-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1050px;
+}
+
+.portal-table th,
+.portal-table td,
+.client-portal-table th,
+.client-portal-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid #edf2f7;
+  text-align: left;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.portal-table th,
+.client-portal-table th {
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 800;
+}
+
+/* Intelligence summary */
+
+.intelligence-summary-panel,
+.ai-intelligence-panel,
+.dashboard-ai-summary {
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.07);
+  margin-bottom: 18px;
+}
+
+.intelligence-summary-header,
+.ai-intelligence-header,
+.dashboard-ai-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.intelligence-summary-header span,
+.ai-intelligence-header span,
+.dashboard-ai-header span {
+  display: block;
+  color: #2563eb;
+  font-weight: 800;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.intelligence-summary-header h2,
+.ai-intelligence-header h2,
+.dashboard-ai-header h2 {
+  margin: 0;
+  font-size: 22px;
+  color: #0f172a;
+  letter-spacing: -0.03em;
+}
+
+.intelligence-summary-header p,
+.ai-intelligence-header p,
+.dashboard-ai-header p {
+  margin: 4px 0 0;
+  color: #64748b;
+}
+
+.intelligence-actions,
+.ai-intelligence-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.intelligence-actions button,
+.ai-intelligence-actions button {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 9px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.intelligence-actions button.primary,
+.ai-intelligence-actions button.primary {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.intelligence-metric-grid,
+.ai-summary-grid,
+.dashboard-ai-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.intelligence-metric,
+.ai-summary-card,
+.dashboard-ai-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.intelligence-metric span,
+.ai-summary-card span,
+.dashboard-ai-card span {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+
+.intelligence-metric strong,
+.ai-summary-card strong,
+.dashboard-ai-card strong {
+  display: block;
+  font-size: 22px;
+  color: #0f172a;
+}
+
+.intelligence-insights,
+.ai-insights,
+.dashboard-ai-insights {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px 18px;
+  margin-top: 12px;
+}
+
+.intelligence-insights h3,
+.ai-insights h3,
+.dashboard-ai-insights h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.intelligence-insights ul,
+.ai-insights ul,
+.dashboard-ai-insights ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.intelligence-insights li,
+.ai-insights li,
+.dashboard-ai-insights li {
+  margin: 6px 0;
+  color: #334155;
+}
+
+/* Dashboard visual fix */
+
+.dashboard-page .dashboard-builder-section,
+.dashboard-page .zoho-card,
+.dashboard-builder-section,
+.dashboard-records-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+  margin-bottom: 16px;
 }
 
 .dashboard-custom-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.custom-dashboard-panel {
-  min-height: 220px;
-  overflow: hidden;
-}
-
-.custom-panel-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid #e5edf7;
-  padding-bottom: 10px;
-}
-
-.custom-panel-header h3 {
-  margin: 0;
-  color: #0f2544;
-  font-size: 16px;
-}
-
-.custom-panel-header small {
-  color: #60708a;
-}
-
-.custom-panel-actions {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.zoho-btn.small {
-  padding: 5px 9px;
-  font-size: 12px;
-}
-
-.zoho-btn.danger {
-  border-color: #fecaca;
-  color: #b91c1c;
-  background: #fff5f5;
-}
-
-.custom-kpi-big {
-  min-height: 150px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-  color: #0f2544;
-}
-
-.custom-kpi-big strong {
-  font-size: 34px;
-}
-
-.custom-kpi-big span {
-  color: #64748b;
-}
-
-.custom-bar-chart {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.custom-bar-label {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  color: #0f2544;
-  font-size: 13px;
-}
-
-.custom-bar-label span {
-  color: #1f7ae0;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.custom-bar-track {
-  height: 12px;
-  border-radius: 999px;
-  background: #e7eef8;
-  overflow: hidden;
-}
-
-.custom-bar-track div {
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #1f7ae0, #58c4e6);
-}
-
-.custom-pie-layout {
-  display: grid;
-  grid-template-columns: 180px 1fr;
-  gap: 18px;
-  align-items: center;
-}
-
-.custom-pie {
-  width: 170px;
-  height: 170px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  position: relative;
-  margin: auto;
-}
-
-.custom-pie::after {
-  content: "";
-  position: absolute;
-  width: 92px;
-  height: 92px;
-  background: #fff;
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 1px #e5edf7;
-}
-
-.custom-pie span {
-  position: relative;
-  z-index: 1;
-  max-width: 84px;
-  text-align: center;
-  font-size: 12px;
-  font-weight: 800;
-  color: #0f2544;
-}
-
-.custom-pie-legend {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 12px;
-}
-
-.custom-pie-legend div {
-  display: grid;
-  grid-template-columns: 12px 1fr auto;
-  gap: 8px;
-  align-items: center;
-}
-
-.custom-pie-legend i {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.custom-pie-legend strong {
-  color: #0f4fb3;
-}
-
-.custom-panel-table-scroll {
-  max-height: 260px;
-}
-
-.custom-panel-records {
-  margin-top: 12px;
-  border-top: 1px solid #e5edf7;
-  padding-top: 10px;
-}
-
-.custom-panel-records summary {
-  cursor: pointer;
-  color: #0f4fb3;
-  font-weight: 700;
-  font-size: 13px;
-}
-
-.custom-panel-record-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.custom-panel-record-list button {
-  border: 1px solid #cfe1ff;
-  color: #0f4fb3;
-  background: #f6fbff;
-  border-radius: 999px;
-  padding: 4px 8px;
-  cursor: pointer;
-}
-
-.dashboard-panel-editor {
-  display: grid;
-  grid-template-columns: minmax(360px, 0.9fr) minmax(360px, 1.1fr);
-  gap: 18px;
-  max-height: 65vh;
-  overflow: auto;
-  padding-right: 6px;
-}
-
-.panel-editor-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.panel-editor-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 700;
-  color: #0f2544;
-}
-
-.panel-editor-block {
-  border: 1px solid #d9e8fb;
-  border-radius: 12px;
-  padding: 12px;
-  background: #f8fbff;
-}
-
-.panel-editor-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.panel-editor-row {
-  display: grid;
-  grid-template-columns: minmax(150px, 1fr) minmax(90px, .5fr) minmax(120px, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-  margin-top: 8px;
-}
-
-.panel-editor-block .panel-editor-row:has(.zoho-btn.danger):not(:has(input)) {
-  grid-template-columns: minmax(180px, 1fr) auto;
-}
-
-.zoho-select.short {
-  min-width: 90px;
-}
-
-.panel-editor-preview {
-  min-width: 0;
-}
-
-@media (max-width: 1100px) {
-  .dashboard-custom-grid,
-  .dashboard-panel-editor {
-    grid-template-columns: 1fr;
-  }
-
-  .custom-pie-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* v32 Dashboard builder tipo Zoho */
-.dashboard-hero-header {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  background: #f5f7fb;
-}
-.dashboard-panel-editor-zoho {
-  grid-template-columns: minmax(560px, 1fr) 380px;
-  gap: 22px;
-  align-items: start;
-  max-height: 72vh;
-  overflow: auto;
-  padding-right: 8px;
-}
-.dashboard-panel-editor-zoho .panel-editor-form {
-  display: grid;
-  gap: 12px;
-}
-.dashboard-panel-editor-zoho label {
-  display: grid;
-  gap: 6px;
-  font-weight: 600;
-  color: #22304a;
-}
-.panel-editor-block {
-  border: 1px solid #d9e3f2;
-  background: #fbfdff;
-  border-radius: 10px;
-  padding: 12px;
-}
-.panel-editor-title-row,
-.criteria-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-}
-.criteria-actions {
-  justify-content: flex-end;
-}
-.panel-editor-row {
-  display: grid;
-  grid-template-columns: auto minmax(180px, 1fr) auto auto;
-  gap: 8px;
-  align-items: center;
-  margin-top: 10px;
-}
-.filter-criteria-row {
-  grid-template-columns: auto minmax(150px, 1fr) 135px minmax(180px, 1fr) auto;
-  position: relative;
-}
-.panel-index-badge {
-  display: inline-flex;
-  width: 28px;
-  height: 28px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #cbd5e1;
-  border-radius: 50%;
-  background: #fff;
-  color: #334155;
-  font-weight: 700;
-}
-.criteria-connector {
-  position: absolute;
-  left: 12px;
-  top: 38px;
-  color: #0b7cff;
-  font-size: 11px;
-  font-weight: 700;
-}
-.criteria-pattern {
-  margin-top: 14px;
-  color: #475569;
-  font-size: 13px;
-}
-.link-button {
-  border: 0;
-  background: transparent;
-  color: #0b7cff;
-  cursor: pointer;
-  font-weight: 600;
-  padding: 0 0 0 8px;
-}
-.panel-editor-preview {
-  position: sticky;
-  top: 0;
-}
-.panel-preview-label {
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 700;
-  margin-bottom: 8px;
-}
-.custom-dashboard-panel {
-  min-height: 180px;
-  overflow: hidden;
-}
-.custom-panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-.custom-panel-header h3 {
-  margin: 0;
-  font-size: 15px;
-  color: #0f1f3d;
-}
-.custom-panel-header small {
-  display: block;
-  color: #64748b;
-  margin-top: 4px;
-}
-.custom-panel-actions {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-.custom-panel-table-scroll {
-  max-height: 420px;
-}
-.custom-panel-total-row td {
-  font-weight: 800;
-  border-top: 2px solid #d8e2f1;
-  background: #fbfdff;
-}
-.custom-bar-chart {
-  display: grid;
-  gap: 10px;
-}
-.custom-bar-label {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 13px;
-}
-.custom-bar-track {
-  height: 10px;
-  background: #e7eef8;
-  border-radius: 999px;
-  overflow: hidden;
-}
-.custom-bar-track div {
-  height: 100%;
-  background: #0b7cff;
-  border-radius: 999px;
-}
-.custom-kpi-big {
-  min-height: 130px;
-  display: grid;
-  place-items: center;
-  text-align: center;
-}
-.custom-kpi-big strong {
-  font-size: 34px;
-  color: #0b1f43;
-}
-.custom-kpi-big span {
-  color: #64748b;
-}
-.custom-pie-layout {
-  display: grid;
-  grid-template-columns: 180px 1fr;
-  gap: 18px;
-  align-items: center;
-}
-.custom-pie {
-  width: 170px;
-  height: 170px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  box-shadow: inset 0 0 0 40px rgba(255,255,255,.76);
-}
-.custom-pie span {
-  display: block;
-  max-width: 110px;
-  text-align: center;
-  font-weight: 800;
-  color: #0f1f3d;
-  font-size: 12px;
-}
-.custom-pie-legend {
-  display: grid;
-  gap: 8px;
-}
-.custom-pie-legend div {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 8px;
-  align-items: center;
-  font-size: 12px;
-}
-.custom-pie-legend i {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-.custom-pie-legend strong {
-  color: #0f1f3d;
-}
-.custom-panel-records {
-  margin-top: 12px;
-  border-top: 1px solid #e5edf7;
-  padding-top: 10px;
-}
-.custom-panel-records summary {
-  cursor: pointer;
-  color: #0b7cff;
-  font-weight: 700;
-}
-.custom-panel-record-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-.custom-panel-record-list button {
-  border: 1px solid #cfe0f8;
-  background: #fff;
-  border-radius: 999px;
-  padding: 5px 9px;
-  color: #0b4aa1;
-  cursor: pointer;
-}
-@media (max-width: 1100px) {
-  .dashboard-panel-editor-zoho {
-    grid-template-columns: 1fr;
-  }
-  .panel-editor-preview {
-    position: static;
-  }
-  .custom-pie-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* v33 - corrección de descuadre en cabecera del dashboard */
-.crm-body,
-.crm-content,
-.zoho-module-page,
-.dashboard-page {
-  min-width: 0;
-  max-width: 100%;
-}
-
-.crm-content,
-.dashboard-page {
-  overflow-x: hidden;
-}
-
-.dashboard-page .dashboard-hero-header {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 14px;
-  width: 100%;
-  max-width: 100%;
-  padding: 12px 12px 14px;
-  margin: -4px 0 0;
-  box-sizing: border-box;
-  background: #f5f7fb;
-  border-bottom: 1px solid #dbe5f1;
-}
-
-.dashboard-page .dashboard-hero-header > div:first-child {
-  min-width: 0;
-}
-
-.dashboard-page .dashboard-hero-header h1,
-.dashboard-page .dashboard-hero-header p {
-  overflow-wrap: anywhere;
-}
-
-.dashboard-page .dashboard-hero-header .zoho-module-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 8px;
-  max-width: min(100%, 620px);
-  min-width: 0;
-}
-
-.dashboard-page .dashboard-hero-header .zoho-module-actions .zoho-btn {
-  white-space: nowrap;
-  flex: 0 0 auto;
-}
-
-.dashboard-page .dashboard-filter-card {
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-.dashboard-page .dashboard-advanced-layout,
-.dashboard-page .dashboard-custom-grid,
-.dashboard-page .dashboard-grid-2,
-.dashboard-page .dashboard-grid-3 {
-  min-width: 0;
-  max-width: 100%;
-}
-
-.dashboard-page .zoho-card,
-.dashboard-page .custom-dashboard-panel {
-  min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-@media (max-width: 1180px) {
-  .dashboard-page .dashboard-hero-header {
-    grid-template-columns: 1fr;
-  }
-
-  .dashboard-page .dashboard-hero-header .zoho-module-actions {
-    justify-content: flex-start;
-    max-width: 100%;
-  }
-}
-
-@media (max-width: 680px) {
-  .dashboard-page .dashboard-hero-header .zoho-module-actions .zoho-btn {
-    flex: 1 1 calc(50% - 8px);
-  }
-}
-
-/* v34 - Dashboard: paneles visibles dentro del área principal, no debajo del filtro lateral */
-.dashboard-dashboard-layout-fixed {
-  display: grid;
-  grid-template-columns: minmax(260px, 330px) minmax(0, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 16px;
-  align-items: start;
 }
 
-.dashboard-main-workspace {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.dashboard-main-workspace .dashboard-kpi-grid,
-.dashboard-main-workspace .dashboard-builder-section,
-.dashboard-main-workspace .dashboard-grid-2,
-.dashboard-main-workspace .dashboard-grid-3,
-.dashboard-main-workspace .dashboard-records-card {
-  margin-top: 0;
-}
-
-.dashboard-main-workspace .dashboard-builder-section {
-  background: #fff;
-  border: 1px solid #dbe7f5;
-  border-radius: 10px;
-  padding: 14px;
-}
-
-.dashboard-main-workspace .dashboard-custom-grid {
+.dashboard-grid-3 {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  gap: 14px;
-  align-items: start;
+  grid-template-columns: repeat(4, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
-.custom-dashboard-panel {
-  display: block;
-  min-height: 160px;
+.dashboard-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(320px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
-.custom-panel-table-scroll {
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-@media (max-width: 1100px) {
-  .dashboard-dashboard-layout-fixed {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* v38 IA chat con acciones */
-.ai-chat-page { min-height: calc(100vh - 40px); }
-.ai-chat-header { align-items: flex-start; gap: 16px; }
-.ai-context-card { background: #fff; border: 1px solid #dce3ef; border-radius: 14px; padding: 12px 16px; margin: 14px 0; color: #344054; }
-.ai-quick-prompts { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
-.zoho-btn.light { background: #f7f9fc; color: #1f2937; border: 1px solid #dce3ef; }
-.ai-chat-shell { background: #f8fafc; border: 1px solid #dce3ef; border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; min-height: 680px; }
-.ai-chat-messages { padding: 18px; overflow: auto; flex: 1; max-height: 70vh; }
-.ai-chat-message { display: flex; flex-direction: column; margin-bottom: 16px; }
-.ai-chat-message.user { align-items: flex-end; }
-.ai-chat-message.assistant { align-items: flex-start; }
-.ai-chat-bubble { max-width: min(920px, 92%); background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 14px 16px; box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05); }
-.ai-chat-message.user .ai-chat-bubble { background: #eaf2ff; border-color: #cfe0ff; }
-.ai-chat-role { font-weight: 700; color: #0f172a; margin-bottom: 8px; font-size: 13px; }
-.ai-chat-bubble pre { margin: 0; white-space: pre-wrap; font-family: inherit; line-height: 1.48; color: #1f2937; }
-.ai-message-meta { display: flex; align-items: center; gap: 12px; margin-top: 12px; color: #64748b; font-size: 12px; flex-wrap: wrap; }
-.zoho-link-button { border: 0; background: transparent; color: #2563eb; cursor: pointer; padding: 0; font-weight: 600; }
-.ai-actions-panel { width: min(920px, 92%); margin-top: 10px; background: #fff; border: 1px solid #dce3ef; border-radius: 16px; padding: 14px; box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05); }
-.ai-actions-panel h3 { margin: 0 0 4px; font-size: 16px; }
-.ai-actions-panel p { margin: 0 0 12px; color: #64748b; }
-.ai-action-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; border-top: 1px solid #eef2f7; padding: 12px 0; align-items: center; }
-.ai-action-row:first-of-type { border-top: 0; }
-.ai-action-row strong { display: block; color: #101828; margin-top: 4px; }
-.ai-action-row small { display: block; color: #667085; margin-top: 4px; }
-.ai-action-type { display: inline-flex; font-size: 12px; background: #eef4ff; color: #3538cd; border-radius: 999px; padding: 3px 8px; font-weight: 700; }
-.ai-action-buttons { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
-.ai-action-result { grid-column: 1 / -1; background: #ecfdf3; color: #027a48; border: 1px solid #abefc6; padding: 8px 10px; border-radius: 10px; font-size: 13px; }
-.ai-chat-loading { color: #64748b; padding: 12px; font-weight: 600; }
-.ai-chat-input { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 14px; border-top: 1px solid #dce3ef; background: #fff; }
-.ai-chat-input textarea { width: 100%; resize: vertical; border: 1px solid #cbd5e1; border-radius: 14px; padding: 12px; font-family: inherit; font-size: 14px; outline: none; }
-.ai-chat-input textarea:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
-@media (max-width: 760px) { .ai-chat-input { grid-template-columns: 1fr; } .ai-action-row { grid-template-columns: 1fr; } .ai-action-buttons { justify-content: flex-start; } }
-
-/* V41 - IA informes con columnas seleccionables */
-.ai-report-card {
-  margin-top: 14px;
-  border: 1px solid #d7e3f4;
-  border-radius: 12px;
-  background: #fff;
-  overflow: hidden;
-}
-
-.ai-report-header {
-  display: flex;
-  justify-content: space-between;
+.dashboard-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(130px, 1fr));
   gap: 12px;
-  align-items: center;
-  padding: 12px 14px;
-  border-bottom: 1px solid #e7eef8;
-  background: #f8fbff;
+  margin-bottom: 16px;
 }
 
-.ai-report-header strong {
-  display: block;
-  color: #10213f;
-  font-size: 14px;
-}
-
-.ai-report-header small {
-  display: block;
-  color: #5a6b86;
-  margin-top: 2px;
-}
-
-.ai-report-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.ai-report-filters {
-  margin: 10px 14px 0;
-  color: #244264;
-  font-size: 12px;
-}
-
-.ai-report-table-wrap {
-  width: 100%;
-  overflow: auto;
-  max-height: 360px;
-}
-
-.ai-report-table {
-  width: max-content;
-  min-width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.ai-report-table th,
-.ai-report-table td {
-  border-bottom: 1px solid #edf2f8;
-  padding: 9px 10px;
-  text-align: left;
-  white-space: nowrap;
-}
-
-.ai-report-table th {
-  position: sticky;
-  top: 0;
-  background: #eef5ff;
-  color: #0d2a55;
-  font-weight: 700;
-  z-index: 1;
-}
-
-/* v47 IA estratégica */
-.ai-identity-card {
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(180px, 260px) minmax(220px, 320px);
-  gap: 10px;
-  align-items: center;
+.dashboard-kpi {
   background: #ffffff;
-  border: 1px solid #d7e3f8;
-  border-radius: 12px;
-  padding: 12px 14px;
-  margin: 12px 0;
-}
-.ai-identity-card span {
-  color: #52617a;
-  margin-left: 4px;
-}
-@media (max-width: 900px) {
-  .ai-identity-card {
-    grid-template-columns: 1fr;
-  }
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
 }
 
-.mass-import-page { display: flex; flex-direction: column; gap: 16px; }
-.import-header { align-items: flex-start; gap: 16px; }
-.import-drop-card { display: flex; gap: 18px; align-items: center; border: 1px dashed #9ab3d6; background: #f7fbff; border-radius: 14px; padding: 24px; cursor: pointer; transition: border-color .2s, background .2s; }
-.import-drop-card:hover { border-color: #2f6fed; background: #f1f7ff; }
-.import-drop-icon { width: 54px; height: 54px; border-radius: 16px; background: #e6efff; display: grid; place-items: center; font-size: 26px; color: #2f6fed; flex: 0 0 auto; }
-.import-loading { border-left: 4px solid #2f6fed; }
-.import-error { border-left: 4px solid #dc2626; background: #fff7f7; color: #7f1d1d; }
-.import-success { border-left: 4px solid #16a34a; background: #f6fff8; }
-.import-kpi-grid { display: grid; grid-template-columns: repeat(6, minmax(130px, 1fr)); gap: 12px; }
-.import-kpi { background: white; border: 1px solid #e6eaf0; border-radius: 12px; padding: 14px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
-.import-kpi span { display: block; color: #64748b; font-size: 12px; margin-bottom: 8px; }
-.import-kpi strong { font-size: 20px; color: #0f172a; }
-.import-two-columns { display: grid; grid-template-columns: 1.2fr .8fr; gap: 16px; }
-.import-ai-review { white-space: pre-wrap; line-height: 1.45; color: #334155; }
-.import-summary-list { display: flex; flex-direction: column; gap: 8px; }
-.import-summary-list div { display: flex; justify-content: space-between; gap: 16px; border-bottom: 1px solid #edf2f7; padding: 7px 0; }
-.import-state-title { margin-top: 16px; }
-.import-table-toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 12px; }
-.import-table-toolbar .zoho-input { max-width: 320px; }
-.import-table-scroll { max-height: 520px; overflow: auto; border: 1px solid #e5e7eb; border-radius: 12px; }
-.import-preview-table { min-width: 1350px; }
-.import-preview-table th { position: sticky; top: 0; z-index: 1; background: #f8fafc; }
-.import-badge { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
-.import-badge-ok { background: #dcfce7; color: #166534; }
-.import-badge-advertencia { background: #fef3c7; color: #92400e; }
-.import-badge-error { background: #fee2e2; color: #991b1b; }
-.import-row-error td { background: #fff7f7; }
-.import-confirm-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.import-checkbox { display: flex; gap: 10px; align-items: center; color: #334155; }
-@media (max-width: 1100px) { .import-kpi-grid { grid-template-columns: repeat(2, 1fr); } .import-two-columns { grid-template-columns: 1fr; } .import-confirm-card, .import-table-toolbar { flex-direction: column; align-items: stretch; } }
-
-/* v55 usuarios + informes */
-.crm-user-box { display:flex; align-items:center; gap:10px; font-size:13px; color:#334155; }
-.zoho-alert { background:#eff6ff; color:#1e3a8a; border:1px solid #bfdbfe; border-radius:10px; padding:12px 14px; margin:12px 0; }
-.zoho-alert.danger { background:#fef2f2; color:#991b1b; border-color:#fecaca; }
-.zoho-card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.05); padding:18px; margin-bottom:16px; }
-.zoho-chip { display:inline-flex; align-items:center; padding:8px 12px; border-radius:999px; background:#f1f5f9; color:#334155; font-size:13px; }
-.reports-grid { display:grid; grid-template-columns:minmax(320px, 1fr) minmax(320px, 1fr); gap:16px; align-items:start; }
-.report-form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; align-items:end; }
-.report-form-grid label, .zoho-card label { display:flex; flex-direction:column; gap:6px; font-size:13px; color:#475569; }
-.report-form-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
-.report-form-actions.compact { justify-content:flex-start; margin-bottom:12px; }
-.report-field-list { display:grid; gap:8px; max-height:560px; overflow:auto; padding-right:4px; }
-.report-field-card { display:grid; grid-template-columns:auto 1fr auto auto; gap:8px; align-items:center; padding:10px; border:1px solid #e5e7eb; border-radius:10px; background:#fff; cursor:pointer; }
-.report-field-card.selected { border-color:#2563eb; background:#eff6ff; }
-.report-field-card small { color:#64748b; text-transform:uppercase; font-size:10px; }
-.report-field-order { display:flex; gap:4px; }
-.report-field-order button { border:1px solid #cbd5e1; background:#fff; border-radius:6px; cursor:pointer; }
-.report-filter-list { display:grid; gap:10px; margin:12px 0; }
-.report-filter-row { display:grid; grid-template-columns:minmax(170px,1.4fr) minmax(120px,.9fr) minmax(120px,1fr) minmax(120px,1fr) auto; gap:8px; align-items:center; }
-.zoho-table-scroll { overflow:auto; max-width:100%; border:1px solid #e5e7eb; border-radius:12px; }
-.zoho-table { width:100%; border-collapse:collapse; min-width:780px; }
-.zoho-table th { background:#f8fafc; color:#475569; text-align:left; font-size:12px; padding:10px; border-bottom:1px solid #e5e7eb; white-space:nowrap; }
-.zoho-table td { padding:10px; border-bottom:1px solid #f1f5f9; font-size:13px; color:#334155; white-space:nowrap; }
-.report-preview-table td, .report-preview-table th { max-width:260px; overflow:hidden; text-overflow:ellipsis; }
-@media (max-width: 1100px) { .reports-grid { grid-template-columns:1fr; } .report-filter-row { grid-template-columns:1fr; } }
-
-/* V61 - Dashboard: sin panel lateral de filtros avanzados */
-.dashboard-dashboard-layout-fixed.dashboard-without-side-filters {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.dashboard-without-side-filters .dashboard-main-workspace {
-  width: 100%;
-}
-
-/* Mejoras V62: filtros buscables, agrupados y paginación de 100 registros */
-.zoho-filter-actions-top {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: #fff;
-  border-bottom: 1px solid #eef2f7;
-  padding-bottom: 10px;
-  margin-bottom: 12px;
-}
-.zoho-filter-search-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(220px, 1fr));
-  gap: 12px;
-  margin-bottom: 14px;
-}
-.zoho-filter-search-grid label {
-  display: grid;
-  gap: 6px;
-  color: #36506f;
-  font-size: 12px;
-  font-weight: 700;
-}
-.zoho-filter-group {
-  border: 1px solid #e5ebf5;
-  border-radius: 12px;
-  margin-bottom: 10px;
-  overflow: hidden;
-  background: #fbfdff;
-}
-.zoho-filter-group summary {
-  cursor: pointer;
-  padding: 10px 12px;
-  color: #0f2a6b;
+.dashboard-kpi span {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
   font-weight: 800;
-  list-style: none;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: #f4f7fb;
-}
-.zoho-filter-group summary::-webkit-details-marker { display: none; }
-.zoho-filter-group summary span {
-  background: #e8f0ff;
-  color: #1f4f9a;
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 12px;
-}
-.zoho-filter-group .zoho-filter-item { padding-left: 12px; padding-right: 12px; }
-.zoho-pagination-bar {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 0 0;
-  color: #36506f;
-  font-size: 13px;
-}
-.zoho-pagination-bar .zoho-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-@media (max-width: 760px) {
-  .zoho-filter-search-grid { grid-template-columns: 1fr; }
-  .zoho-pagination-bar { justify-content: center; flex-wrap: wrap; }
-}
-
-/* V73 - Registros Empresas PRO */
-.records-pro-layout {
-  grid-template-columns: 240px 1fr;
-}
-
-.records-pro-command-center {
-  display: grid;
-  gap: 14px;
-  margin: 14px 0 18px;
-}
-
-.records-pro-kpis {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(130px, 1fr));
-  gap: 12px;
-}
-
-.records-pro-kpis > div,
-.records-pro-ai-hint {
-  background: #ffffff;
-  border: 1px solid #e5eaf2;
-  border-radius: 16px;
-  padding: 14px;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
-}
-
-.records-pro-kpis span,
-.records-pro-ai-hint span {
-  display: block;
-  color: #64748b;
-  font-size: 12px;
-}
-
-.records-pro-kpis strong {
-  display: block;
-  color: #0f172a;
-  font-size: 21px;
-  margin-top: 5px;
-}
-
-.records-pro-ai-hint {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  border-left: 5px solid #2563eb;
-}
-
-.records-pro-ai-hint strong {
-  color: #1d4ed8;
-  white-space: nowrap;
-}
-
-.record-quick-filters-pro {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.record-quick-filters-pro button {
-  border: 1px solid #dbe3ef;
-  background: #fff;
-  border-radius: 999px;
-  padding: 9px 13px;
-  font-size: 13px;
-  cursor: pointer;
-  color: #334155;
-}
-
-.record-quick-filters-pro button.active,
-.zoho-btn.active {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
-  color: #fff;
-}
-
-.records-pro-table-scroll {
-  max-height: calc(100vh - 360px);
-}
-
-.records-pro-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-}
-
-.records-pro-row {
-  cursor: pointer;
-  transition: background 0.16s ease, box-shadow 0.16s ease;
-}
-
-.records-pro-row:hover {
-  background: #f8fafc;
-  box-shadow: inset 4px 0 0 #2563eb;
-}
-
-.records-money-cell {
-  font-weight: 700;
-  color: #0f766e;
-}
-
-.record-status-badge,
-.record-priority-badge,
-.record-ready-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border-radius: 999px;
-  padding: 5px 10px;
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.record-status-badge.tone-success { background: #dcfce7; color: #166534; }
-.record-status-badge.tone-danger { background: #fee2e2; color: #991b1b; }
-.record-status-badge.tone-info { background: #dbeafe; color: #1e40af; }
-.record-status-badge.tone-warning { background: #fef3c7; color: #92400e; }
-.record-status-badge.tone-pending { background: #f1f5f9; color: #334155; }
-.record-status-badge.tone-neutral { background: #e5e7eb; color: #374151; }
-
-.record-priority-badge.tone-high { background: #fee2e2; color: #991b1b; }
-.record-priority-badge.tone-medium { background: #fef3c7; color: #92400e; }
-.record-priority-badge.tone-low { background: #e0f2fe; color: #075985; }
-.record-ready-pill.ready { background: #dcfce7; color: #166534; }
-.record-ready-pill.blocked { background: #fee2e2; color: #991b1b; }
-
-.records-kanban-pro {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(300px, 340px);
-  gap: 14px;
-  overflow-x: auto;
-  padding-bottom: 10px;
-  min-height: 520px;
-}
-
-.records-kanban-column {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 18px;
-  overflow: hidden;
-}
-
-.records-kanban-column header {
-  padding: 14px;
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.records-kanban-column header strong,
-.records-kanban-column header span {
-  display: block;
-}
-
-.records-kanban-column header span {
-  color: #64748b;
-  font-size: 12px;
-  margin-top: 3px;
-}
-
-.records-kanban-list {
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  max-height: 620px;
-  overflow-y: auto;
-}
-
-.records-kanban-card {
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  border-radius: 16px;
-  padding: 12px;
-  text-align: left;
-  cursor: pointer;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
-}
-
-.records-kanban-card:hover {
-  border-color: #2563eb;
-  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.12);
-}
-
-.kanban-card-top,
-.kanban-card-bottom {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  align-items: center;
-}
-
-.kanban-card-top strong {
-  color: #0f172a;
-  font-size: 13px;
-}
-
-.kanban-card-meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  color: #64748b;
-  font-size: 12px;
-  margin: 10px 0;
-}
-
-.kanban-empty {
-  color: #94a3b8;
-  text-align: center;
-  padding: 30px 10px;
-  font-size: 13px;
-}
-
-.record-detail-overlay-pro {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.38);
-  z-index: 80;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.record-detail-panel-pro {
-  width: min(760px, 96vw);
-  height: 100vh;
-  overflow-y: auto;
-  background: #f8fafc;
-  border-left: 1px solid #dbe3ef;
-  box-shadow: -20px 0 40px rgba(15, 23, 42, 0.2);
-  padding: 20px;
-}
-
-.record-panel-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 20px;
-  padding: 18px;
-}
-
-.record-panel-header h2 {
-  margin: 3px 0;
-  font-size: 22px;
-}
-
-.record-panel-header p,
-.record-panel-eyebrow,
-.record-panel-muted {
-  color: #64748b;
-}
-
-.record-panel-eyebrow {
-  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  margin-bottom: 6px;
 }
 
-.record-panel-close {
-  width: 36px;
-  height: 36px;
-  border: 0;
-  border-radius: 999px;
-  background: #f1f5f9;
-  cursor: pointer;
-  font-size: 24px;
-}
-
-.record-panel-badges,
-.record-panel-footer {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-  margin: 14px 0;
-}
-
-.record-panel-ai-card,
-.record-panel-kpis > div,
-.record-panel-tabs-pro section {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 18px;
-  padding: 16px;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
-}
-
-.record-panel-ai-card {
-  border-left: 5px solid #2563eb;
-}
-
-.record-panel-ai-card p {
-  margin: 8px 0 0;
-  color: #475569;
-  line-height: 1.5;
-}
-
-.record-panel-kpis {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin: 14px 0;
-}
-
-.record-panel-kpis span,
-.record-panel-field span {
+.dashboard-kpi strong {
   display: block;
-  color: #64748b;
-  font-size: 12px;
-}
-
-.record-panel-kpis strong,
-.record-panel-field strong {
-  display: block;
-  margin-top: 4px;
+  font-size: 20px;
   color: #0f172a;
 }
 
-.record-panel-tabs-pro {
-  display: grid;
-  gap: 14px;
-}
-
-.record-panel-tabs-pro h3 {
-  margin: 0 0 12px;
-}
-
-.record-panel-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(160px, 1fr));
-  gap: 12px;
-}
-
-.record-panel-list,
-.record-panel-timeline {
-  display: grid;
-  gap: 10px;
-}
-
-.record-panel-list a,
-.record-panel-timeline div {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 10px;
-  text-decoration: none;
-  color: #1d4ed8;
-}
-
-.record-panel-timeline div strong,
-.record-panel-timeline div span {
+.dashboard-kpi small {
   display: block;
-}
-
-.record-panel-timeline div span {
   color: #64748b;
   margin-top: 4px;
 }
 
-.record-panel-footer {
-  position: sticky;
-  bottom: 0;
-  background: #f8fafc;
-  padding: 12px 0 0;
-  justify-content: flex-end;
+.dashboard-progress {
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 10px;
 }
 
-@media (max-width: 1100px) {
-  .records-pro-layout { grid-template-columns: 1fr; }
-  .records-pro-kpis { grid-template-columns: repeat(2, 1fr); }
-  .record-panel-kpis,
-  .record-panel-grid { grid-template-columns: 1fr; }
+.dashboard-progress div {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #38bdf8);
+}
+
+.ranking-card {
+  min-height: 260px;
+}
+
+.ranking-row {
+  margin-bottom: 12px;
+}
+
+.ranking-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 5px;
+}
+
+.ranking-head span {
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.ranking-bar {
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.ranking-bar div {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #60a5fa);
+}
+
+.clickable-row {
+  cursor: pointer;
+}
+
+.clickable-row:hover {
+  background: #f8fafc;
+}
+
+.status-pill {
+  display: inline-flex;
+  background: #e0f2fe;
+  color: #075985;
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* Responsive */
+
+@media (max-width: 1200px) {
+  .portal-kpi-grid,
+  .client-portal-kpis,
+  .portal-summary-grid,
+  .dashboard-kpi-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .dashboard-grid-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .intelligence-metric-grid,
+  .ai-summary-grid,
+  .dashboard-ai-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .client-portal-hero,
+  .portal-client-hero,
+  .portal-hero {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .client-portal-pro,
+  .client-portal-page {
+    padding: 14px;
+  }
+
+  .portal-kpi-grid,
+  .client-portal-kpis,
+  .portal-summary-grid,
+  .dashboard-kpi-grid,
+  .dashboard-grid-2,
+  .dashboard-grid-3,
+  .intelligence-metric-grid,
+  .ai-summary-grid,
+  .dashboard-ai-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .portal-record-fields,
+  .client-portal-fields,
+  .portal-fields-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .portal-kanban,
+  .client-portal-kanban {
+    grid-template-columns: repeat(4, 260px);
+  }
 }

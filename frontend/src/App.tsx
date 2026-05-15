@@ -14,7 +14,6 @@ import LoginPage from "./pages/LoginPage";
 import { defaultPathForUser, getCurrentUser } from "./auth";
 import V66AutomationPage from "./pages/V66AutomationPage";
 import AICommandCenterPage from "./pages/AICommandCenterPage";
-import "./styles/zoho-modules.css";
 
 function RootRedirect() {
   return <Navigate to={defaultPathForUser(getCurrentUser())} replace />;
