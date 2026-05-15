@@ -1,5 +1,6 @@
 /* =========================================================
-   OPERAFIX CRM GLOBAL LAYOUT RESTORE
+   OPERAFIX CRM GLOBAL LAYOUT RESTORE - ACTUAL CLASS NAMES
+   Debe estar AL INICIO de frontend/src/styles/zoho-modules.css
    ========================================================= */
 
 * {
@@ -43,6 +44,7 @@ textarea {
   min-height: 52px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 18px;
   padding: 0 22px;
   background: linear-gradient(90deg, #0f172a 0%, #1d4ed8 100%);
@@ -52,25 +54,31 @@ textarea {
   z-index: 50;
 }
 
-.crm-brand {
+.crm-topbar-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 18px;
+  min-width: 0;
+  flex: 1;
+}
+
+.crm-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 130px;
-  font-size: 24px;
+  border: 0;
+  background: transparent;
+  color: #ffffff;
+  font-size: 26px;
   font-weight: 900;
-  letter-spacing: -0.04em;
-  color: #ffffff;
-  text-decoration: none;
+  letter-spacing: -0.05em;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
 }
 
-.crm-brand a,
-.crm-brand span {
-  color: #ffffff;
-  text-decoration: none;
-}
-
-.crm-nav {
+.crm-main-nav {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -80,14 +88,11 @@ textarea {
   scrollbar-width: none;
 }
 
-.crm-nav::-webkit-scrollbar {
+.crm-main-nav::-webkit-scrollbar {
   display: none;
 }
 
-.crm-nav a,
-.crm-nav button {
-  border: 0;
-  background: transparent;
+.crm-main-nav a {
   color: rgba(255, 255, 255, 0.9);
   text-decoration: none;
   padding: 8px 10px;
@@ -95,53 +100,41 @@ textarea {
   font-size: 14px;
   font-weight: 700;
   white-space: nowrap;
-  cursor: pointer;
 }
 
-.crm-nav a:hover,
-.crm-nav button:hover,
-.crm-nav a.active {
+.crm-main-nav a:hover,
+.crm-main-nav a.active {
   background: rgba(255, 255, 255, 0.16);
   color: #ffffff;
 }
 
-.crm-user-area {
+.crm-user-box {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
   margin-left: auto;
+  color: rgba(255, 255, 255, 0.9);
   white-space: nowrap;
-}
-
-.crm-user-info {
-  display: grid;
-  line-height: 1.1;
-  text-align: right;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.86);
 }
 
-.crm-role-badge {
+.role-chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #ffffff;
-  color: #1d4ed8;
   border-radius: 999px;
   padding: 5px 12px;
+  background: #ffffff;
+  color: #1d4ed8;
   font-size: 12px;
   font-weight: 800;
+  line-height: 1;
 }
 
-.crm-logout-btn,
-.crm-exit-btn {
-  border: 0;
-  background: #ffffff;
-  color: #0f172a;
-  border-radius: 8px;
-  padding: 8px 13px;
-  font-weight: 800;
-  cursor: pointer;
+.role-chip.soft {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
 }
 
 .crm-body {
@@ -160,45 +153,42 @@ textarea {
   min-width: 0;
 }
 
-.crm-sidebar-search,
-.crm-sidebar input[type="search"],
-.crm-sidebar input {
+.crm-sidebar-search {
+  margin-bottom: 12px;
+}
+
+.crm-sidebar-search .zoho-input,
+.crm-sidebar-search input {
   width: 100%;
   border: 1px solid #cbd5e1;
   border-radius: 9px;
   padding: 9px 10px;
-  margin-bottom: 12px;
   background: #ffffff;
   color: #0f172a;
   outline: none;
 }
 
-.crm-sidebar-nav,
-.crm-sidebar-menu {
+.crm-side-nav {
   display: grid;
   gap: 2px;
 }
 
-.crm-sidebar a,
-.crm-sidebar button {
+.crm-side-nav a {
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 32px;
-  border: 0;
-  background: transparent;
+  min-height: 34px;
   color: #0f172a;
   text-align: left;
   text-decoration: none;
   padding: 8px 10px;
   border-radius: 8px;
   font-size: 15px;
-  cursor: pointer;
+  line-height: 1.15;
 }
 
-.crm-sidebar a:hover,
-.crm-sidebar button:hover,
-.crm-sidebar a.active {
+.crm-side-nav a:hover,
+.crm-side-nav a.active {
   background: #eef4ff;
   color: #1d4ed8;
   font-weight: 800;
@@ -268,6 +258,7 @@ textarea {
   font-weight: 700;
   cursor: pointer;
   text-decoration: none;
+  line-height: 1.1;
 }
 
 .zoho-btn:hover {
@@ -280,6 +271,12 @@ textarea {
   background: #2563eb;
   border-color: #2563eb;
   color: #ffffff;
+}
+
+.zoho-btn.subtle {
+  background: rgba(255, 255, 255, 0.92);
+  color: #0f172a;
+  border-color: transparent;
 }
 
 .zoho-btn.danger,
@@ -297,6 +294,7 @@ textarea {
   padding: 5px 8px;
   font-size: 12px;
   cursor: pointer;
+  line-height: 1.1;
 }
 
 .zoho-select,
@@ -309,6 +307,7 @@ textarea {
   background: #ffffff;
   color: #0f172a;
   outline: none;
+  font-size: 14px;
 }
 
 .zoho-select:focus,
@@ -1268,1296 +1267,4 @@ textarea {
 .records-money-cell {
   font-weight: 800;
   color: #0f172a;
-}
-/* =========================================================
-   OPERAFIX V74 EMERGENCY UI RESTORE
-   Restaura layout global + componentes Zoho/CRM.
-   ========================================================= */
-
-html, body, #root {
-  min-height: 100%;
-}
-
-body {
-  margin: 0;
-  background: #f3f6fb;
-  color: #0f172a;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 14px;
-}
-
-button, input, select, textarea {
-  font-family: inherit;
-}
-
-.crm-shell {
-  min-height: 100vh;
-  background: #f3f6fb;
-}
-
-.crm-topbar {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 0 20px;
-  background: linear-gradient(90deg, #0f63b6 0%, #4f9be5 100%);
-  color: #ffffff;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
-}
-
-.crm-topbar-left {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  min-width: 0;
-}
-
-.crm-brand {
-  border: 0;
-  background: transparent;
-  color: #020617;
-  font-weight: 900;
-  font-size: 26px;
-  letter-spacing: -0.04em;
-  padding: 0;
-  cursor: pointer;
-}
-
-.crm-main-nav {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-wrap: wrap;
-}
-
-.crm-main-nav a {
-  color: #ffffff;
-  text-decoration: none;
-  padding: 9px 8px;
-  border-radius: 8px;
-  font-size: 15px;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.crm-main-nav a.active,
-.crm-main-nav a:hover {
-  background: rgba(255, 255, 255, 0.18);
-}
-
-.crm-user-box {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  min-width: 0;
-  font-size: 12px;
-}
-
-.crm-user-box > span:first-child {
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.role-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: #eef6ff;
-  color: #185ea8;
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.role-chip.soft {
-  background: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-}
-
-.crm-body {
-  display: grid;
-  grid-template-columns: 226px minmax(0, 1fr);
-  min-height: calc(100vh - 52px);
-}
-
-.crm-sidebar {
-  background: #ffffff;
-  border-right: 1px solid #dbe3ef;
-  padding: 12px;
-  overflow-y: auto;
-}
-
-.crm-sidebar-search {
-  margin-bottom: 12px;
-}
-
-.crm-side-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.crm-side-nav a {
-  display: block;
-  color: #0f172a;
-  text-decoration: none;
-  padding: 7px 8px;
-  border-radius: 8px;
-  font-size: 16px;
-  line-height: 1.15;
-}
-
-.crm-side-nav a.active,
-.crm-side-nav a:hover {
-  background: #eaf3ff;
-  color: #0f63b6;
-  font-weight: 800;
-}
-
-.crm-content {
-  min-width: 0;
-  padding: 16px;
-  overflow: auto;
-}
-
-.zoho-module-page {
-  min-width: 0;
-  color: #0f172a;
-}
-
-.zoho-module-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  border-bottom: 1px solid #dbe3ef;
-  padding: 4px 0 14px;
-  margin-bottom: 16px;
-}
-
-.zoho-module-header h1 {
-  margin: 0;
-  font-size: 28px;
-  line-height: 1.05;
-  letter-spacing: -0.03em;
-  color: #0f172a;
-}
-
-.zoho-module-header p {
-  margin: 6px 0 0;
-  color: #64748b;
-  font-size: 15px;
-}
-
-.zoho-module-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.zoho-btn,
-.zoho-small-btn,
-.link-button {
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #0f172a;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 32px;
-}
-
-.zoho-btn:hover,
-.zoho-small-btn:hover {
-  background: #f8fafc;
-  border-color: #94a3b8;
-}
-
-.zoho-btn.active,
-.zoho-btn-primary,
-.zoho-btn.zoho-btn-primary {
-  background: #2383dc;
-  border-color: #2383dc;
-  color: #ffffff;
-  font-weight: 800;
-}
-
-.zoho-btn.subtle {
-  background: rgba(255, 255, 255, 0.88);
-  color: #0f172a;
-}
-
-.zoho-btn.danger,
-.zoho-small-btn.danger {
-  color: #b42318;
-  border-color: #fecaca;
-  background: #fff7f7;
-}
-
-.zoho-btn.small,
-.zoho-small-btn {
-  padding: 5px 8px;
-  font-size: 12px;
-  min-height: 26px;
-  border-radius: 6px;
-}
-
-.zoho-input,
-.zoho-select,
-.zoho-textarea,
-select.zoho-select,
-input.zoho-input,
-textarea.zoho-input {
-  width: 100%;
-  min-height: 34px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #0f172a;
-  padding: 8px 10px;
-  font-size: 14px;
-  outline: none;
-}
-
-.zoho-input:focus,
-.zoho-select:focus,
-.zoho-textarea:focus {
-  border-color: #2383dc;
-  box-shadow: 0 0 0 3px rgba(35, 131, 220, 0.12);
-}
-
-.zoho-textarea {
-  min-height: 90px;
-  resize: vertical;
-}
-
-.zoho-card {
-  background: #ffffff;
-  border: 1px solid #dbe3ef;
-  border-radius: 14px;
-  padding: 16px;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
-}
-
-.zoho-card-title-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.zoho-card-title-row h2,
-.zoho-card-title-row h3 {
-  margin: 0;
-  font-size: 17px;
-  color: #0f172a;
-}
-
-.zoho-empty {
-  padding: 18px;
-  border-radius: 12px;
-  background: #f8fafc;
-  border: 1px dashed #cbd5e1;
-  color: #64748b;
-}
-
-.zoho-empty.small {
-  padding: 10px;
-  font-size: 13px;
-}
-
-.zoho-scope-hint,
-.dashboard-filter-help,
-.modal-helper-text,
-.column-order-help {
-  background: #f8fbff;
-  border: 1px solid #dbeafe;
-  color: #274060;
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 13px;
-  margin-bottom: 14px;
-}
-
-.zoho-view-tabs {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
-
-.zoho-view-tabs button {
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  border-radius: 8px;
-  padding: 8px 16px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.zoho-view-tabs button.active {
-  border-color: #2383dc;
-  background: #eaf3ff;
-  color: #0f63b6;
-  font-weight: 800;
-}
-
-.zoho-table-wrap,
-.zoho-table-scroll,
-.zoho-table-horizontal-scroll {
-  width: 100%;
-  overflow: auto;
-  background: #ffffff;
-  border: 1px solid #dbe3ef;
-  border-radius: 12px;
-}
-
-.zoho-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: #ffffff;
-  font-size: 13px;
-}
-
-.zoho-table th,
-.zoho-table td {
-  border-bottom: 1px solid #eef2f7;
-  padding: 9px 10px;
-  text-align: left;
-  vertical-align: middle;
-}
-
-.zoho-table th {
-  background: #f8fafc;
-  color: #334155;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.zoho-table.compact th,
-.zoho-table.compact td {
-  padding: 7px 9px;
-}
-
-.clickable-row,
-.records-pro-row {
-  cursor: pointer;
-}
-
-.clickable-row:hover,
-.records-pro-row:hover {
-  background: #f8fafc;
-}
-
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 5px 9px;
-  background: #eef2f7;
-  color: #334155;
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-/* Dashboard restored */
-.dashboard-page {
-  display: block;
-}
-
-.dashboard-filter-card {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(160px, 1fr));
-  gap: 12px;
-  padding: 16px;
-  background: #ffffff;
-  border: 1px solid #dbe3ef;
-  border-radius: 14px;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
-  margin-bottom: 14px;
-}
-
-.dashboard-goal-input {
-  display: grid;
-  gap: 6px;
-  color: #64748b;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 800;
-}
-
-.dashboard-advanced-layout,
-.dashboard-main-workspace {
-  min-width: 0;
-}
-
-.dashboard-kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(150px, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.dashboard-kpi {
-  background: #ffffff;
-  border: 1px solid #dbe3ef;
-  border-radius: 14px;
-  padding: 16px;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
-}
-
-.dashboard-kpi span {
-  display: block;
-  color: #64748b;
-  font-size: 11px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  margin-bottom: 8px;
-}
-
-.dashboard-kpi strong {
-  display: block;
-  font-size: 22px;
-  color: #0f172a;
-  letter-spacing: -0.03em;
-}
-
-.dashboard-kpi small {
-  display: block;
-  color: #64748b;
-  margin-top: 6px;
-}
-
-.dashboard-progress {
-  height: 8px;
-  background: #e2e8f0;
-  border-radius: 999px;
-  overflow: hidden;
-  margin-top: 10px;
-}
-
-.dashboard-progress div {
-  height: 100%;
-  background: linear-gradient(90deg, #2563eb, #38bdf8);
-}
-
-.dashboard-builder-section,
-.dashboard-records-card,
-.custom-dashboard-panel,
-.ranking-card {
-  background: #ffffff;
-  border: 1px solid #dbe3ef;
-  border-radius: 16px;
-  padding: 16px;
-  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.05);
-  margin-bottom: 16px;
-}
-
-.dashboard-custom-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 16px;
-}
-
-.dashboard-grid-3 {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(240px, 1fr));
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.dashboard-grid-2 {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(320px, 1fr));
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.ranking-row {
-  margin-bottom: 12px;
-}
-
-.ranking-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 13px;
-  margin-bottom: 5px;
-}
-
-.ranking-head span {
-  color: #64748b;
-  white-space: nowrap;
-}
-
-.ranking-bar {
-  height: 8px;
-  background: #e2e8f0;
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.ranking-bar div {
-  height: 100%;
-  background: linear-gradient(90deg, #2563eb, #60a5fa);
-}
-
-.custom-panel-header,
-.custom-panel-actions,
-.panel-editor-title-row,
-.criteria-actions,
-.column-picker-actions,
-.zoho-form-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.custom-bar-chart,
-.custom-pie-legend,
-.custom-panel-record-list,
-.notes-list,
-.attachment-list,
-.activity-list,
-.timeline-list {
-  display: grid;
-  gap: 10px;
-}
-
-.custom-bar-label {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 13px;
-}
-
-.custom-bar-track {
-  height: 10px;
-  background: #e2e8f0;
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.custom-bar-track div {
-  height: 100%;
-  background: linear-gradient(90deg, #2563eb, #60a5fa);
-}
-
-.custom-pie-layout {
-  display: grid;
-  grid-template-columns: 150px 1fr;
-  gap: 18px;
-  align-items: center;
-}
-
-.custom-pie {
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-weight: 900;
-  color: #0f172a;
-  position: relative;
-}
-
-.custom-pie::after {
-  content: "";
-  position: absolute;
-  inset: 28px;
-  background: #ffffff;
-  border-radius: 50%;
-}
-
-.custom-pie span {
-  position: relative;
-  z-index: 1;
-  font-size: 12px;
-  text-align: center;
-}
-
-/* Intelligence panel restored */
-.ai-executive-panel {
-  background: #ffffff;
-  border: 1px solid #dbe3ef;
-  border-radius: 16px;
-  padding: 16px;
-  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.05);
-  margin-bottom: 16px;
-}
-
-.ai-executive-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  align-items: flex-start;
-  margin-bottom: 14px;
-}
-
-.ai-eyebrow {
-  display: block;
-  color: #2563eb;
-  font-size: 12px;
-  font-weight: 900;
-  margin-bottom: 4px;
-}
-
-.ai-executive-header h2 {
-  margin: 0;
-  font-size: 24px;
-  letter-spacing: -0.03em;
-}
-
-.ai-executive-header p {
-  color: #64748b;
-  margin-top: 4px;
-}
-
-.ai-executive-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.ai-insight-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(160px, 1fr));
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.ai-insight-card {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 14px;
-}
-
-.ai-insight-card span {
-  display: block;
-  color: #64748b;
-  font-size: 11px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 6px;
-}
-
-.ai-insight-card strong {
-  font-size: 22px;
-}
-
-.ai-insight-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
-  gap: 14px;
-}
-
-.ai-narrative-card,
-.ai-priority-card {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 14px;
-}
-
-.ai-priority-row {
-  width: 100%;
-  text-align: left;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 58px;
-  gap: 8px;
-  border: 1px solid #dbe3ef;
-  border-radius: 12px;
-  background: #ffffff;
-  padding: 10px;
-  margin-bottom: 8px;
-}
-
-.ai-score-box {
-  display: grid;
-  place-items: center;
-  border-radius: 10px;
-  background: #dbeafe;
-  color: #1d4ed8;
-  font-weight: 900;
-}
-
-/* Portal restored */
-.client-portal-page,
-.portal-pro-page {
-  display: block;
-}
-
-.portal-hero,
-.portal-pro-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 24px;
-  align-items: start;
-  padding: 26px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #10244f 0%, #1d4ed8 100%);
-  color: #ffffff;
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.16);
-  margin-bottom: 22px;
-}
-
-.portal-hero h1 {
-  margin: 4px 0 8px;
-  font-size: 28px;
-  letter-spacing: -0.03em;
-}
-
-.portal-hero p {
-  color: rgba(255, 255, 255, 0.88);
-}
-
-.portal-hero .eyebrow {
-  color: #bfdbfe;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  font-weight: 900;
-  font-size: 12px;
-}
-
-.portal-hero-actions {
-  display: grid;
-  gap: 10px;
-}
-
-.portal-summary-strip,
-.portal-pro-summary {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(150px, 1fr));
-  gap: 14px;
-  margin-bottom: 18px;
-}
-
-.portal-summary-card {
-  background: #ffffff;
-  border: 1px solid #dbe3ef;
-  border-radius: 14px;
-  padding: 16px;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
-}
-
-.portal-summary-card span {
-  display: block;
-  color: #64748b;
-  font-size: 11px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 8px;
-}
-
-.portal-summary-card strong {
-  display: block;
-  font-size: 22px;
-}
-
-.portal-view-tabs {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-
-.portal-view-tabs button {
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #0f172a;
-  border-radius: 999px;
-  padding: 8px 14px;
-  cursor: pointer;
-  font-weight: 800;
-}
-
-.portal-view-tabs button.active {
-  background: #2563eb;
-  border-color: #2563eb;
-  color: #ffffff;
-}
-
-.portal-record-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
-}
-
-.portal-card,
-.portal-pro-card {
-  background: #ffffff;
-  border: 1px solid #dbe3ef;
-  border-radius: 16px;
-  padding: 16px;
-  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.portal-card-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.portal-card-head h3 {
-  margin: 0;
-  font-size: 17px;
-  line-height: 1.15;
-}
-
-.portal-card-head p {
-  margin: 5px 0 0;
-  color: #64748b;
-}
-
-.portal-stage-pill,
-.portal-status-pill {
-  display: inline-flex;
-  border-radius: 999px;
-  padding: 6px 10px;
-  background: #dbeafe;
-  color: #1d4ed8;
-  font-size: 11px;
-  font-weight: 900;
-  white-space: nowrap;
-}
-
-.portal-progress {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-}
-
-.portal-progress span,
-.portal-progress-step {
-  text-align: center;
-  border-radius: 10px;
-  background: #f1f5f9;
-  color: #64748b;
-  padding: 9px 6px;
-  font-size: 11px;
-  font-weight: 900;
-}
-
-.portal-progress span.active,
-.portal-progress-step.active {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.portal-card-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-
-.portal-card-metrics > div {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 10px;
-}
-
-.portal-card-metrics span {
-  display: block;
-  color: #64748b;
-  font-size: 10px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 5px;
-}
-
-.portal-card-metrics strong {
-  display: block;
-  font-size: 13px;
-}
-
-.portal-documents {
-  border-top: 1px solid #e2e8f0;
-  padding-top: 12px;
-}
-
-.portal-kanban-board {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(260px, 1fr));
-  gap: 14px;
-  overflow-x: auto;
-  padding-bottom: 10px;
-}
-
-.portal-kanban-column {
-  background: #eef2f7;
-  border: 1px solid #dbe3ef;
-  border-radius: 16px;
-  padding: 12px;
-  min-height: 360px;
-}
-
-.portal-kanban-title {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.portal-kanban-card {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 12px;
-  margin-bottom: 10px;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
-}
-
-.portal-table-card {
-  padding: 0;
-  overflow: hidden;
-}
-
-/* Records panel resize */
-.records-pro-layout {
-  display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
-  gap: 14px;
-  align-items: start;
-}
-
-.records-pro-command-center {
-  background: #ffffff;
-  border: 1px solid #dbe3ef;
-  border-radius: 16px;
-  padding: 16px;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
-  margin-bottom: 16px;
-}
-
-.records-pro-kpis {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(120px, 1fr));
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.records-pro-kpis > div {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 12px;
-}
-
-.records-pro-kpis span {
-  display: block;
-  color: #64748b;
-  font-size: 11px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 5px;
-}
-
-.records-pro-kpis strong {
-  font-size: 18px;
-}
-
-.records-pro-ai-hint {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  border: 1px solid #bfdbfe;
-  background: #eff6ff;
-  border-radius: 12px;
-  padding: 10px 12px;
-  margin-bottom: 12px;
-  color: #1e3a8a;
-}
-
-.records-pro-ai-hint strong {
-  color: #2563eb;
-}
-
-.zoho-filter-compact-card {
-  background: #ffffff;
-  border: 1px solid #dbe3ef;
-  border-radius: 14px;
-  padding: 14px;
-  display: grid;
-  gap: 10px;
-  position: sticky;
-  top: 68px;
-}
-
-.records-pro-layout .zoho-table-wrap,
-.records-pro-layout .zoho-table-wrap-scroll {
-  min-height: 420px;
-  height: calc(100vh - 330px);
-  max-height: calc(100vh - 220px);
-  resize: vertical;
-  overflow: auto;
-  border-radius: 16px;
-  background: #ffffff;
-  border: 1px solid #dbe3ef;
-  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
-}
-
-.records-pro-table-scroll {
-  width: 100%;
-  overflow: auto;
-  min-height: 320px;
-  max-height: calc(100vh - 390px);
-}
-
-.records-pro-table {
-  min-width: 1450px;
-  width: max-content;
-}
-
-.records-pro-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  background: #f8fafc;
-  box-shadow: inset 0 -1px 0 #e2e8f0;
-}
-
-.records-pro-table th:first-child,
-.records-pro-table td:first-child {
-  position: sticky;
-  left: 0;
-  z-index: 4;
-  background: #ffffff;
-}
-
-.records-pro-table thead th:first-child {
-  z-index: 5;
-  background: #f8fafc;
-}
-
-.records-pro-table th:last-child,
-.records-pro-table td:last-child {
-  position: sticky;
-  right: 0;
-  z-index: 4;
-  background: #ffffff;
-  box-shadow: -8px 0 14px rgba(15, 23, 42, 0.06);
-}
-
-.records-pro-table thead th:last-child {
-  z-index: 5;
-  background: #f8fafc;
-}
-
-.zoho-table-toolbar {
-  position: sticky;
-  top: 0;
-  z-index: 6;
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
-  padding: 10px 12px;
-}
-
-.zoho-pagination-bar {
-  position: sticky;
-  bottom: 0;
-  z-index: 6;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
-  background: #ffffff;
-  border-top: 1px solid #e2e8f0;
-  padding: 10px 12px;
-}
-
-.compact-actions {
-  display: flex;
-  gap: 4px;
-  flex-wrap: nowrap;
-  white-space: nowrap;
-}
-
-.records-pro-row td {
-  white-space: nowrap;
-}
-
-.records-money-cell {
-  font-weight: 800;
-  color: #0f172a;
-}
-
-.record-priority-badge,
-.record-status-badge {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 5px 9px;
-  font-size: 12px;
-  font-weight: 900;
-  white-space: nowrap;
-}
-
-.record-priority-badge.tone-high { background: #fee2e2; color: #b91c1c; }
-.record-priority-badge.tone-medium { background: #fef3c7; color: #92400e; }
-.record-priority-badge.tone-low { background: #e2e8f0; color: #475569; }
-.record-priority-badge.tone-blocked { background: #fce7f3; color: #be185d; }
-
-/* Modal and forms */
-.modal-overlay,
-.zoho-modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: grid;
-  place-items: center;
-  background: rgba(15, 23, 42, 0.45);
-  padding: 20px;
-}
-
-.modal-card,
-.zoho-modal,
-.zoho-modal-card {
-  width: min(1100px, 96vw);
-  max-height: 90vh;
-  overflow: auto;
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.28);
-}
-
-.zoho-form-section {
-  border: 1px solid #dbe3ef;
-  border-radius: 14px;
-  padding: 14px;
-  margin-bottom: 14px;
-}
-
-.zoho-form-section h3 {
-  margin: 0 0 12px;
-  font-size: 16px;
-}
-
-.zoho-form-grid,
-.sort-panel-grid,
-.panel-editor-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.zoho-form-field,
-.panel-editor-form label,
-.Field {
-  display: grid;
-  gap: 6px;
-  color: #334155;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.column-picker-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 10px;
-}
-
-.column-picker-item {
-  border: 1px solid #dbe3ef;
-  border-radius: 10px;
-  padding: 10px;
-  background: #ffffff;
-}
-
-.column-picker-item.active {
-  background: #eff6ff;
-  border-color: #93c5fd;
-}
-
-@media (max-width: 1300px) {
-  .dashboard-kpi-grid,
-  .portal-summary-strip,
-  .portal-pro-summary,
-  .records-pro-kpis {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  .dashboard-grid-3 {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .ai-insight-body,
-  .dashboard-grid-2 {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 900px) {
-  .crm-body,
-  .records-pro-layout {
-    grid-template-columns: 1fr;
-  }
-  .crm-sidebar {
-    display: none;
-  }
-  .crm-topbar {
-    height: auto;
-    min-height: 52px;
-    flex-wrap: wrap;
-    padding: 10px 14px;
-  }
-  .crm-main-nav {
-    max-width: 100%;
-  }
-  .portal-hero,
-  .portal-pro-hero,
-  .dashboard-filter-card,
-  .ai-insight-grid,
-  .portal-summary-strip,
-  .portal-pro-summary,
-  .records-pro-kpis,
-  .dashboard-kpi-grid,
-  .dashboard-grid-3,
-  .dashboard-grid-2,
-  .portal-card-metrics,
-  .zoho-form-grid,
-  .sort-panel-grid,
-  .panel-editor-row {
-    grid-template-columns: 1fr;
-  }
-  .portal-kanban-board {
-    grid-template-columns: repeat(4, 260px);
-  }
 }
