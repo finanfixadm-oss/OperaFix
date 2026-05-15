@@ -5,7 +5,12 @@ import ZohoModal from "../components/ZohoModal";
 import { fetchJson, postJson } from "../api";
 import type { FilterRule, ManagementLineAfp } from "../types";
 import type { RecordItem } from "../types-records";
-import { defaultRecordColumnFields, formatCellValue, getValueByPath, recordColumns, recordFilterFields } from "../utils-record-fields";
+import { defaultRecordColumnFields, formatCellValue, formatMoney, getValueByPath, recordColumns, recordFilterFields } from "../utils-record-fields";
+import RecordDetailPanel from "../components/records/RecordDetailPanel";
+import RecordPriorityBadge from "../components/records/RecordPriorityBadge";
+import RecordQuickFilters, { type RecordQuickFilterKey } from "../components/records/RecordQuickFilters";
+import RecordStatusBadge from "../components/records/RecordStatusBadge";
+import RecordsKanbanView from "../components/records/RecordsKanbanView";
 
 type MandanteOption = {
   id: string;
@@ -249,6 +254,77 @@ function saveRecordsScopedSettings(view: string, settings: RecordsScopedSettings
 }
 
 
+type RecordsViewMode = "table" | "kanban";
+
+function recordMoneyValue(value: unknown) {
+  const n = Number(String(value ?? 0).replace(/\./g, "").replace(/,/g, ".").replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function recordDaysSince(value?: string | null) {
+  if (!value) return 999;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 999;
+  return Math.floor((Date.now() - date.getTime()) / 86400000);
+}
+
+function recordText(value: unknown) {
+  return String(value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+function rowMatchesQuickFilter(row: RecordItem, filter: RecordQuickFilterKey) {
+  const status = recordText(row.estado_gestion);
+  const amount = recordMoneyValue(row.monto_devolucion);
+  const hasCc = row.confirmacion_cc === true;
+  const hasPower = row.confirmacion_poder === true;
+  const lastActivityDays = recordDaysSince(row.last_activity_at || row.updated_at || row.created_at);
+
+  switch (filter) {
+    case "listos":
+      return hasCc && hasPower && amount > 0 && status.includes("pend") && Boolean(row.entidad || row.lineAfp?.afp_name);
+    case "sin_poder":
+      return row.confirmacion_poder !== true;
+    case "sin_cc":
+      return row.confirmacion_cc !== true;
+    case "alto_monto":
+      return amount >= 1000000;
+    case "pendientes":
+      return status.includes("pend");
+    case "pagados":
+      return status.includes("pag") || status.includes("cerr") || status.includes("factur");
+    case "rechazados":
+      return status.includes("rechaz") || recordText(row.motivo_rechazo).includes("rechaz");
+    case "dormidos":
+      return lastActivityDays > 30;
+    case "todos":
+    default:
+      return true;
+  }
+}
+
+function buildRecordsSummary(rows: RecordItem[]) {
+  return rows.reduce(
+    (acc, row) => {
+      const amount = recordMoneyValue(row.monto_devolucion);
+      const status = recordText(row.estado_gestion);
+      acc.total += 1;
+      acc.amount += amount;
+      if (row.confirmacion_cc === true && row.confirmacion_poder === true && amount > 0 && status.includes("pend")) acc.ready += 1;
+      if (row.confirmacion_cc !== true) acc.blockedCc += 1;
+      if (row.confirmacion_poder !== true) acc.blockedPower += 1;
+      if (amount >= 1000000) acc.highAmount += 1;
+      if (status.includes("pag") || status.includes("cerr") || status.includes("factur")) acc.paid += 1;
+      return acc;
+    },
+    { total: 0, amount: 0, ready: 0, blockedCc: 0, blockedPower: 0, highAmount: 0, paid: 0 }
+  );
+}
+
+
 export default function RecordsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -271,8 +347,10 @@ export default function RecordsPage() {
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const selectedRecordId =
-  searchParams.get("id") || searchParams.get("recordId");
+  const [quickFilter, setQuickFilter] = useState<RecordQuickFilterKey>("todos");
+  const [viewMode, setViewMode] = useState<RecordsViewMode>("table");
+  const [selectedRecord, setSelectedRecord] = useState<RecordItem | null>(null);
+  const selectedRecordId = searchParams.get("id") || searchParams.get("recordId");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -318,17 +396,10 @@ export default function RecordsPage() {
   }, []);
 
   useEffect(() => {
-  if (!selectedRecordId) return;
-  if (!rows.length) return;
-
-  const found = rows.find(
-    (row) => String(row.id) === String(selectedRecordId)
-  );
-
-  if (found) {
-    navigate(`/records/${found.id}`);
-  }
-}, [rows, selectedRecordId, navigate]);
+    if (!selectedRecordId || !rows.length) return;
+    const found = rows.find((row) => String(row.id) === String(selectedRecordId));
+    if (found) setSelectedRecord(found);
+  }, [selectedRecordId, rows]);
 
   useEffect(() => {
     saveRecordsScopedSettings(activeView, { activeRules, quickSearch, visibleColumns, columnOrder, sort });
@@ -350,6 +421,14 @@ export default function RecordsPage() {
   }
 
   const selectedAfp = useMemo(() => allAfps.find((item) => item.id === form.line_afp_id) || null, [allAfps, form.line_afp_id]);
+
+  function openRecordPanel(row: RecordItem) {
+    setSelectedRecord(row);
+  }
+
+  function openRecordFull(row: RecordItem) {
+    window.open(`/records/${row.id}`, "_blank");
+  }
 
   async function deleteRecord(row: RecordItem) {
     const razon = String((row as any).razon_social || (row as any).company?.razon_social || "registro");
@@ -514,8 +593,12 @@ export default function RecordsPage() {
       data = data.filter((row) => activeRules.every((rule) => matchRule(getRecordFieldValue(row, rule.field), rule)));
     }
 
+    if (quickFilter !== "todos") {
+      data = data.filter((row) => rowMatchesQuickFilter(row, quickFilter));
+    }
+
     return data;
-  }, [rows, activeRules, quickSearch, activeView, mandantes]);
+  }, [rows, activeRules, quickSearch, activeView, mandantes, quickFilter]);
 
   const sortedRows = useMemo(() => {
     const selectedSort = cleanRecordSort(sort);
@@ -541,12 +624,13 @@ export default function RecordsPage() {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedIds([]);
-  }, [activeRules, quickSearch, activeView, sort]);
+  }, [activeRules, quickSearch, activeView, sort, quickFilter]);
 
   const visibleSortedIds = useMemo(() => pagedRows.map((row) => String(row.id)), [pagedRows]);
   const allVisibleSelected = visibleSortedIds.length > 0 && visibleSortedIds.every((id) => selectedIds.includes(id));
 
   const currentSortLabel = recordColumns.find((column) => column.field === sort.field)?.label || "Fecha actualización";
+  const recordsSummary = useMemo(() => buildRecordsSummary(sortedRows), [sortedRows]);
 
   function clearAdvancedFilters() {
     setActiveRules([]);
@@ -569,6 +653,8 @@ export default function RecordsPage() {
           <button className="zoho-btn" onClick={() => setFilterModalOpen(true)}>Filtrar</button>
           <button className="zoho-btn" onClick={() => setSortModalOpen(true)}>Ordenar</button>
           <button className="zoho-btn" onClick={() => setColumnModalOpen(true)}>Campos / columnas</button>
+          <button className={viewMode === "table" ? "zoho-btn active" : "zoho-btn"} onClick={() => setViewMode("table")}>Tabla</button>
+          <button className={viewMode === "kanban" ? "zoho-btn active" : "zoho-btn"} onClick={() => setViewMode("kanban")}>Kanban</button>
           {selectedIds.length > 0 && <button className="zoho-btn danger" onClick={deleteSelectedRecords}>Eliminar seleccionados ({selectedIds.length})</button>}
           <button className="zoho-btn zoho-btn-primary" onClick={() => setModalOpen(true)}>
             Crear Registro de empresa
@@ -592,7 +678,23 @@ export default function RecordsPage() {
 
       <div className="zoho-scope-hint">Los filtros, columnas visibles y orden de columnas quedan guardados solo para la vista seleccionada.</div>
 
-      <div className="zoho-module-layout">
+      <section className="records-pro-command-center">
+        <div className="records-pro-kpis">
+          <div><span>Registros filtrados</span><strong>{recordsSummary.total}</strong></div>
+          <div><span>Monto devolución</span><strong>{formatMoney(recordsSummary.amount)}</strong></div>
+          <div><span>Listos para gestionar</span><strong>{recordsSummary.ready}</strong></div>
+          <div><span>Sin poder</span><strong>{recordsSummary.blockedPower}</strong></div>
+          <div><span>Sin CC</span><strong>{recordsSummary.blockedCc}</strong></div>
+          <div><span>Alto monto</span><strong>{recordsSummary.highAmount}</strong></div>
+        </div>
+        <div className="records-pro-ai-hint">
+          <strong>OperaFix IA</strong>
+          <span>{recordsSummary.ready > 0 ? `Hay ${recordsSummary.ready} casos listos para gestionar. Prioriza los de mayor monto y menor bloqueo documental.` : "No hay casos completamente listos en este filtro. Revisa bloqueos por poder, CC o documentos."}</span>
+        </div>
+        <RecordQuickFilters value={quickFilter} onChange={setQuickFilter} />
+      </section>
+
+      <div className="zoho-module-layout records-pro-layout">
         <aside className="zoho-filter-compact-card">
           <strong>Filtros</strong>
           <span>{activeRules.length} criterios · {quickSearch ? `Búsqueda: ${quickSearch}` : "Sin búsqueda"}</span>
@@ -608,41 +710,43 @@ export default function RecordsPage() {
 
           {loading ? (
             <div className="zoho-empty">Cargando registros...</div>
+          ) : viewMode === "kanban" ? (
+            <RecordsKanbanView rows={sortedRows} onOpen={openRecordPanel} />
           ) : (
             <>
-            <div className="zoho-table-horizontal-scroll">
-            <table className="zoho-table zoho-table-wide">
+            <div className="zoho-table-horizontal-scroll records-pro-table-scroll">
+            <table className="zoho-table zoho-table-wide records-pro-table">
               <thead>
                 <tr>
-                  <th><input type="checkbox" checked={allVisibleSelected} onChange={(e) => toggleAllVisible(e.target.checked)} /></th>
+                  <th className="records-sticky-check"><input type="checkbox" checked={allVisibleSelected} onChange={(e) => toggleAllVisible(e.target.checked)} /></th>
+                  <th>Prioridad</th>
                   {selectedColumns.map((column) => <th key={column.field}>{column.label}</th>)}
                   <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {sortedRows.length === 0 ? (
-                  <tr><td colSpan={selectedColumns.length + 2}>Sin registros de empresas.</td></tr>
+                  <tr><td colSpan={selectedColumns.length + 3}>Sin registros de empresas.</td></tr>
                 ) : (
                   <>
                   {pagedRows.map((row) => (
-                    <tr key={row.id}>
-                      <td><input type="checkbox" checked={selectedIds.includes(String(row.id))} onChange={() => toggleSelected(String(row.id))} /></td>
+                    <tr key={row.id} className="records-pro-row" onClick={() => openRecordPanel(row)}>
+                      <td onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(String(row.id))} onChange={() => toggleSelected(String(row.id))} /></td>
+                      <td><RecordPriorityBadge row={row} /></td>
                       {selectedColumns.map((column) => {
                         const value = column.value(row);
-                        const clickable = ["razon_social", "entidad", "company.razon_social", "lineAfp.afp_name"].includes(column.field);
+                        const isStatus = column.field === "estado_gestion";
+                        const isMoney = column.money;
                         return (
-                          <td
-                            key={`${row.id}-${column.field}`}
-                            className={clickable ? "zoho-link-cell" : ""}
-                            onClick={clickable ? () => navigate(`/records/${row.id}`) : undefined}
-                          >
-                            {formatCellValue(value, column)}
+                          <td key={`${row.id}-${column.field}`} className={isMoney ? "records-money-cell" : ""}>
+                            {isStatus ? <RecordStatusBadge status={String(value || "")} /> : formatCellValue(value, column)}
                           </td>
                         );
                       })}
-                      <td>
+                      <td onClick={(event) => event.stopPropagation()}>
                         <div className="zoho-actions-row compact-actions">
-                          <button className="zoho-small-btn" onClick={() => navigate(`/records/${row.id}`)}>Ver</button>
+                          <button className="zoho-small-btn" onClick={() => openRecordPanel(row)}>Detalle</button>
+                          <button className="zoho-small-btn" onClick={() => openRecordFull(row)}>Abrir</button>
                           <button className="zoho-small-btn danger" onClick={() => deleteRecord(row)}>Eliminar</button>
                         </div>
                       </td>
@@ -664,6 +768,12 @@ export default function RecordsPage() {
           )}
         </section>
       </div>
+
+      <RecordDetailPanel
+        record={selectedRecord}
+        onClose={() => setSelectedRecord(null)}
+        onOpenFull={openRecordFull}
+      />
 
       <ZohoModal title="Filtrar registros" isOpen={filterModalOpen} onClose={() => setFilterModalOpen(false)}>
         <div className="modal-helper-text">
