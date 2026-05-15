@@ -1,46 +1,97 @@
 import type { RecordItem } from "../../types-records";
 
-function amount(value: unknown) {
-  const n = Number(String(value ?? 0).replace(/\./g, "").replace(/,/g, ".").replace(/[^0-9.-]/g, ""));
-  return Number.isFinite(n) ? n : 0;
+function normalizeText(value: unknown) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
-function daysSince(value?: string | null) {
-  if (!value) return 999;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 999;
-  return Math.floor((Date.now() - date.getTime()) / 86400000);
+function toBool(value: unknown) {
+  if (typeof value === "boolean") return value;
+
+  const text = normalizeText(value);
+
+  return (
+    text === "true" ||
+    text === "si" ||
+    text === "sí" ||
+    text === "1" ||
+    text === "confirmado" ||
+    text === "confirmada"
+  );
+}
+
+function toMoneyNumber(value: unknown) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+
+  const cleaned = String(value ?? "")
+    .replace(/\$/g, "")
+    .replace(/\./g, "")
+    .replace(/,/g, ".")
+    .replace(/[^0-9.-]/g, "");
+
+  const parsed = Number(cleaned);
+
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function isReadyToManage(record: RecordItem) {
+  const row: any = record;
+
+  const hasPower = toBool(row.confirmacion_poder ?? row.confirmation_power);
+  const hasCc = toBool(row.confirmacion_cc ?? row.confirmation_cc);
+  const amount = toMoneyNumber(row.monto_devolucion ?? row.refund_amount);
+  const status = normalizeText(row.estado_gestion ?? row.management_status);
+
+  return hasPower && hasCc && amount > 0 && status.includes("pendiente");
 }
 
 export function getRecordPriority(row: RecordItem) {
-  const refund = amount(row.monto_devolucion);
-  const hasCc = row.confirmacion_cc === true;
-  const hasPower = row.confirmacion_poder === true;
-  const status = String(row.estado_gestion || "").toLowerCase();
-  const age = daysSince(row.last_activity_at || row.updated_at || row.created_at);
+  const record: any = row;
 
-  let score = 0;
-  if (refund >= 1000000) score += 35;
-  else if (refund >= 500000) score += 22;
-  else if (refund > 0) score += 10;
-  if (hasCc) score += 20;
-  if (hasPower) score += 20;
-  if (String(row.entidad || row.lineAfp?.afp_name || "").trim()) score += 10;
-  if (status.includes("pend")) score += 10;
-  if (age > 30) score -= 12;
-  if (status.includes("rechaz")) score -= 25;
-  if (status.includes("pag") || status.includes("cerr")) score -= 20;
+  const refund = toMoneyNumber(record.monto_devolucion ?? record.refund_amount);
+  const hasCc = toBool(record.confirmacion_cc ?? record.confirmation_cc);
+  const hasPower = toBool(record.confirmacion_poder ?? record.confirmation_power);
+  const status = normalizeText(record.estado_gestion ?? record.management_status);
+  const ready = isReadyToManage(row);
 
-  if (score >= 70) return { label: "Alta", tone: "high", score };
-  if (score >= 40) return { label: "Media", tone: "medium", score };
-  return { label: "Baja", tone: "low", score };
+  if (ready && refund >= 1000000) {
+    return { label: "Alta", tone: "high", score: 100 };
+  }
+
+  if (ready) {
+    return { label: "Media", tone: "medium", score: 75 };
+  }
+
+  if (!hasPower) {
+    return { label: "Falta poder", tone: "blocked", score: 20 };
+  }
+
+  if (!hasCc) {
+    return { label: "Falta CC", tone: "blocked", score: 25 };
+  }
+
+  if (refund <= 0) {
+    return { label: "Sin monto", tone: "low", score: 10 };
+  }
+
+  if (!status.includes("pendiente")) {
+    return { label: "No pendiente", tone: "low", score: 30 };
+  }
+
+  return { label: "No listo", tone: "low", score: 35 };
 }
 
 export default function RecordPriorityBadge({ row }: { row: RecordItem }) {
   const priority = getRecordPriority(row);
 
   return (
-    <span className={`record-priority-badge tone-${priority.tone}`} title={`Score operacional: ${priority.score}`}>
+    <span
+      className={`record-priority-badge tone-${priority.tone}`}
+      title={`Score operacional: ${priority.score}. Listo para gestionar exige poder = Sí, CC = Sí, monto > 0 y estado pendiente.`}
+    >
       {priority.label}
     </span>
   );
