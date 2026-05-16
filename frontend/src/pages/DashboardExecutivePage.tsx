@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { fetchJson } from "../api";
 import ZohoModal from "../components/ZohoModal";
 import IntelligenceSummaryPanel from "../components/intelligence/IntelligenceSummaryPanel";
+import "./dashboard-executive-pro.css";
 import type { FilterRule } from "../types";
 import type { RecordItem } from "../types-records";
 import { defaultRecordColumnFields, formatCellValue, getValueByPath, recordColumns, type RecordColumnDefinition } from "../utils-record-fields";

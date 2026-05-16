@@ -1,302 +1,934 @@
+/* =========================================================
+   OPERAFIX DASHBOARD ONLY FIX
+   Archivo: frontend/src/pages/dashboard-executive-pro.css
+   Este CSS afecta sólo al Dashboard Ejecutivo.
+   ========================================================= */
 
-.dash-page {
-  padding: 24px;
-  background: #f6f8fb;
-  min-height: 100vh;
-  color: #172033;
+.dashboard-page {
+  display: block;
+  width: 100%;
+  min-height: 100%;
+  padding: 22px;
+  background: #f3f6fb;
+  color: #0f172a;
 }
 
-.dash-header {
+.dashboard-page * {
+  box-sizing: border-box;
+}
+
+.dashboard-page button,
+.dashboard-page input,
+.dashboard-page select,
+.dashboard-page textarea {
+  font-family: inherit;
+}
+
+.dashboard-page .dashboard-hero-header {
   display: flex;
   justify-content: space-between;
-  gap: 20px;
   align-items: flex-start;
-  margin-bottom: 18px;
-  background: #ffffff;
-  border: 1px solid #e6ebf2;
-  border-radius: 18px;
-  padding: 22px;
-  box-shadow: 0 10px 24px rgba(20, 32, 55, 0.06);
+  gap: 18px;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #dbe3ef;
 }
 
-.dash-eyebrow {
-  margin: 0 0 4px;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #61708a;
-}
-
-.dash-header h1 {
+.dashboard-page .dashboard-hero-header h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: 30px;
+  line-height: 1.05;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  color: #0f172a;
 }
 
-.dash-subtitle {
-  margin: 8px 0 0;
-  color: #607086;
+.dashboard-page .dashboard-hero-header p {
+  margin: 7px 0 0;
+  color: #475569;
+  font-size: 15px;
 }
 
-.dash-actions {
+.dashboard-page .zoho-module-actions {
   display: flex;
-  gap: 12px;
-  align-items: end;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
   flex-wrap: wrap;
 }
 
-.dash-actions label {
-  display: grid;
-  gap: 6px;
-  font-size: 12px;
-  color: #5b677c;
-}
-
-.dash-actions select,
-.dash-actions button,
-.dash-panel-menu select,
-.dash-panel-menu button {
-  border: 1px solid #d5ddea;
-  background: #fff;
-  border-radius: 10px;
-  padding: 9px 11px;
+.dashboard-page .zoho-btn {
+  min-height: 36px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  border-radius: 9px;
+  padding: 8px 13px;
   font-size: 13px;
-}
-
-.dash-actions button,
-.dash-panel-menu button {
+  font-weight: 700;
   cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
-.dash-summary {
+.dashboard-page .zoho-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.dashboard-page .zoho-btn-primary,
+.dashboard-page .zoho-btn.zoho-btn-primary {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.dashboard-page .zoho-btn.danger,
+.dashboard-page .zoho-btn.danger.small {
+  background: #fff5f5;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.dashboard-page .zoho-btn.small {
+  min-height: 30px;
+  padding: 6px 9px;
+  font-size: 12px;
+}
+
+.dashboard-filter-card {
   display: grid;
-  grid-template-columns: repeat(3, minmax(180px, 1fr));
-  gap: 14px;
-  margin-bottom: 18px;
-}
-
-.dash-summary > div {
-  background: #fff;
-  border: 1px solid #e6ebf2;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: end;
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
   border-radius: 16px;
-  padding: 16px;
-  box-shadow: 0 8px 20px rgba(20, 32, 55, 0.05);
+  padding: 14px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+  margin-bottom: 14px;
 }
 
-.dash-summary strong {
+.dashboard-page .zoho-select,
+.dashboard-page .zoho-input,
+.dashboard-page .zoho-textarea {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  padding: 8px 10px;
+  background: #ffffff;
+  color: #0f172a;
+  outline: none;
+}
+
+.dashboard-page .zoho-select:focus,
+.dashboard-page .zoho-input:focus,
+.dashboard-page .zoho-textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.dashboard-goal-input {
+  display: grid;
+  gap: 5px;
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.dashboard-page .zoho-scope-hint {
+  color: #475569;
+  font-size: 12px;
+  margin: 8px 0 16px;
+}
+
+.dashboard-advanced-layout,
+.dashboard-main-workspace {
   display: block;
-  font-size: 22px;
+  width: 100%;
+}
+
+.dashboard-filter-help {
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  padding: 14px 16px;
+  color: #334155;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+  margin-bottom: 16px;
+}
+
+/* ===================== IA EXECUTIVE PANEL ===================== */
+
+.ai-executive-panel {
+  display: block;
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 18px;
+  padding: 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07);
+}
+
+.ai-executive-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.ai-eyebrow {
+  display: block;
+  color: #2563eb;
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   margin-bottom: 4px;
 }
 
-.dash-summary span {
-  color: #61708a;
-  font-size: 13px;
-}
-
-.dash-grid {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(80px, 1fr));
-  gap: 16px;
-  align-items: stretch;
-}
-
-.dash-panel {
-  background: #fff;
-  border: 1px solid #e4e9f2;
-  border-radius: 18px;
-  box-shadow: 0 10px 26px rgba(20, 32, 55, 0.07);
-  overflow: hidden;
-  min-height: 210px;
-}
-
-.dash-panel-sm {
-  grid-column: span 3;
-}
-
-.dash-panel-md {
-  grid-column: span 6;
-}
-
-.dash-panel-lg {
-  grid-column: span 8;
-}
-
-.dash-panel-xl {
-  grid-column: span 12;
-}
-
-.dash-panel-header {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  border-bottom: 1px solid #eef2f7;
-  padding: 14px;
-  background: linear-gradient(180deg, #fff, #fbfcff);
-}
-
-.dash-drag-handle {
-  cursor: grab;
-  user-select: none;
-  color: #8190a7;
-  font-weight: 700;
-}
-
-.dash-panel-header h3 {
+.ai-executive-header h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  color: #0f172a;
 }
 
-.dash-panel-header p {
-  margin: 3px 0 0;
-  color: #7b8799;
+.ai-executive-header p {
+  margin: 5px 0 0;
+  color: #475569;
+  font-size: 14px;
+}
+
+.ai-executive-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ai-insight-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ai-insight-grid > div {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.ai-insight-grid span {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 7px;
+}
+
+.ai-insight-grid strong {
+  display: block;
+  color: #0f172a;
+  font-size: 24px;
+  line-height: 1.1;
+  font-weight: 900;
+}
+
+.ai-insight-grid small {
+  display: block;
+  color: #64748b;
+  margin-top: 4px;
   font-size: 12px;
 }
 
-.dash-panel-menu {
-  margin-left: auto;
-  display: flex;
+.ai-insight-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.ai-narrative-card,
+.ai-priority-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.ai-narrative-card h3,
+.ai-priority-card h3 {
+  margin: 0 0 10px;
+  font-size: 17px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.ai-narrative-card ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.ai-narrative-card li {
+  margin: 7px 0;
+  color: #334155;
+}
+
+.ai-priority-card {
+  display: grid;
   gap: 8px;
+}
+
+.ai-priority-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px;
+  gap: 12px;
+  text-align: left;
+  border: 1px solid #dbe3ef;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 12px;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
+}
+
+.ai-priority-row:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.ai-priority-row strong {
+  display: block;
+  color: #0f172a;
+  font-size: 13px;
+  line-height: 1.2;
+  margin-bottom: 3px;
+}
+
+.ai-priority-row span,
+.ai-priority-row small {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.ai-score-box {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  background: #e0f2fe;
+  color: #075985;
+  border-radius: 12px;
+  padding: 8px;
+}
+
+.ai-score-box strong {
+  font-size: 18px;
+  color: #075985;
+  margin: 0;
+}
+
+.ai-score-box span {
+  color: #075985;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.muted {
+  color: #64748b;
+}
+
+/* ===================== KPI CARDS ===================== */
+
+.dashboard-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.dashboard-kpi {
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 16px;
+  padding: 15px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+  min-height: 98px;
+}
+
+.dashboard-kpi span {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.dashboard-kpi strong {
+  display: block;
+  font-size: 23px;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -0.03em;
+}
+
+.dashboard-kpi small {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.dashboard-progress {
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.dashboard-progress > div {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #38bdf8);
+}
+
+/* ===================== PANEL BUILDER ===================== */
+
+.dashboard-builder-section,
+.dashboard-page .zoho-card,
+.dashboard-records-card {
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+  margin-bottom: 16px;
+}
+
+.dashboard-builder-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.dashboard-builder-title h2,
+.zoho-card-title-row h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.dashboard-builder-title p {
+  margin: 4px 0 0;
+  color: #64748b;
+}
+
+.dashboard-custom-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 14px;
+}
+
+.custom-dashboard-panel {
+  min-height: 240px;
+}
+
+.custom-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.custom-panel-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.custom-panel-header small {
+  display: block;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.custom-panel-actions {
+  display: flex;
+  gap: 6px;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
 
-.dash-panel-menu .danger {
-  color: #b42318;
-  border-color: #ffd3cc;
+.custom-kpi-big {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  min-height: 150px;
+  background: linear-gradient(135deg, #eff6ff, #ffffff);
+  border-radius: 14px;
 }
 
-.dash-panel-body {
-  padding: 16px;
+.custom-kpi-big strong {
+  display: block;
+  font-size: 32px;
+  color: #1d4ed8;
+  font-weight: 900;
 }
 
-.dash-kpi-value {
-  font-size: 34px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+.custom-kpi-big span {
+  color: #64748b;
 }
 
-.dash-kpi-caption {
-  color: #607086;
-  margin-top: 6px;
+.custom-bar-chart {
+  display: grid;
+  gap: 10px;
 }
 
-.dash-table-wrap {
-  overflow: auto;
-  max-height: 320px;
+.custom-bar-row {
+  display: grid;
+  gap: 5px;
 }
 
-.dash-table {
-  width: 100%;
-  border-collapse: collapse;
+.custom-bar-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
   font-size: 13px;
 }
 
-.dash-table th,
-.dash-table td {
-  padding: 10px;
-  border-bottom: 1px solid #edf1f6;
-  text-align: left;
+.custom-bar-label span {
+  color: #64748b;
+  white-space: nowrap;
 }
 
-.dash-table th {
-  color: #526178;
+.custom-bar-track {
+  height: 9px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.custom-bar-track > div {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #60a5fa);
+}
+
+.custom-pie-layout {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 16px;
+  align-items: center;
+}
+
+.custom-pie {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+.custom-pie::after {
+  content: "";
+  position: absolute;
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.custom-pie span {
+  position: relative;
+  z-index: 2;
+  font-weight: 900;
+  font-size: 13px;
+  color: #0f172a;
+  text-align: center;
+}
+
+.custom-pie-legend {
+  display: grid;
+  gap: 8px;
+}
+
+.custom-pie-legend > div {
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.custom-pie-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.custom-pie-legend span {
+  color: #334155;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.custom-pie-legend strong {
+  color: #0f172a;
+}
+
+.custom-panel-table-scroll {
+  max-height: 300px;
+  overflow: auto;
+}
+
+.custom-panel-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.custom-panel-total-row td {
+  font-weight: 900;
   background: #f8fafc;
 }
 
-.dash-bars {
-  display: grid;
-  gap: 12px;
+.custom-panel-records {
+  margin-top: 12px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 10px;
 }
 
-.dash-bar-row {
+.custom-panel-records summary {
+  cursor: pointer;
+  color: #2563eb;
+  font-weight: 800;
+}
+
+.custom-panel-record-list {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.custom-panel-record-list button {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  border-radius: 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+/* ===================== RANKINGS / TABLES ===================== */
+
+.dashboard-grid-3 {
   display: grid;
-  grid-template-columns: 150px 1fr 120px;
+  grid-template-columns: repeat(4, minmax(240px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.dashboard-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(360px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.ranking-card {
+  min-height: 260px;
+}
+
+.ranking-row {
+  margin-bottom: 12px;
+}
+
+.ranking-head {
+  display: flex;
+  justify-content: space-between;
   gap: 10px;
+  font-size: 13px;
+  margin-bottom: 5px;
+}
+
+.ranking-head strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ranking-head span {
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.ranking-bar {
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #e2e8f0;
+}
+
+.ranking-bar > div {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #38bdf8);
+}
+
+.dashboard-page .zoho-card-title-row {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.dashboard-page .zoho-table-scroll {
+  width: 100%;
+  overflow: auto;
+}
+
+.dashboard-page .zoho-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+}
+
+.dashboard-page .zoho-table th,
+.dashboard-page .zoho-table td {
+  padding: 10px 11px;
+  border-bottom: 1px solid #edf2f7;
+  text-align: left;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.dashboard-page .zoho-table th {
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 900;
+}
+
+.dashboard-page .zoho-table tbody tr:hover td {
+  background: #f8fafc;
+}
+
+.dashboard-page .clickable-row {
+  cursor: pointer;
+}
+
+.dashboard-page .status-pill {
+  display: inline-flex;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #075985;
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.dashboard-records-card .zoho-table-scroll {
+  max-height: 520px;
+}
+
+.dashboard-records-card .zoho-table {
+  min-width: 1200px;
+}
+
+/* ===================== MODAL / PANEL EDITOR ===================== */
+
+.dashboard-panel-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 16px;
+}
+
+.panel-editor-form,
+.panel-editor-preview {
+  display: grid;
+  gap: 14px;
+}
+
+.panel-editor-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: #475569;
+  font-weight: 800;
+}
+
+.panel-editor-block {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.panel-editor-title-row,
+.panel-editor-row,
+.criteria-actions,
+.column-picker-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.panel-editor-title-row {
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.panel-editor-row {
+  margin-top: 8px;
+}
+
+.panel-index-badge {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.criteria-pattern {
+  margin-top: 10px;
+  color: #475569;
   font-size: 13px;
 }
 
-.dash-bar-label {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+.link-button {
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  cursor: pointer;
+  font-weight: 800;
 }
 
-.dash-bar-track {
-  height: 10px;
-  background: #edf2f7;
-  border-radius: 999px;
-  overflow: hidden;
+.panel-preview-label {
+  color: #64748b;
+  font-weight: 900;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.08em;
 }
 
-.dash-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #4457ff, #7a8cff);
-  border-radius: 999px;
+.column-order-help {
+  color: #475569;
+  margin: 10px 0;
 }
 
-.dash-bar-value {
-  text-align: right;
-  color: #526178;
-}
-
-.dash-pie-list {
+.column-picker-grid {
   display: grid;
-  gap: 12px;
-}
-
-.dash-pie-row {
-  display: grid;
-  grid-template-columns: 14px 1fr 60px;
-  align-items: center;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 10px;
+  max-height: 520px;
+  overflow: auto;
 }
 
-.dash-dot {
-  width: 10px;
-  height: 10px;
+.column-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.column-picker-item.active {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.column-picker-item label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: 1;
+}
+
+.drag-handle {
+  color: #94a3b8;
+  cursor: grab;
+}
+
+.column-position {
+  display: inline-flex;
+  min-width: 28px;
+  justify-content: center;
   border-radius: 999px;
-  display: inline-block;
+  padding: 3px 7px;
+  background: #e2e8f0;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 900;
 }
 
-.dash-dot-1 { background: #4457ff; }
-.dash-dot-2 { background: #10b981; }
-.dash-dot-3 { background: #f59e0b; }
-.dash-dot-4 { background: #ef4444; }
-.dash-dot-5 { background: #8b5cf6; }
-.dash-dot-6 { background: #06b6d4; }
+/* ===================== RESPONSIVE ===================== */
 
-.dash-pie-label {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.dash-pie-value {
-  text-align: right;
-  font-weight: 700;
-}
-
-@media (max-width: 1100px) {
-  .dash-panel-sm,
-  .dash-panel-md,
-  .dash-panel-lg {
-    grid-column: span 12;
+@media (max-width: 1300px) {
+  .dashboard-kpi-grid {
+    grid-template-columns: repeat(4, minmax(150px, 1fr));
   }
 
-  .dash-summary {
-    grid-template-columns: 1fr;
+  .dashboard-grid-3 {
+    grid-template-columns: repeat(2, minmax(240px, 1fr));
   }
 
-  .dash-header {
+  .ai-insight-grid {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .dashboard-page {
+    padding: 14px;
+  }
+
+  .dashboard-page .dashboard-hero-header,
+  .ai-executive-header,
+  .dashboard-builder-title,
+  .dashboard-page .zoho-card-title-row {
     flex-direction: column;
   }
 
-  .dash-bar-row {
+  .dashboard-filter-card,
+  .dashboard-kpi-grid,
+  .dashboard-grid-2,
+  .dashboard-grid-3,
+  .ai-insight-grid,
+  .ai-insight-body,
+  .dashboard-panel-editor,
+  .custom-pie-layout {
     grid-template-columns: 1fr;
-  }
-
-  .dash-bar-value {
-    text-align: left;
   }
 }
