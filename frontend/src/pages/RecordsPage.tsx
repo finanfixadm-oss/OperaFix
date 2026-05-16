@@ -11,6 +11,7 @@ import RecordPriorityBadge from "../components/records/RecordPriorityBadge";
 import RecordQuickFilters, { type RecordQuickFilterKey } from "../components/records/RecordQuickFilters";
 import RecordStatusBadge from "../components/records/RecordStatusBadge";
 import RecordsKanbanView from "../components/records/RecordsKanbanView";
+import RecordsAfpSummary, { type RecordsAfpSummaryGroup } from "../components/records/RecordsAfpSummary";
 
 type MandanteOption = {
   id: string;
@@ -360,6 +361,48 @@ function buildRecordsSummary(rows: RecordItem[]) {
   );
 }
 
+function getRecordEntity(row: RecordItem) {
+  const rowAny: any = row;
+  return String(rowAny.entidad ?? rowAny.entity ?? row.lineAfp?.afp_name ?? "Sin AFP").trim() || "Sin AFP";
+}
+
+function buildAfpSummary(rows: RecordItem[]): RecordsAfpSummaryGroup[] {
+  const map = new Map<string, RecordsAfpSummaryGroup>();
+
+  rows.forEach((row) => {
+    const entity = getRecordEntity(row);
+    const key = recordText(entity);
+    const rowAny: any = row;
+    const amount = recordMoneyValue(rowAny.monto_devolucion ?? rowAny.refund_amount);
+    const status = recordText(rowAny.estado_gestion ?? rowAny.management_status);
+    const hasCc = recordBool(rowAny.confirmacion_cc ?? rowAny.confirmation_cc);
+    const hasPower = recordBool(rowAny.confirmacion_poder ?? rowAny.confirmation_power);
+
+    const current = map.get(key) || {
+      entity,
+      amount: 0,
+      count: 0,
+      ready: 0,
+      pending: 0,
+      paid: 0,
+      blockedPower: 0,
+      blockedCc: 0,
+    };
+
+    current.amount += amount;
+    current.count += 1;
+    if (isReadyToManage(row)) current.ready += 1;
+    if (status.includes("pendiente") || status.includes("pend")) current.pending += 1;
+    if (status.includes("pag") || status.includes("cerr") || status.includes("factur")) current.paid += 1;
+    if (!hasPower) current.blockedPower += 1;
+    if (!hasCc) current.blockedCc += 1;
+
+    map.set(key, current);
+  });
+
+  return Array.from(map.values()).sort((a, b) => b.amount - a.amount || b.count - a.count || a.entity.localeCompare(b.entity));
+}
+
 
 export default function RecordsPage() {
   const navigate = useNavigate();
@@ -384,6 +427,7 @@ export default function RecordsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [quickFilter, setQuickFilter] = useState<RecordQuickFilterKey>("todos");
+  const [selectedAfpFilter, setSelectedAfpFilter] = useState("");
   const [viewMode, setViewMode] = useState<RecordsViewMode>("table");
   const [selectedRecord, setSelectedRecord] = useState<RecordItem | null>(null);
   const selectedRecordId = searchParams.get("id") || searchParams.get("recordId");
@@ -601,7 +645,7 @@ export default function RecordsPage() {
     setColumnOrder(cleanRecordColumnOrder(columnOrder));
   }
 
-  const filteredRows = useMemo(() => {
+  const baseFilteredRows = useMemo(() => {
     let data = [...rows];
 
     if (activeView !== "todos" && activeView !== "mis") {
@@ -636,6 +680,14 @@ export default function RecordsPage() {
     return data;
   }, [rows, activeRules, quickSearch, activeView, mandantes, quickFilter]);
 
+  const afpSummaryRows = useMemo(() => buildAfpSummary(baseFilteredRows), [baseFilteredRows]);
+
+  const filteredRows = useMemo(() => {
+    if (!selectedAfpFilter) return baseFilteredRows;
+    const selected = recordText(selectedAfpFilter);
+    return baseFilteredRows.filter((row) => recordText(getRecordEntity(row)) === selected);
+  }, [baseFilteredRows, selectedAfpFilter]);
+
   const sortedRows = useMemo(() => {
     const selectedSort = cleanRecordSort(sort);
     const directionMultiplier = selectedSort.direction === "asc" ? 1 : -1;
@@ -660,7 +712,7 @@ export default function RecordsPage() {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedIds([]);
-  }, [activeRules, quickSearch, activeView, sort, quickFilter]);
+  }, [activeRules, quickSearch, activeView, sort, quickFilter, selectedAfpFilter]);
 
   const visibleSortedIds = useMemo(() => pagedRows.map((row) => String(row.id)), [pagedRows]);
   const allVisibleSelected = visibleSortedIds.length > 0 && visibleSortedIds.every((id) => selectedIds.includes(id));
@@ -728,6 +780,13 @@ export default function RecordsPage() {
           <span>{recordsSummary.ready > 0 ? `Hay ${recordsSummary.ready} casos listos para gestionar: tienen poder confirmado, cuenta corriente confirmada, monto devolución mayor a cero y estado pendiente de gestión.` : "No hay casos listos en este filtro. Para estar listo debe tener poder confirmado, CC confirmada, monto devolución mayor a cero y estado pendiente de gestión."}</span>
         </div>
         <RecordQuickFilters value={quickFilter} onChange={setQuickFilter} />
+
+        <RecordsAfpSummary
+          groups={afpSummaryRows}
+          selectedAfp={selectedAfpFilter}
+          onSelect={(entity) => setSelectedAfpFilter((current) => current === entity ? "" : entity)}
+          onClear={() => setSelectedAfpFilter("")}
+        />
       </section>
 
       <div className="zoho-module-layout records-pro-layout">

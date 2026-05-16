@@ -3467,3 +3467,185 @@
     min-height: 420px;
   }
 }
+
+
+/* =========================================================
+   OPERAFIX V76 - REGISTROS AGRUPADOS POR AFP
+   ========================================================= */
+
+.records-afp-summary {
+  margin-top: 16px;
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+}
+
+.records-afp-summary-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px auto;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.records-afp-eyebrow {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #2563eb;
+  font-weight: 900;
+  margin-bottom: 4px;
+}
+
+.records-afp-summary h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.records-afp-summary p {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.records-afp-total {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: 14px;
+  padding: 12px;
+  text-align: right;
+}
+
+.records-afp-total span,
+.records-afp-total small {
+  display: block;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.records-afp-total strong {
+  display: block;
+  color: #0f172a;
+  font-size: 18px;
+  margin: 3px 0;
+}
+
+.records-afp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.records-afp-card {
+  width: 100%;
+  border: 1px solid #dbe3ef;
+  background: #f8fafc;
+  border-radius: 16px;
+  padding: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  color: #0f172a;
+}
+
+.records-afp-card:hover {
+  transform: translateY(-2px);
+  border-color: #93c5fd;
+  background: #ffffff;
+  box-shadow: 0 12px 26px rgba(37, 99, 235, 0.12);
+}
+
+.records-afp-card.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: 0 14px 30px rgba(37, 99, 235, 0.16);
+}
+
+.records-afp-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 9px;
+}
+
+.records-afp-card-top strong {
+  font-size: 14px;
+  line-height: 1.15;
+}
+
+.records-afp-card-top span {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.records-afp-card.active .records-afp-card-top span {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.records-afp-amount {
+  font-size: 20px;
+  font-weight: 950;
+  color: #0f172a;
+  letter-spacing: -0.04em;
+  margin-bottom: 10px;
+}
+
+.records-afp-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.records-afp-metrics span {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  border-radius: 10px;
+  padding: 7px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.records-afp-metrics b {
+  color: #0f172a;
+  font-size: 12px;
+}
+
+.records-afp-empty {
+  border: 1px dashed #cbd5e1;
+  background: #f8fafc;
+  border-radius: 14px;
+  padding: 18px;
+  color: #64748b;
+  text-align: center;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .records-afp-summary-head {
+    grid-template-columns: 1fr;
+  }
+
+  .records-afp-total {
+    text-align: left;
+  }
+
+  .records-afp-grid {
+    grid-template-columns: 1fr;
+  }
+}
