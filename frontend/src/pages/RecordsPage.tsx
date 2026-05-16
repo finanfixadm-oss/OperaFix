@@ -257,7 +257,16 @@ function saveRecordsScopedSettings(view: string, settings: RecordsScopedSettings
 type RecordsViewMode = "table" | "kanban";
 
 function recordMoneyValue(value: unknown) {
-  const n = Number(String(value ?? 0).replace(/\./g, "").replace(/,/g, ".").replace(/[^0-9.-]/g, ""));
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+
+  const n = Number(
+    String(value ?? 0)
+      .replace(/\$/g, "")
+      .replace(/\./g, "")
+      .replace(/,/g, ".")
+      .replace(/[^0-9.-]/g, "")
+  );
+
   return Number.isFinite(n) ? n : 0;
 }
 
@@ -276,24 +285,47 @@ function recordText(value: unknown) {
     .trim();
 }
 
+function recordBool(value: unknown) {
+  if (typeof value === "boolean") return value;
+
+  const text = recordText(value);
+  return text === "true" || text === "si" || text === "sí" || text === "1" || text === "confirmado" || text === "confirmada";
+}
+
+function isPendingManagement(row: RecordItem) {
+  const rowAny: any = row;
+  const status = recordText(rowAny.estado_gestion ?? rowAny.management_status);
+  return status.includes("pendiente") || status.includes("pend");
+}
+
+function isReadyToManage(row: RecordItem) {
+  const rowAny: any = row;
+  const hasCc = recordBool(rowAny.confirmacion_cc ?? rowAny.confirmation_cc);
+  const hasPower = recordBool(rowAny.confirmacion_poder ?? rowAny.confirmation_power);
+  const amount = recordMoneyValue(rowAny.monto_devolucion ?? rowAny.refund_amount);
+
+  return hasCc && hasPower && amount > 0 && isPendingManagement(row);
+}
+
 function rowMatchesQuickFilter(row: RecordItem, filter: RecordQuickFilterKey) {
-  const status = recordText(row.estado_gestion);
-  const amount = recordMoneyValue(row.monto_devolucion);
-  const hasCc = row.confirmacion_cc === true;
-  const hasPower = row.confirmacion_poder === true;
+  const rowAny: any = row;
+  const status = recordText(rowAny.estado_gestion ?? rowAny.management_status);
+  const amount = recordMoneyValue(rowAny.monto_devolucion ?? rowAny.refund_amount);
+  const hasCc = recordBool(rowAny.confirmacion_cc ?? rowAny.confirmation_cc);
+  const hasPower = recordBool(rowAny.confirmacion_poder ?? rowAny.confirmation_power);
   const lastActivityDays = recordDaysSince(row.last_activity_at || row.updated_at || row.created_at);
 
   switch (filter) {
     case "listos":
-      return hasCc && hasPower && amount > 0 && status.includes("pend") && Boolean(row.entidad || row.lineAfp?.afp_name);
+      return isReadyToManage(row);
     case "sin_poder":
-      return row.confirmacion_poder !== true;
+      return !hasPower;
     case "sin_cc":
-      return row.confirmacion_cc !== true;
+      return !hasCc;
     case "alto_monto":
       return amount >= 1000000;
     case "pendientes":
-      return status.includes("pend");
+      return status.includes("pendiente") || status.includes("pend");
     case "pagados":
       return status.includes("pag") || status.includes("cerr") || status.includes("factur");
     case "rechazados":
@@ -309,13 +341,17 @@ function rowMatchesQuickFilter(row: RecordItem, filter: RecordQuickFilterKey) {
 function buildRecordsSummary(rows: RecordItem[]) {
   return rows.reduce(
     (acc, row) => {
-      const amount = recordMoneyValue(row.monto_devolucion);
-      const status = recordText(row.estado_gestion);
+      const rowAny: any = row;
+      const amount = recordMoneyValue(rowAny.monto_devolucion ?? rowAny.refund_amount);
+      const status = recordText(rowAny.estado_gestion ?? rowAny.management_status);
+      const hasCc = recordBool(rowAny.confirmacion_cc ?? rowAny.confirmation_cc);
+      const hasPower = recordBool(rowAny.confirmacion_poder ?? rowAny.confirmation_power);
+
       acc.total += 1;
       acc.amount += amount;
-      if (row.confirmacion_cc === true && row.confirmacion_poder === true && amount > 0 && status.includes("pend")) acc.ready += 1;
-      if (row.confirmacion_cc !== true) acc.blockedCc += 1;
-      if (row.confirmacion_poder !== true) acc.blockedPower += 1;
+      if (isReadyToManage(row)) acc.ready += 1;
+      if (!hasCc) acc.blockedCc += 1;
+      if (!hasPower) acc.blockedPower += 1;
       if (amount >= 1000000) acc.highAmount += 1;
       if (status.includes("pag") || status.includes("cerr") || status.includes("factur")) acc.paid += 1;
       return acc;
@@ -689,7 +725,7 @@ export default function RecordsPage() {
         </div>
         <div className="records-pro-ai-hint">
           <strong>OperaFix IA</strong>
-          <span>{recordsSummary.ready > 0 ? `Hay ${recordsSummary.ready} casos listos para gestionar. Prioriza los de mayor monto y menor bloqueo documental.` : "No hay casos completamente listos en este filtro. Revisa bloqueos por poder, CC o documentos."}</span>
+          <span>{recordsSummary.ready > 0 ? `Hay ${recordsSummary.ready} casos listos para gestionar: tienen poder confirmado, cuenta corriente confirmada, monto devolución mayor a cero y estado pendiente de gestión.` : "No hay casos listos en este filtro. Para estar listo debe tener poder confirmado, CC confirmada, monto devolución mayor a cero y estado pendiente de gestión."}</span>
         </div>
         <RecordQuickFilters value={quickFilter} onChange={setQuickFilter} />
       </section>

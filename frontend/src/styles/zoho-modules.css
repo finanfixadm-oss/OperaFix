@@ -3226,3 +3226,244 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* =========================================================
+   V75 - REGISTROS EMPRESAS PRO FINAL / SOLO REGISTROS
+   ========================================================= */
+
+.records-pro-layout {
+  align-items: flex-start;
+  grid-template-columns: 240px minmax(0, 1fr);
+}
+
+.records-pro-layout .zoho-table-wrap,
+.records-pro-layout .zoho-table-wrap-scroll {
+  min-height: 430px;
+  height: calc(100vh - 345px);
+  max-height: calc(100vh - 210px);
+  resize: vertical;
+  overflow: auto;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+}
+
+.records-pro-table-scroll {
+  width: 100%;
+  overflow: auto;
+  min-height: 320px;
+  max-height: calc(100vh - 405px);
+}
+
+.records-pro-table {
+  min-width: 1380px;
+  width: max-content;
+}
+
+.records-pro-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #f8fafc;
+  box-shadow: inset 0 -1px 0 #e2e8f0;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.records-pro-table th:first-child,
+.records-pro-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: #ffffff;
+}
+
+.records-pro-table thead th:first-child {
+  z-index: 5;
+  background: #f8fafc;
+}
+
+.records-pro-table th:last-child,
+.records-pro-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 4;
+  background: #ffffff;
+  box-shadow: -8px 0 14px rgba(15, 23, 42, 0.06);
+}
+
+.records-pro-table thead th:last-child {
+  z-index: 5;
+  background: #f8fafc;
+}
+
+.records-pro-row td {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.records-pro-row:hover td {
+  background: #f8fafc;
+}
+
+.records-money-cell {
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.zoho-table-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 7;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.zoho-pagination-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 7;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  padding: 10px 12px;
+}
+
+.compact-actions {
+  display: flex;
+  gap: 5px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.records-pro-command-center {
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  border: 1px solid #dbe3ef;
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+}
+
+.records-pro-kpis {
+  grid-template-columns: repeat(6, minmax(140px, 1fr));
+}
+
+.records-pro-kpis > div {
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.records-pro-ai-hint {
+  border-radius: 14px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-left: 5px solid #2563eb;
+  box-shadow: none;
+}
+
+.record-quick-filters-pro button {
+  transition: all 0.16s ease;
+}
+
+.record-quick-filters-pro button:hover {
+  border-color: #2563eb;
+  color: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.record-priority-badge.tone-blocked {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.record-priority-badge.tone-high {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.record-priority-badge.tone-medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.record-priority-badge.tone-low {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.record-ready-pill.ready {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.record-ready-pill.blocked {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.record-detail-overlay-pro {
+  z-index: 120;
+  backdrop-filter: blur(2px);
+}
+
+.record-detail-panel-pro {
+  width: min(820px, 96vw);
+  background: #f5f7fb;
+}
+
+.record-panel-header-premium,
+.record-panel-header {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid #dbe3ef;
+}
+
+.record-panel-ai-card {
+  background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+  border-color: #bfdbfe;
+}
+
+.record-panel-tabs-pro section {
+  transition: box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.record-panel-tabs-pro section:hover {
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.07);
+}
+
+.record-panel-field {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 10px;
+}
+
+.records-kanban-pro {
+  min-height: calc(100vh - 360px);
+}
+
+.records-kanban-column {
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+}
+
+.records-kanban-card {
+  width: 100%;
+}
+
+@media (max-width: 1200px) {
+  .records-pro-kpis {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .records-pro-kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .records-pro-layout .zoho-table-wrap,
+  .records-pro-layout .zoho-table-wrap-scroll {
+    height: 70vh;
+    min-height: 420px;
+  }
+}
