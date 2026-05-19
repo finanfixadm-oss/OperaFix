@@ -42,7 +42,11 @@ export default function Layout({ children }: PropsWithChildren) {
             <>
               <span>{user.full_name || user.email}</span>
               <span className="role-chip">{ROLE_LABELS[String(user.role)] || user.role}</span>
-              {user.mandante_name && <span className="role-chip soft">{user.mandante_name}</span>}
+              {Array.isArray(user.assigned_mandante_names) && user.assigned_mandante_names.length > 0 ? (
+                <span className="role-chip soft">{user.assigned_mandante_names.length === 1 ? user.assigned_mandante_names[0] : `${user.assigned_mandante_names.length} mandantes`}</span>
+              ) : user.mandante_name ? (
+                <span className="role-chip soft">{user.mandante_name}</span>
+              ) : null}
               <button className="zoho-btn subtle" onClick={logout}>Salir</button>
             </>
           ) : (

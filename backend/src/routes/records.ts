@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { prisma } from "../config/prisma.js";
+import { parseSession, recordMatchesSession, sessionCanUseMandante } from "../middleware/security.js";
 
 const recordsRouter = Router();
 
@@ -1185,6 +1186,9 @@ recordsRouter.get("/", async (req, res) => {
       })),
     ];
 
+    const session = parseSession(req);
+    rows = rows.filter((row: any) => recordMatchesSession(row, session));
+
     if (search) {
       rows = rows.filter((row: any) => {
         const text = [
@@ -1224,13 +1228,21 @@ recordsRouter.get("/:id", async (req, res) => {
         where: { id },
         include: recordInclude,
       });
-      if (row) return res.json(await enrichRecordWithCompatibleChildren(row));
+      if (row) {
+        const session = parseSession(req);
+        if (!recordMatchesSession(row, session)) return res.status(403).json({ message: "No tienes acceso a este registro." });
+        return res.json(await enrichRecordWithCompatibleChildren(row));
+      }
     } catch (managementError: any) {
       console.error("ERROR /api/records/:id usando managements. Se buscará modo compatible:", managementError?.message || managementError);
     }
 
     const legacyRow = await findLegacyRecordById(id);
-    if (legacyRow) return res.json(await enrichRecordWithCompatibleChildren(legacyRow));
+    if (legacyRow) {
+      const session = parseSession(req);
+      if (!recordMatchesSession(legacyRow, session)) return res.status(403).json({ message: "No tienes acceso a este registro." });
+      return res.json(await enrichRecordWithCompatibleChildren(legacyRow));
+    }
 
     return res.status(404).json({ message: "Registro no encontrado" });
   } catch (error: any) {
@@ -1244,6 +1256,11 @@ recordsRouter.get("/:id", async (req, res) => {
 
 recordsRouter.post("/", async (req, res) => {
   const body = cleanRecordBody(req.body);
+  const session = parseSession(req);
+
+  if (!sessionCanUseMandante(session, body.mandante_id, body.mandante_name || body.mandante)) {
+    return res.status(403).json({ message: "No puedes crear registros para un mandante no asignado." });
+  }
 
   try {
     try {
@@ -1291,12 +1308,24 @@ recordsRouter.post("/", async (req, res) => {
 recordsRouter.put("/:id", async (req, res) => {
   const id = String(req.params.id);
   const body = cleanRecordBody(req.body);
+  const session = parseSession(req);
+
+  const existingForAccess = await findLegacyRecordById(id).catch(() => null);
+  if (existingForAccess && !recordMatchesSession(existingForAccess, session)) {
+    return res.status(403).json({ message: "No tienes acceso a este registro." });
+  }
+
+  if ((hasOwn(body, "mandante_id") || hasOwn(body, "mandante_name") || hasOwn(body, "mandante")) &&
+      !sessionCanUseMandante(session, body.mandante_id, body.mandante_name || body.mandante)) {
+    return res.status(403).json({ message: "No puedes mover el registro a un mandante no asignado." });
+  }
 
   try {
     try {
       const previous = await prisma.management.findUnique({ where: { id } });
 
       if (previous) {
+        if (!recordMatchesSession(previous, session)) return res.status(403).json({ message: "No tienes acceso a este registro." });
         const patch = managementPatchData(body);
 
         // v14: Si cambia el mandante, reconstruimos también grupo/empresa/línea/AFP.
@@ -1453,6 +1482,11 @@ recordsRouter.post("/:id/email/send", async (req, res) => {
 recordsRouter.post("/:id/notes", async (req, res, next) => {
   try {
     const recordId = String(req.params.id);
+    const session = parseSession(req);
+    const existingForAccess = await findLegacyRecordById(recordId).catch(() => null);
+    if (existingForAccess && !recordMatchesSession(existingForAccess, session)) {
+      return res.status(403).json({ message: "No tienes acceso a este registro." });
+    }
     const note = await prisma.note.create({
       data: {
         related_module: "records",
@@ -1526,7 +1560,13 @@ recordsRouter.delete("/bulk/delete", async (req, res) => {
     if (ids.length > 500) return res.status(400).json({ message: "Por seguridad elimina máximo 500 registros por lote." });
 
     const results = [];
+    const session = parseSession(req);
     for (const recordId of ids) {
+      const existingForAccess = await findLegacyRecordById(recordId).catch(() => null);
+      if (existingForAccess && !recordMatchesSession(existingForAccess, session)) {
+        results.push({ id: recordId, skipped: true, reason: "Sin acceso al mandante" });
+        continue;
+      }
       const docsDeleted = await deleteRecordDocumentsFromDisk(recordId);
       await prisma.note.deleteMany({ where: { OR: [{ management_id: recordId }, { related_module: "records", related_record_id: recordId }] } }).catch(() => null);
       await prisma.activity.deleteMany({ where: { OR: [{ management_id: recordId }, { related_module: "records", related_record_id: recordId }] } }).catch(() => null);
@@ -1545,6 +1585,11 @@ recordsRouter.delete("/bulk/delete", async (req, res) => {
 recordsRouter.delete("/:id", async (req, res) => {
   try {
     const recordId = req.params.id;
+    const session = parseSession(req);
+    const existingForAccess = await findLegacyRecordById(recordId).catch(() => null);
+    if (existingForAccess && !recordMatchesSession(existingForAccess, session)) {
+      return res.status(403).json({ message: "No tienes acceso a este registro." });
+    }
     const docsDeleted = await deleteRecordDocumentsFromDisk(recordId);
 
     await prisma.note.deleteMany({ where: { OR: [{ management_id: recordId }, { related_module: "records", related_record_id: recordId }] } }).catch(() => null);
@@ -1618,6 +1663,11 @@ recordsRouter.post("/:id/documents/upload", upload.single("file"), async (req, r
   const recordId = String(req.params.id);
 
   try {
+    const session = parseSession(req);
+    const existingForAccess = await findLegacyRecordById(recordId).catch(() => null);
+    if (existingForAccess && !recordMatchesSession(existingForAccess, session)) {
+      return res.status(403).json({ message: "No tienes acceso a este registro." });
+    }
     if (!req.file) return res.status(400).json({ message: "Archivo requerido" });
 
     const doc = await createDocumentCompatible(recordId, req.file, req.body || {});

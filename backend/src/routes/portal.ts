@@ -1,21 +1,10 @@
 import { Router } from "express";
-import jwt from "jsonwebtoken";
 import { prisma } from "../config/prisma.js";
-import { env } from "../config/env.js";
+import { parseSession, recordMatchesSession } from "../middleware/security.js";
 
 const portalRouter = Router();
 
 type PortalRecord = ReturnType<typeof normalizeRow>;
-
-function getSession(req: any) {
-  const token = req.headers.authorization?.replace("Bearer ", "");
-  if (!token) return null;
-  try {
-    return jwt.verify(token, env.jwtSecret) as any;
-  } catch {
-    return null;
-  }
-}
 
 function text(value: unknown, fallback = "") {
   const raw = String(value ?? "").trim();
@@ -72,19 +61,7 @@ function normalizeRow(row: any, type: "LM" | "TP") {
 }
 
 function filterBySession(rows: PortalRecord[], session: any) {
-  const role = String(session.role || "").toLowerCase();
-  if (role !== "cliente") return rows;
-
-  const mandanteId = text(session.mandante_id);
-  const mandanteName = normalize(session.mandante_name);
-
-  if (!mandanteId && !mandanteName) return [];
-
-  return rows.filter((row) => {
-    if (mandanteId && String(row.mandante_id || "") === mandanteId) return true;
-    if (mandanteName && normalize(row.mandante?.name).includes(mandanteName)) return true;
-    return false;
-  });
+  return rows.filter((row) => recordMatchesSession(row, session));
 }
 
 async function loadDocuments(recordIds: string[]) {
@@ -113,7 +90,7 @@ async function loadDocuments(recordIds: string[]) {
 
 portalRouter.get("/records", async (req, res) => {
   try {
-    const session = getSession(req);
+    const session = parseSession(req);
     if (!session) return res.status(401).json({ message: "Debes iniciar sesión." });
 
     const [lm, tp] = await Promise.all([
@@ -150,7 +127,7 @@ portalRouter.get("/records", async (req, res) => {
 
 portalRouter.get("/summary", async (req, res) => {
   try {
-    const session = getSession(req);
+    const session = parseSession(req);
     if (!session) return res.status(401).json({ message: "Debes iniciar sesión." });
 
     const [lm, tp] = await Promise.all([

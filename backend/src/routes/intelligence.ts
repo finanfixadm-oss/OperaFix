@@ -1,5 +1,6 @@
 import express from "express";
 import { PrismaClient } from "@prisma/client";
+import { parseSession, recordMatchesSession } from "../middleware/security.js";
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -246,7 +247,8 @@ function group(rows: SmartRecord[], key: keyof SmartRecord) {
 
 router.get("/summary", async (req, res) => {
   try {
-    const all = await loadSmartRecords();
+    const session = parseSession(req);
+    const all = (await loadSmartRecords()).filter((row: any) => recordMatchesSession({ mandante: { name: row.mandante } }, session));
     const records = filterRecords(all, req);
     const ready = records.filter((r) => r.confirmation_cc && r.confirmation_power && r.refund_amount > 0 && statusKind(r.management_status) === "pendiente");
     const blockedPower = records.filter((r) => !r.confirmation_power);
@@ -300,7 +302,8 @@ router.get("/summary", async (req, res) => {
 
 router.get("/priorities", async (req, res) => {
   try {
-    const all = await loadSmartRecords();
+    const session = parseSession(req);
+    const all = (await loadSmartRecords()).filter((row: any) => recordMatchesSession({ mandante: { name: row.mandante } }, session));
     const records = filterRecords(all, req);
     res.json(records.sort((a, b) => b.score - a.score || b.refund_amount - a.refund_amount).slice(0, 100));
   } catch (error: any) {
