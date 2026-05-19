@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { fetchJson, postJson } from "../api";
+import { fetchJson, postJson, putJson } from "../api";
 
 type UserRow = {
   id: string;
@@ -17,12 +17,22 @@ type UserRow = {
 
 type Mandante = { id: string; name: string };
 
-const emptyForm = {
+type UserForm = {
+  full_name: string;
+  email: string;
+  password: string;
+  role: string;
+  active: boolean;
+  assigned_mandante_ids: string[];
+};
+
+const emptyForm: UserForm = {
   full_name: "",
   email: "",
   password: "",
   role: "interno",
-  assigned_mandante_ids: [] as string[],
+  active: true,
+  assigned_mandante_ids: [],
 };
 
 function roleLabel(role: string) {
@@ -44,13 +54,31 @@ function assignedText(user: UserRow) {
   return "Sin mandantes asignados";
 }
 
+function formFromUser(user: UserRow): UserForm {
+  const assignedIds =
+    user.assigned_mandante_ids ||
+    user.assigned_mandantes?.map((item) => item.id) ||
+    (user.mandante_id ? [user.mandante_id] : []);
+
+  return {
+    full_name: user.full_name || "",
+    email: user.email || "",
+    password: "",
+    role: String(user.role || "interno").toLowerCase(),
+    active: user.active !== false,
+    assigned_mandante_ids: String(user.role).toLowerCase() === "admin" ? [] : assignedIds,
+  };
+}
+
 export default function UsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [mandantes, setMandantes] = useState<Mandante[]>([]);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState<UserForm>(emptyForm);
+  const [editingUser, setEditingUser] = useState<UserRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const session = useMemo(() => {
     try {
@@ -109,11 +137,26 @@ export default function UsersPage() {
     }));
   }
 
-  async function createUser(e: FormEvent) {
+  function startEdit(user: UserRow) {
+    setEditingUser(user);
+    setForm(formFromUser(user));
+    setError("");
+    setSuccess("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function cancelEdit() {
+    setEditingUser(null);
+    setForm(emptyForm);
+    setError("");
+    setSuccess("");
+  }
+
+  async function saveUser(e: FormEvent) {
     e.preventDefault();
 
     if (!isAdmin) {
-      setError("Solo un administrador puede crear usuarios.");
+      setError("Solo un administrador puede crear o modificar usuarios.");
       return;
     }
 
@@ -122,43 +165,110 @@ export default function UsersPage() {
       return;
     }
 
+    if (!form.full_name.trim() || !form.email.trim()) {
+      setError("Nombre y correo son obligatorios.");
+      return;
+    }
+
+    if (!editingUser && !form.password.trim()) {
+      setError("La contraseña temporal es obligatoria al crear un usuario.");
+      return;
+    }
+
     setSaving(true);
     setError("");
+    setSuccess("");
+
+    const payload = {
+      full_name: form.full_name,
+      email: form.email,
+      password: form.password,
+      role: form.role,
+      active: form.active,
+      assigned_mandante_ids: form.role === "admin" ? [] : form.assigned_mandante_ids,
+    };
 
     try {
-      await postJson("/users", {
-        full_name: form.full_name,
-        email: form.email,
-        password: form.password,
-        role: form.role,
-        assigned_mandante_ids: form.role === "admin" ? [] : form.assigned_mandante_ids,
-      });
+      if (editingUser) {
+        await putJson(`/users/${editingUser.id}`, payload);
+        setSuccess("Usuario actualizado correctamente.");
+      } else {
+        await postJson("/users", payload);
+        setSuccess("Usuario creado correctamente.");
+      }
 
+      setEditingUser(null);
       setForm(emptyForm);
       await load();
     } catch (err: any) {
-      setError(err.message || "No se pudo crear el usuario.");
+      setError(err.message || "No se pudo guardar el usuario.");
     } finally {
       setSaving(false);
     }
   }
 
-  async function disableUser(user: UserRow) {
+  async function setUserActive(user: UserRow, active: boolean) {
     if (!isAdmin) {
-      setError("Solo un administrador puede desactivar usuarios.");
+      setError("Solo un administrador puede activar o desactivar usuarios.");
       return;
     }
 
-    if (!confirm(`¿Desactivar usuario ${user.email}?`)) return;
+    const action = active ? "activar" : "desactivar";
+    if (!confirm(`¿${action} usuario ${user.email}?`)) return;
 
     setError("");
+    setSuccess("");
     try {
-      await fetchJson(`/users/${user.id}`, { method: "DELETE" });
+      await putJson(`/users/${user.id}`, {
+        full_name: user.full_name,
+        email: user.email,
+        role: user.role,
+        active,
+        assigned_mandante_ids:
+          String(user.role).toLowerCase() === "admin"
+            ? []
+            : user.assigned_mandante_ids || user.assigned_mandantes?.map((item) => item.id) || [],
+      });
+      setSuccess(active ? "Usuario activado." : "Usuario desactivado.");
       await load();
     } catch (err: any) {
-      setError(err.message || "No se pudo desactivar el usuario.");
+      setError(err.message || `No se pudo ${action} el usuario.`);
     }
   }
+
+  async function deleteUser(user: UserRow) {
+    if (!isAdmin) {
+      setError("Solo un administrador puede eliminar usuarios.");
+      return;
+    }
+
+    const currentId = String(session?.id || session?.sub || "");
+    if (currentId && currentId === String(user.id)) {
+      setError("No puedes eliminar tu propio usuario desde esta pantalla.");
+      return;
+    }
+
+    if (
+      !confirm(
+        `¿Eliminar definitivamente el usuario ${user.email}?\n\nEsta acción borrará el usuario y sus mandantes asignados. No elimina registros del CRM.`
+      )
+    ) {
+      return;
+    }
+
+    setError("");
+    setSuccess("");
+    try {
+      await fetchJson(`/users/${user.id}`, { method: "DELETE" });
+      if (editingUser?.id === user.id) cancelEdit();
+      setSuccess("Usuario eliminado correctamente.");
+      await load();
+    } catch (err: any) {
+      setError(err.message || "No se pudo eliminar el usuario.");
+    }
+  }
+
+  const selectedCount = form.assigned_mandante_ids.length;
 
   return (
     <div className="zoho-module-page">
@@ -167,16 +277,17 @@ export default function UsersPage() {
           <h1>Control de usuarios</h1>
           <p>
             Administra usuarios de OperaFix. Los internos y KAM pueden operar el CRM,
-            pero solo ven los mandantes asignados. Solo Admin puede crear usuarios.
+            pero solo ven los mandantes asignados. Solo Admin puede crear, editar o eliminar usuarios.
           </p>
         </div>
       </div>
 
       {error && <div className="zoho-alert danger">{error}</div>}
+      {success && <div className="zoho-alert success">{success}</div>}
 
       {!isAdmin && (
         <div className="zoho-alert warning">
-          Tu rol no permite crear usuarios. Puedes operar el CRM según tus mandantes asignados.
+          Tu rol no permite administrar usuarios. Puedes operar el CRM según tus mandantes asignados.
         </div>
       )}
 
@@ -184,18 +295,23 @@ export default function UsersPage() {
         <section className="zoho-card users-create-card">
           <div className="zoho-card-header">
             <div>
-              <h2>Crear usuario</h2>
-              <p>Asigna uno o más mandantes para limitar la información visible.</p>
+              <h2>{editingUser ? "Editar usuario" : "Crear usuario"}</h2>
+              <p>
+                {editingUser
+                  ? "Modifica rol, estado, contraseña opcional y mandantes asignados."
+                  : "Asigna uno o más mandantes para limitar la información visible."}
+              </p>
             </div>
           </div>
 
-          <form onSubmit={createUser} className="zoho-form-grid users-form-grid">
+          <form onSubmit={saveUser} className="zoho-form-grid users-form-grid">
             <Field label="Nombre completo">
               <input
                 className="zoho-input"
                 value={form.full_name}
                 onChange={(e) => setForm((prev) => ({ ...prev, full_name: e.target.value }))}
                 required
+                disabled={!isAdmin}
               />
             </Field>
 
@@ -206,16 +322,19 @@ export default function UsersPage() {
                 value={form.email}
                 onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
                 required
+                disabled={!isAdmin}
               />
             </Field>
 
-            <Field label="Contraseña temporal">
+            <Field label={editingUser ? "Nueva contraseña opcional" : "Contraseña temporal"}>
               <input
                 className="zoho-input"
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-                required
+                required={!editingUser}
+                disabled={!isAdmin}
+                placeholder={editingUser ? "Dejar vacío para mantener contraseña actual" : "Contraseña temporal"}
               />
             </Field>
 
@@ -223,6 +342,7 @@ export default function UsersPage() {
               <select
                 className="zoho-select"
                 value={form.role}
+                disabled={!isAdmin}
                 onChange={(e) =>
                   setForm((prev) => ({
                     ...prev,
@@ -238,14 +358,28 @@ export default function UsersPage() {
               </select>
             </Field>
 
+            {editingUser && (
+              <Field label="Estado">
+                <select
+                  className="zoho-select"
+                  value={form.active ? "true" : "false"}
+                  disabled={!isAdmin}
+                  onChange={(e) => setForm((prev) => ({ ...prev, active: e.target.value === "true" }))}
+                >
+                  <option value="true">Activo</option>
+                  <option value="false">Inactivo</option>
+                </select>
+              </Field>
+            )}
+
             {form.role !== "admin" && (
               <div className="zoho-form-field users-mandantes-field">
                 <label>Mandantes asignados</label>
                 <div className="users-mandantes-actions">
-                  <button type="button" className="zoho-small-btn" onClick={selectAllMandantes}>
+                  <button type="button" className="zoho-small-btn" onClick={selectAllMandantes} disabled={!isAdmin}>
                     Seleccionar todos
                   </button>
-                  <button type="button" className="zoho-small-btn" onClick={clearMandantes}>
+                  <button type="button" className="zoho-small-btn" onClick={clearMandantes} disabled={!isAdmin}>
                     Limpiar
                   </button>
                 </div>
@@ -257,6 +391,7 @@ export default function UsersPage() {
                         type="checkbox"
                         checked={form.assigned_mandante_ids.includes(mandante.id)}
                         onChange={() => toggleMandante(mandante.id)}
+                        disabled={!isAdmin}
                       />
                       <span>{mandante.name}</span>
                     </label>
@@ -264,15 +399,20 @@ export default function UsersPage() {
                 </div>
 
                 <small>
-                  Seleccionados: {form.assigned_mandante_ids.length}. El usuario solo verá registros,
+                  Seleccionados: {selectedCount}. El usuario solo verá registros,
                   dashboard, portal, informes y carga asociados a estos mandantes.
                 </small>
               </div>
             )}
 
             <div className="zoho-form-actions users-form-actions">
+              {editingUser && (
+                <button type="button" className="zoho-btn" onClick={cancelEdit} disabled={saving}>
+                  Cancelar edición
+                </button>
+              )}
               <button className="zoho-btn zoho-btn-primary" disabled={saving || !isAdmin}>
-                {saving ? "Creando..." : "Crear usuario"}
+                {saving ? "Guardando..." : editingUser ? "Guardar cambios" : "Crear usuario"}
               </button>
             </div>
           </form>
@@ -283,11 +423,11 @@ export default function UsersPage() {
           <div className="users-rule-list">
             <div>
               <strong>Administrador</strong>
-              <span>Ve todo y puede crear usuarios.</span>
+              <span>Ve todo y puede crear, editar, activar, desactivar y eliminar usuarios.</span>
             </div>
             <div>
               <strong>Interno / KAM</strong>
-              <span>Opera el CRM completo, pero solo sobre sus mandantes asignados. No puede crear usuarios.</span>
+              <span>Opera el CRM completo, puede crear mandantes, pero solo sobre sus mandantes asignados. No puede administrar usuarios.</span>
             </div>
             <div>
               <strong>Cliente</strong>
@@ -334,10 +474,24 @@ export default function UsersPage() {
                   <td>{user.active ? "Activo" : "Inactivo"}</td>
                   <td>{user.created_at ? new Date(user.created_at).toLocaleDateString("es-CL") : "—"}</td>
                   <td>
-                    {isAdmin && user.active && (
-                      <button className="zoho-small-btn danger" onClick={() => disableUser(user)}>
-                        Desactivar
-                      </button>
+                    {isAdmin && (
+                      <div className="zoho-actions-row compact-actions">
+                        <button className="zoho-small-btn" onClick={() => startEdit(user)}>
+                          Editar
+                        </button>
+                        {user.active ? (
+                          <button className="zoho-small-btn danger" onClick={() => setUserActive(user, false)}>
+                            Desactivar
+                          </button>
+                        ) : (
+                          <button className="zoho-small-btn" onClick={() => setUserActive(user, true)}>
+                            Activar
+                          </button>
+                        )}
+                        <button className="zoho-small-btn danger" onClick={() => deleteUser(user)}>
+                          Eliminar
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>

@@ -43,7 +43,7 @@ function requireAdmin(req: any, res: any) {
 
   if (String(session.role || "").toLowerCase() !== "admin") {
     res.status(403).json({
-      message: "Solo un administrador puede crear, modificar o desactivar usuarios.",
+      message: "Solo un administrador puede crear, modificar, activar, desactivar o eliminar usuarios.",
     });
     return null;
   }
@@ -157,6 +157,20 @@ async function saveAssignments(userId: string, role: string, mandanteIds: string
   return mandantes;
 }
 
+async function findUserById(userId: string) {
+  const rows = await prisma.$queryRawUnsafe<UserRow[]>(
+    `
+      select id, email, full_name, role, mandante_id, mandante_name, active, created_at, updated_at
+      from operafix_users
+      where id = $1
+      limit 1
+    `,
+    userId
+  );
+
+  return rows[0] || null;
+}
+
 usersRouter.get("/", async (req, res) => {
   await ensureUsersTable();
 
@@ -261,9 +275,16 @@ usersRouter.put("/:id", async (req, res) => {
     if (!session) return;
 
     const userId = String(req.params.id);
-    const fullName = String(req.body.full_name || req.body.name || "").trim();
-    const role = normalizeRole(req.body.role);
-    const active = req.body.active === undefined ? undefined : Boolean(req.body.active);
+    const existing = await findUserById(userId);
+
+    if (!existing) {
+      return res.status(404).json({ message: "Usuario no encontrado." });
+    }
+
+    const email = String(req.body.email || existing.email || "").trim().toLowerCase();
+    const fullName = String(req.body.full_name || req.body.name || existing.full_name || email).trim();
+    const role = normalizeRole(req.body.role || existing.role);
+    const active = req.body.active === undefined ? Boolean(existing.active) : Boolean(req.body.active);
     const password = String(req.body.password || "");
 
     const mandanteIds = [
@@ -272,34 +293,32 @@ usersRouter.put("/:id", async (req, res) => {
       ...(req.body.mandante_id ? [String(req.body.mandante_id)] : []),
     ];
 
+    if (!email) {
+      return res.status(400).json({ message: "Correo es obligatorio." });
+    }
+
     if (role !== "admin" && mandanteIds.length === 0) {
       return res.status(400).json({
         message: "Debes asignar al menos un mandante para usuarios internos, KAM o clientes.",
       });
     }
 
-    if (fullName) {
-      await prisma.$executeRawUnsafe(
-        `update operafix_users set full_name = $2, role = $3, updated_at = now() where id = $1`,
-        userId,
-        fullName,
-        role
-      );
-    } else {
-      await prisma.$executeRawUnsafe(
-        `update operafix_users set role = $2, updated_at = now() where id = $1`,
-        userId,
-        role
-      );
-    }
-
-    if (active !== undefined) {
-      await prisma.$executeRawUnsafe(
-        `update operafix_users set active = $2, updated_at = now() where id = $1`,
-        userId,
-        active
-      );
-    }
+    await prisma.$executeRawUnsafe(
+      `
+        update operafix_users
+        set email = $2,
+            full_name = $3,
+            role = $4,
+            active = $5,
+            updated_at = now()
+        where id = $1
+      `,
+      userId,
+      email,
+      fullName,
+      role,
+      active
+    );
 
     if (password) {
       const hash = await bcrypt.hash(password, 10);
@@ -311,21 +330,12 @@ usersRouter.put("/:id", async (req, res) => {
     }
 
     const assigned = await saveAssignments(userId, role, mandanteIds, null);
+    const updated = await findUserById(userId);
 
-    const rows = await prisma.$queryRawUnsafe<UserRow[]>(
-      `
-        select id, email, full_name, role, mandante_id, mandante_name, active, created_at, updated_at
-        from operafix_users
-        where id = $1
-        limit 1
-      `,
-      userId
-    );
-
-    if (!rows[0]) return res.status(404).json({ message: "Usuario no encontrado." });
+    if (!updated) return res.status(404).json({ message: "Usuario no encontrado." });
 
     res.json({
-      ...rows[0],
+      ...updated,
       assigned_mandantes: assigned,
       assigned_mandante_ids: assigned.map((item) => item.id),
       assigned_mandante_names: assigned.map((item) => item.name),
@@ -336,7 +346,7 @@ usersRouter.put("/:id", async (req, res) => {
   }
 });
 
-usersRouter.delete("/:id", async (req, res) => {
+usersRouter.post("/:id/deactivate", async (req, res) => {
   try {
     await ensureUsersTable();
 
@@ -352,8 +362,52 @@ usersRouter.delete("/:id", async (req, res) => {
 
     res.json({ ok: true });
   } catch (error: any) {
-    console.error("Disable user error:", error);
+    console.error("Deactivate user error:", error);
     res.status(500).json({ message: "No se pudo desactivar el usuario.", detail: error?.message });
+  }
+});
+
+usersRouter.post("/:id/activate", async (req, res) => {
+  try {
+    await ensureUsersTable();
+
+    const session = requireAdmin(req, res);
+    if (!session) return;
+
+    const userId = String(req.params.id);
+
+    await prisma.$executeRawUnsafe(
+      `update operafix_users set active = true, updated_at = now() where id = $1`,
+      userId
+    );
+
+    res.json({ ok: true });
+  } catch (error: any) {
+    console.error("Activate user error:", error);
+    res.status(500).json({ message: "No se pudo activar el usuario.", detail: error?.message });
+  }
+});
+
+usersRouter.delete("/:id", async (req, res) => {
+  try {
+    await ensureUsersTable();
+
+    const session = requireAdmin(req, res);
+    if (!session) return;
+
+    const userId = String(req.params.id);
+
+    if (String(session.sub || session.id || "") === userId) {
+      return res.status(400).json({ message: "No puedes eliminar tu propio usuario desde esta pantalla." });
+    }
+
+    await prisma.$executeRawUnsafe(`delete from operafix_user_mandantes where user_id = $1`, userId);
+    await prisma.$executeRawUnsafe(`delete from operafix_users where id = $1`, userId);
+
+    res.json({ ok: true });
+  } catch (error: any) {
+    console.error("Delete user error:", error);
+    res.status(500).json({ message: "No se pudo eliminar el usuario.", detail: error?.message });
   }
 });
 
