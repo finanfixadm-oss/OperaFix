@@ -51,11 +51,9 @@ app.use("/storage", express.static(path.resolve(process.cwd(), "storage")));
 app.use("/api/automation", automationRoutes);
 app.use("/api/ai-actions", aiExecuteRoutes);
 app.use("/api/ai-suggestions", aiSuggestionsRoutes);
-app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/dashboard", requireAuth, requireRoles(["admin", "interno", "kam"]), dashboardRoutes);
 app.use("/api/intelligence", requireAuth, requireRoles(["admin", "interno", "kam"]), intelligenceRouter);
 app.use("/api/ai-chat", aiChatRoutes);
-app.use("/api/users", usersRouter);
-
 app.get("/", (_req, res) => {
   res.json({ status: "OK DESDE SERVER" });
 });
@@ -95,7 +93,7 @@ app.use(
 app.use(
   "/api/mandantes",
   requireAuth,
-  requireRoles(["admin", "interno"]),
+  requireRoles(["admin", "interno", "kam"]),
   mandantesRouter
 );
 
@@ -152,14 +150,14 @@ app.use(
 app.use(
   "/api/imports",
   requireAuth,
-  requireRoles(["admin", "interno"]),
+  requireRoles(["admin", "interno", "kam"]),
   importRecordsRouter
 );
 
 app.use(
   "/api/users",
   requireAuth,
-  requireRoles(["admin", "interno"]),
+  requireRoles(["admin"]),
   usersRouter
 );
 

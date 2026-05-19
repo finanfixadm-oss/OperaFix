@@ -80,7 +80,7 @@ export default function App() {
           <Route
             path="/carga-masiva"
             element={
-              <ProtectedRoute roles={["admin", "interno"]}>
+              <ProtectedRoute roles={["admin", "interno", "kam"]}>
                 <MassImportPage />
               </ProtectedRoute>
             }
@@ -107,7 +107,7 @@ export default function App() {
           <Route
             path="/mandantes"
             element={
-              <ProtectedRoute roles={["admin", "interno"]}>
+              <ProtectedRoute roles={["admin", "interno", "kam"]}>
                 <MandantesPage />
               </ProtectedRoute>
             }

@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { prisma } from "../config/prisma.js";
+import { parseSession, rowMandanteAllowed } from "../middleware/security.js";
 
 const importRecordsRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 80 * 1024 * 1024 } });
@@ -799,6 +800,24 @@ importRecordsRouter.post("/records/preview", upload.single("file"), async (req, 
   try {
     if (!req.file) return res.status(400).json({ message: "Debes adjuntar un archivo Excel." });
     const parsed = parseWorkbook(req.file.buffer);
+    const session = parseSession(req);
+    if (session && String(session.role || "").toLowerCase() !== "admin") {
+      for (const row of parsed.rows as any[]) {
+        const allowed = rowMandanteAllowed(
+          {
+            mandante: row.mandante,
+            mandante_name: row.mandante,
+          },
+          session
+        );
+
+        if (!allowed) {
+          row.status = "ERROR";
+          row.errors = [...(row.errors || []), "Mandante no asignado al usuario"];
+          row.validation_errors = [...(row.validation_errors || []), "Mandante no asignado al usuario"];
+        }
+      }
+    }
     await markDatabaseDuplicates(parsed.rows);
     const id = `imp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
     importSessions.set(id, { id, createdAt: Date.now(), fileName: req.file.originalname, rows: parsed.rows, headers: parsed.headers, mappedColumns: parsed.mappedColumns, unmappedHeaders: parsed.unmappedHeaders });
@@ -834,6 +853,11 @@ importRecordsRouter.post("/records/commit", async (req, res) => {
     for (const batch of chunkArray(session.rows, batchSize)) {
       const batchResults = await Promise.all(batch.map(async (row) => {
         try {
+          const sessionUser = parseSession(req);
+          if (sessionUser && String(sessionUser.role || "").toLowerCase() !== "admin") {
+            const allowed = rowMandanteAllowed({ mandante: row.mandante, mandante_name: row.mandante }, sessionUser);
+            if (!allowed) return { status: "error", rowNumber: row.rowNumber, reason: "Mandante no asignado al usuario" };
+          }
           return await insertRow(row, skipDuplicates);
         } catch (error: any) {
           return { status: "error", rowNumber: row.rowNumber, reason: error?.message || String(error) };

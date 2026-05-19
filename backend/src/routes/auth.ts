@@ -6,6 +6,11 @@ import { env } from "../config/env.js";
 
 const authRouter = Router();
 
+type AssignedMandante = {
+  id: string;
+  name: string;
+};
+
 type OperafixUser = {
   id: string;
   email: string;
@@ -13,28 +18,11 @@ type OperafixUser = {
   role: string;
   mandante_id: string | null;
   mandante_name: string | null;
-  assigned_mandante_ids?: string | string[] | null;
-  assigned_mandante_names?: string | string[] | null;
   active: boolean;
+  assigned_mandantes?: AssignedMandante[];
+  assigned_mandante_ids?: string[];
+  assigned_mandante_names?: string[];
 };
-
-function parseArray(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map(String).filter(Boolean);
-  if (typeof value === "string") {
-    const raw = value.trim();
-    if (!raw) return [];
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
-    } catch {}
-    return raw.split(",").map((x) => x.trim()).filter(Boolean);
-  }
-  return [];
-}
-
-function stringifyArray(values: unknown): string {
-  return JSON.stringify(parseArray(values));
-}
 
 async function ensureUsersTable() {
   await prisma.$executeRawUnsafe(`
@@ -46,16 +34,22 @@ async function ensureUsersTable() {
       role text not null default 'admin',
       mandante_id text null,
       mandante_name text null,
-      assigned_mandante_ids text null,
-      assigned_mandante_names text null,
       active boolean not null default true,
       created_at timestamp not null default now(),
       updated_at timestamp not null default now()
     )
   `);
 
-  await prisma.$executeRawUnsafe(`alter table operafix_users add column if not exists assigned_mandante_ids text null`).catch(() => null);
-  await prisma.$executeRawUnsafe(`alter table operafix_users add column if not exists assigned_mandante_names text null`).catch(() => null);
+  await prisma.$executeRawUnsafe(`
+    create table if not exists operafix_user_mandantes (
+      id text primary key,
+      user_id text not null,
+      mandante_id text not null,
+      mandante_name text not null,
+      created_at timestamp not null default now(),
+      unique(user_id, mandante_id)
+    )
+  `);
 }
 
 function normalizeRole(value: unknown) {
@@ -64,10 +58,47 @@ function normalizeRole(value: unknown) {
   return "cliente";
 }
 
-function signToken(user: OperafixUser) {
-  const assignedIds = parseArray(user.assigned_mandante_ids);
-  const assignedNames = parseArray(user.assigned_mandante_names);
+async function loadAssignedMandantes(userId: string): Promise<AssignedMandante[]> {
+  await ensureUsersTable();
 
+  const rows = await prisma.$queryRawUnsafe<AssignedMandante[]>(
+    `
+      select mandante_id as id, mandante_name as name
+      from operafix_user_mandantes
+      where user_id = $1
+      order by mandante_name asc
+    `,
+    userId
+  );
+
+  return rows.map((row) => ({
+    id: String(row.id),
+    name: String(row.name),
+  }));
+}
+
+function withAssignedMandantes(user: OperafixUser, assigned: AssignedMandante[]): OperafixUser {
+  const fallback =
+    user.mandante_id && user.mandante_name
+      ? [{ id: user.mandante_id, name: user.mandante_name }]
+      : [];
+
+  const cleanAssigned = assigned.length ? assigned : fallback;
+
+  return {
+    ...user,
+    assigned_mandantes: cleanAssigned,
+    assigned_mandante_ids: cleanAssigned.map((item) => item.id),
+    assigned_mandante_names: cleanAssigned.map((item) => item.name),
+  };
+}
+
+async function hydrateUser(user: OperafixUser): Promise<OperafixUser> {
+  const assigned = await loadAssignedMandantes(user.id);
+  return withAssignedMandantes(user, assigned);
+}
+
+function signToken(user: OperafixUser) {
   return jwt.sign(
     {
       sub: user.id,
@@ -75,8 +106,9 @@ function signToken(user: OperafixUser) {
       role: user.role,
       mandante_id: user.mandante_id,
       mandante_name: user.mandante_name,
-      assigned_mandante_ids: assignedIds,
-      assigned_mandante_names: assignedNames,
+      assigned_mandantes: user.assigned_mandantes || [],
+      assigned_mandante_ids: user.assigned_mandante_ids || [],
+      assigned_mandante_names: user.assigned_mandante_names || [],
       full_name: user.full_name,
     },
     env.jwtSecret,
@@ -92,8 +124,9 @@ function publicUser(user: OperafixUser) {
     role: user.role,
     mandante_id: user.mandante_id,
     mandante_name: user.mandante_name,
-    assigned_mandante_ids: parseArray(user.assigned_mandante_ids),
-    assigned_mandante_names: parseArray(user.assigned_mandante_names),
+    assigned_mandantes: user.assigned_mandantes || [],
+    assigned_mandante_ids: user.assigned_mandante_ids || [],
+    assigned_mandante_names: user.assigned_mandante_names || [],
     active: user.active,
   };
 }
@@ -111,34 +144,33 @@ authRouter.post("/login", async (req, res) => {
     if (userCount === 0) {
       const hash = await bcrypt.hash(password, 10);
       const created = await prisma.$queryRawUnsafe<OperafixUser[]>(
-        `insert into operafix_users (id, email, password_hash, full_name, role, active, assigned_mandante_ids, assigned_mandante_names)
-         values ($1, $2, $3, $4, $5, true, $6, $7)
-         returning id, email, full_name, role, mandante_id, mandante_name, assigned_mandante_ids, assigned_mandante_names, active`,
+        `insert into operafix_users (id, email, password_hash, full_name, role, active)
+         values ($1, $2, $3, $4, $5, true)
+         returning id, email, full_name, role, mandante_id, mandante_name, active`,
         `usr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         email,
         hash,
         "Administrador OperaFix",
-        "admin",
-        stringifyArray([]),
-        stringifyArray([])
+        "admin"
       );
-      const user = created[0];
+      const user = await hydrateUser(created[0]);
       return res.json({ token: signToken(user), user: publicUser(user), first_admin_created: true });
     }
 
     const rows = await prisma.$queryRawUnsafe<(OperafixUser & { password_hash: string })[]>(
-      `select id, email, password_hash, full_name, role, mandante_id, mandante_name, assigned_mandante_ids, assigned_mandante_names, active
+      `select id, email, password_hash, full_name, role, mandante_id, mandante_name, active
        from operafix_users
        where lower(email) = lower($1)
        limit 1`,
       email
     );
-    const user = rows[0];
-    if (!user || !user.active) return res.status(401).json({ message: "Usuario o contraseña inválidos." });
+    const rawUser = rows[0];
+    if (!rawUser || !rawUser.active) return res.status(401).json({ message: "Usuario o contraseña inválidos." });
 
-    const ok = await bcrypt.compare(password, user.password_hash);
+    const ok = await bcrypt.compare(password, rawUser.password_hash);
     if (!ok) return res.status(401).json({ message: "Usuario o contraseña inválidos." });
 
+    const user = await hydrateUser(rawUser);
     return res.json({ token: signToken(user), user: publicUser(user) });
   } catch (error: any) {
     console.error("Login error:", error);
@@ -157,8 +189,9 @@ authRouter.get("/me", async (req, res) => {
       role: payload.role,
       mandante_id: payload.mandante_id || null,
       mandante_name: payload.mandante_name || null,
-      assigned_mandante_ids: parseArray(payload.assigned_mandante_ids),
-      assigned_mandante_names: parseArray(payload.assigned_mandante_names),
+      assigned_mandantes: payload.assigned_mandantes || [],
+      assigned_mandante_ids: payload.assigned_mandante_ids || [],
+      assigned_mandante_names: payload.assigned_mandante_names || [],
       full_name: payload.full_name || payload.email,
     });
   } catch {
@@ -167,4 +200,4 @@ authRouter.get("/me", async (req, res) => {
 });
 
 export default authRouter;
-export { ensureUsersTable, normalizeRole, publicUser, signToken, parseArray, stringifyArray };
+export { ensureUsersTable, normalizeRole, publicUser, signToken, loadAssignedMandantes, hydrateUser };

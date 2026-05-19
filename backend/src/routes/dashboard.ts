@@ -1,6 +1,6 @@
 import express from "express";
 import { PrismaClient } from "@prisma/client";
-import { parseSession, recordMatchesSession } from "../middleware/security.js";
+import { filterRowsBySession } from "../middleware/security.js";
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -131,8 +131,7 @@ function groupBy(records: DashboardRecord[], key: keyof DashboardRecord) {
 
 router.get("/metrics", async (req, res) => {
   try {
-    const session = parseSession(req);
-    const records = (await loadRecords()).filter((row: any) => recordMatchesSession({ mandante: { name: row.mandante }, mandante_id: (row as any).mandante_id }, session));
+    const records = filterRowsBySession(await loadRecords(), req as any);
     const total = records.reduce((acc, row) => acc + row.refund_amount, 0);
     const paid = records.reduce((acc, row) => acc + row.actual_paid_amount, 0);
     const ready = records.filter((row) => row.confirmation_cc && row.confirmation_power && row.refund_amount > 0 && statusKind(row.status) === "pendiente");

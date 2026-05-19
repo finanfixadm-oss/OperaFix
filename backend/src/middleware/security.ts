@@ -5,12 +5,18 @@ import { prisma } from "../config/prisma.js";
 
 type Role = "admin" | "interno" | "kam" | "cliente";
 
+export type AssignedMandante = {
+  id: string;
+  name: string;
+};
+
 export interface OperafixSession {
   id: string;
   email: string;
   role: Role | string;
   mandante_id?: string | null;
   mandante_name?: string | null;
+  assigned_mandantes?: AssignedMandante[];
   assigned_mandante_ids?: string[];
   assigned_mandante_names?: string[];
   full_name?: string | null;
@@ -28,18 +34,8 @@ function normalizeText(value: unknown) {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
-function parseArray(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map(String).map((x) => x.trim()).filter(Boolean);
-  if (typeof value === "string") {
-    const raw = value.trim();
-    if (!raw) return [];
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed.map(String).map((x) => x.trim()).filter(Boolean);
-    } catch {}
-    return raw.split(",").map((x) => x.trim()).filter(Boolean);
-  }
-  return [];
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(String).filter(Boolean) : [];
 }
 
 export function parseSession(req: Request): OperafixSession | null {
@@ -48,16 +44,29 @@ export function parseSession(req: Request): OperafixSession | null {
   if (!token) return null;
   try {
     const payload = jwt.verify(token, env.jwtSecret) as any;
-    const assignedIds = parseArray(payload.assigned_mandante_ids);
-    const assignedNames = parseArray(payload.assigned_mandante_names);
+    const assigned_mandantes = Array.isArray(payload.assigned_mandantes)
+      ? payload.assigned_mandantes.map((item: any) => ({
+          id: String(item.id || item.mandante_id || ""),
+          name: String(item.name || item.mandante_name || ""),
+        })).filter((item: AssignedMandante) => item.id || item.name)
+      : [];
+
+    const assigned_mandante_ids = asStringArray(payload.assigned_mandante_ids);
+    const assigned_mandante_names = asStringArray(payload.assigned_mandante_names);
+
     return {
       id: String(payload.sub || payload.id || ""),
       email: String(payload.email || ""),
       role: String(payload.role || "cliente").toLowerCase(),
       mandante_id: payload.mandante_id || null,
       mandante_name: payload.mandante_name || null,
-      assigned_mandante_ids: assignedIds,
-      assigned_mandante_names: assignedNames,
+      assigned_mandantes,
+      assigned_mandante_ids: assigned_mandante_ids.length
+        ? assigned_mandante_ids
+        : assigned_mandantes.map((item: AssignedMandante) => item.id).filter(Boolean),
+      assigned_mandante_names: assigned_mandante_names.length
+        ? assigned_mandante_names
+        : assigned_mandantes.map((item: AssignedMandante) => item.name).filter(Boolean),
       full_name: payload.full_name || payload.email || null,
     };
   } catch {
@@ -93,80 +102,99 @@ export function isInternal(session?: OperafixSession | null) {
 }
 
 export function assignedMandanteIds(session?: OperafixSession | null) {
-  const ids = [...(session?.assigned_mandante_ids || [])];
-  if (session?.mandante_id) ids.push(String(session.mandante_id));
-  return Array.from(new Set(ids.filter(Boolean)));
+  if (!session) return [] as string[];
+  const ids = new Set<string>();
+  for (const id of session.assigned_mandante_ids || []) {
+    if (id) ids.add(String(id));
+  }
+  for (const item of session.assigned_mandantes || []) {
+    if (item.id) ids.add(String(item.id));
+  }
+  if (session.mandante_id) ids.add(String(session.mandante_id));
+  return [...ids];
 }
 
 export function assignedMandanteNames(session?: OperafixSession | null) {
-  const names = [...(session?.assigned_mandante_names || [])];
-  if (session?.mandante_name) names.push(String(session.mandante_name));
-  return Array.from(new Set(names.filter(Boolean)));
-}
-
-export function hasMandanteRestriction(session?: OperafixSession | null) {
-  const role = String(session?.role || "").toLowerCase();
-  if (role === "admin") return false;
-  if (role === "cliente") return true;
-  if (["interno", "kam"].includes(role)) {
-    return assignedMandanteIds(session).length > 0 || assignedMandanteNames(session).length > 0;
+  if (!session) return [] as string[];
+  const names = new Set<string>();
+  for (const name of session.assigned_mandante_names || []) {
+    if (name) names.add(String(name));
   }
-  return true;
+  for (const item of session.assigned_mandantes || []) {
+    if (item.name) names.add(String(item.name));
+  }
+  if (session.mandante_name) names.add(String(session.mandante_name));
+  return [...names];
 }
 
-export function sessionCanUseMandante(
-  session: OperafixSession | null | undefined,
-  mandanteId?: unknown,
-  mandanteName?: unknown
-) {
-  if (!session) return false;
-  if (isAdmin(session)) return true;
-  if (!hasMandanteRestriction(session)) return true;
+export function hasAssignedMandanteScope(session?: OperafixSession | null) {
+  if (!session) return true;
+  if (isAdmin(session)) return false;
+  return ["interno", "kam", "cliente"].includes(String(session.role || "").toLowerCase());
+}
 
-  const id = String(mandanteId || "").trim();
-  const name = normalizeText(mandanteName);
-  const allowedIds = assignedMandanteIds(session).map(String);
-  const allowedNames = assignedMandanteNames(session).map(normalizeText);
+export function rowMandanteAllowed(row: any, session?: OperafixSession | null) {
+  if (!hasAssignedMandanteScope(session)) return true;
 
-  if (id && allowedIds.includes(id)) return true;
-  if (name && allowedNames.some((allowed) => allowed && (allowed === name || name.includes(allowed) || allowed.includes(name)))) return true;
+  const ids = assignedMandanteIds(session);
+  const names = assignedMandanteNames(session).map(normalizeText);
+
+  if (!ids.length && !names.length) return false;
+
+  const rowIds = [
+    row?.mandante_id,
+    row?.mandanteId,
+    row?.mandante?.id,
+    row?.mandante_rel?.id,
+  ].filter(Boolean).map(String);
+
+  if (ids.length && rowIds.some((id) => ids.includes(id))) return true;
+
+  const rowNames = [
+    row?.mandante,
+    row?.mandante_name,
+    row?.mandante?.name,
+    row?.mandante_rel?.name,
+    row?.client_name,
+  ].filter(Boolean).map(normalizeText);
+
+  if (names.length && rowNames.some((name) => names.includes(name) || names.some((target) => name.includes(target) || target.includes(name)))) return true;
+
   return false;
 }
 
-export function recordMatchesSession(record: any, session?: OperafixSession | null) {
-  if (!session) return false;
-  if (isAdmin(session)) return true;
-  if (!hasMandanteRestriction(session)) return true;
+export function filterRowsBySession<T extends any>(rows: T[], reqOrSession?: SecureRequest | OperafixSession | null): T[] {
+  const session = reqOrSession && "headers" in (reqOrSession as any)
+    ? ((reqOrSession as SecureRequest).user || parseSession(reqOrSession as Request))
+    : (reqOrSession as OperafixSession | null | undefined);
 
-  const recordMandanteId =
-    record?.mandante_id ||
-    record?.mandanteId ||
-    record?.mandante?.id ||
-    record?.mandante_rel?.id ||
-    null;
+  if (!hasAssignedMandanteScope(session)) return rows;
+  return rows.filter((row: any) => rowMandanteAllowed(row, session));
+}
 
-  const recordMandanteName =
-    record?.mandante_name ||
-    record?.mandante?.name ||
-    record?.mandante_rel?.name ||
-    record?.mandante ||
-    record?.client_name ||
-    null;
-
-  return sessionCanUseMandante(session, recordMandanteId, recordMandanteName);
+export function ensureMandanteAccess(req: SecureRequest, rowOrMandante: any, res: Response) {
+  const session = req.user || parseSession(req);
+  if (rowMandanteAllowed(rowOrMandante, session)) return true;
+  res.status(403).json({ message: "No tienes acceso al mandante de este registro." });
+  return false;
 }
 
 export function tenantWhere(session?: OperafixSession | null) {
-  if (!session || isAdmin(session) || !hasMandanteRestriction(session)) return {};
+  if (!session || isAdmin(session)) return {};
 
   const ids = assignedMandanteIds(session);
   const names = assignedMandanteNames(session);
-  const OR: any[] = [];
 
-  if (ids.length) OR.push({ mandante_id: { in: ids } });
-  if (names.length) OR.push(...names.map((name) => ({ mandante: name })));
+  if (ids.length || names.length) {
+    return {
+      OR: [
+        ...(ids.length ? [{ mandante_id: { in: ids } }] : []),
+        ...(names.length ? [{ mandante: { in: names } }] : []),
+      ],
+    };
+  }
 
-  return OR.length ? { OR } : { id: "__NO_ACCESS__" };
+  return { id: "__NO_ACCESS__" };
 }
 
 export async function ensureAuditTable() {
@@ -194,9 +222,12 @@ export async function audit(req: SecureRequest, action: string, module: string, 
     await ensureAuditTable();
     const session = req.user || parseSession(req);
     await prisma.$executeRawUnsafe(
-      `insert into operafix_audit_logs (id, user_id, user_email, user_role, mandante_id, mandante_name, action, module, record_id, detail, ip, user_agent)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-      `audit_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+      `
+      insert into operafix_audit_logs
+      (id, user_id, user_email, user_role, mandante_id, mandante_name, action, module, record_id, detail, ip, user_agent)
+      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+      `,
+      `aud_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       session?.id || null,
       session?.email || null,
       session?.role || null,
@@ -210,6 +241,6 @@ export async function audit(req: SecureRequest, action: string, module: string, 
       req.headers["user-agent"] || null
     );
   } catch (error) {
-    console.warn("Audit log skipped:", error);
+    console.warn("No se pudo registrar auditoría:", error);
   }
 }

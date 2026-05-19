@@ -1,10 +1,22 @@
 import { Router } from "express";
+import jwt from "jsonwebtoken";
 import { prisma } from "../config/prisma.js";
-import { parseSession, recordMatchesSession } from "../middleware/security.js";
+import { env } from "../config/env.js";
+import { filterRowsBySession } from "../middleware/security.js";
 
 const portalRouter = Router();
 
 type PortalRecord = ReturnType<typeof normalizeRow>;
+
+function getSession(req: any) {
+  const token = req.headers.authorization?.replace("Bearer ", "");
+  if (!token) return null;
+  try {
+    return jwt.verify(token, env.jwtSecret) as any;
+  } catch {
+    return null;
+  }
+}
 
 function text(value: unknown, fallback = "") {
   const raw = String(value ?? "").trim();
@@ -61,7 +73,7 @@ function normalizeRow(row: any, type: "LM" | "TP") {
 }
 
 function filterBySession(rows: PortalRecord[], session: any) {
-  return rows.filter((row) => recordMatchesSession(row, session));
+  return filterRowsBySession(rows as any[], session as any) as PortalRecord[];
 }
 
 async function loadDocuments(recordIds: string[]) {
@@ -90,7 +102,7 @@ async function loadDocuments(recordIds: string[]) {
 
 portalRouter.get("/records", async (req, res) => {
   try {
-    const session = parseSession(req);
+    const session = getSession(req);
     if (!session) return res.status(401).json({ message: "Debes iniciar sesión." });
 
     const [lm, tp] = await Promise.all([
@@ -127,7 +139,7 @@ portalRouter.get("/records", async (req, res) => {
 
 portalRouter.get("/summary", async (req, res) => {
   try {
-    const session = parseSession(req);
+    const session = getSession(req);
     if (!session) return res.status(401).json({ message: "Debes iniciar sesión." });
 
     const [lm, tp] = await Promise.all([

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../config/prisma.js";
+import { filterRowsBySession, ensureMandanteAccess, parseSession, rowMandanteAllowed } from "../middleware/security.js";
 import { Prisma } from "@prisma/client";
 
 const managementsRouter = Router();
@@ -90,7 +91,7 @@ managementsRouter.get("/", async (req, res, next) => {
       orderBy: { created_at: "desc" },
     });
 
-    res.json(items);
+    res.json(filterRowsBySession(items as any[], req as any));
   } catch (error) {
     next(error);
   }
@@ -129,6 +130,11 @@ managementsRouter.get("/:id", async (req, res, next) => {
 // =======================
 managementsRouter.post("/", async (req, res, next) => {
   try {
+    const session = parseSession(req);
+    if (session && String(session.role || "").toLowerCase() !== "admin" && !rowMandanteAllowed({ mandante_id: req.body.mandante_id }, session)) {
+      return res.status(403).json({ message: "No puedes crear información para mandantes no asignados." });
+    }
+
     const item = await prisma.management.create({
       data: {
         mandante_id: req.body.mandante_id,

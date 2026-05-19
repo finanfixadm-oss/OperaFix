@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../config/prisma.js";
+import { filterRowsBySession, parseSession, rowMandanteAllowed } from "../middleware/security.js";
 import { Prisma } from "@prisma/client";
 
 const managementLineAfpsRouter = Router();
@@ -48,7 +49,7 @@ managementLineAfpsRouter.get("/", async (req, res) => {
       orderBy: [{ afp_name: "asc" }, { created_at: "desc" }],
     });
 
-    return res.json(items);
+    return res.json(filterRowsBySession(items.map((item: any) => ({ ...item, mandante_id: item.line?.mandante_id, mandante: item.line?.mandante })) as any[], req as any));
   } catch (error: any) {
     console.error(
       "ERROR /api/management-line-afps. Respondiendo [] en modo compatible Railway:",
@@ -97,6 +98,8 @@ managementLineAfpsRouter.get("/:id", async (req, res, next) => {
 // CREAR AFP EN LÍNEA
 managementLineAfpsRouter.post("/", async (req, res, next) => {
   try {
+    const session = parseSession(req);
+
     const item = await prisma.managementLineAfp.create({
       data: {
         line_id: req.body.line_id,

@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import * as XLSX from "xlsx";
 import { prisma } from "../config/prisma.js";
 import { env } from "../config/env.js";
-import { audit } from "../middleware/security.js";
+import { audit, filterRowsBySession } from "../middleware/security.js";
 
 const reportsRouter = Router();
 
@@ -167,24 +167,12 @@ function normalizeTp(row: any) {
 }
 
 async function loadRows(session: any) {
-  const lmWhere: any = {};
-  const tpWhere: any = {};
-  if (session && !isInternal(session)) {
-    if (session.mandante_id) {
-      lmWhere.OR = [{ mandante_id: session.mandante_id }, { mandante: session.mandante_name || "" }];
-      tpWhere.OR = [{ mandante_id: session.mandante_id }, { mandante: session.mandante_name || "" }];
-    } else if (session.mandante_name) {
-      lmWhere.mandante = session.mandante_name;
-      tpWhere.mandante = session.mandante_name;
-    } else {
-      return [];
-    }
-  }
   const [lm, tp] = await Promise.all([
-    prisma.lmRecord.findMany({ where: lmWhere, include: { mandante_rel: true, company_rel: true, line_afp_rel: true }, orderBy: { created_at: "desc" }, take: 10000 }),
-    prisma.tpRecord.findMany({ where: tpWhere, include: { mandante_rel: true, company_rel: true, line_afp_rel: true }, orderBy: { created_at: "desc" }, take: 10000 }),
+    prisma.lmRecord.findMany({ include: { mandante_rel: true, company_rel: true, line_afp_rel: true }, orderBy: { created_at: "desc" }, take: 10000 }),
+    prisma.tpRecord.findMany({ include: { mandante_rel: true, company_rel: true, line_afp_rel: true }, orderBy: { created_at: "desc" }, take: 10000 }),
   ]);
-  return [...lm.map(normalizeLm), ...tp.map(normalizeTp)];
+
+  return filterRowsBySession([...lm.map(normalizeLm), ...tp.map(normalizeTp)] as any[], session as any);
 }
 
 type Filter = { field: string; operator: string; value: string; value2?: string };

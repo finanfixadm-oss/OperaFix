@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../config/prisma.js";
-import { parseSession, isAdmin, hasMandanteRestriction, assignedMandanteIds, assignedMandanteNames, sessionCanUseMandante } from "../middleware/security.js";
+import { parseSession, filterRowsBySession, ensureMandanteAccess, isAdmin } from "../middleware/security.js";
 
 const mandantesRouter = Router();
 
@@ -31,34 +31,20 @@ function mandanteData(body: any) {
 mandantesRouter.get("/", async (req, res, next) => {
   try {
     const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
-    const session = parseSession(req);
-
-    const andFilters: any[] = [];
-
-    if (search) {
-      andFilters.push({
-        OR: [
-          { name: { contains: search, mode: "insensitive" } },
-          { owner_name: { contains: search, mode: "insensitive" } },
-          { email: { contains: search, mode: "insensitive" } },
-          { phone: { contains: search, mode: "insensitive" } },
-          { campaign: { contains: search, mode: "insensitive" } },
-          { active_contract: { contains: search, mode: "insensitive" } },
-        ],
-      });
-    }
-
-    if (session && !isAdmin(session) && hasMandanteRestriction(session)) {
-      const ids = assignedMandanteIds(session);
-      const names = assignedMandanteNames(session);
-      const orFilters: any[] = [];
-      if (ids.length) orFilters.push({ id: { in: ids } });
-      if (names.length) orFilters.push(...names.map((name) => ({ name: { equals: name, mode: "insensitive" } })));
-      andFilters.push(orFilters.length ? { OR: orFilters } : { id: "__NO_ACCESS__" });
-    }
 
     const rows = await prisma.mandante.findMany({
-      where: andFilters.length ? { AND: andFilters } : undefined,
+      where: search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { owner_name: { contains: search, mode: "insensitive" } },
+              { email: { contains: search, mode: "insensitive" } },
+              { phone: { contains: search, mode: "insensitive" } },
+              { campaign: { contains: search, mode: "insensitive" } },
+              { active_contract: { contains: search, mode: "insensitive" } },
+            ],
+          }
+        : undefined,
       include: {
         _count: {
           select: {
@@ -71,7 +57,7 @@ mandantesRouter.get("/", async (req, res, next) => {
       orderBy: { name: "asc" },
     });
 
-    res.json(rows);
+    res.json(filterRowsBySession(rows as any[], req as any));
   } catch (error) {
     next(error);
   }
@@ -79,11 +65,10 @@ mandantesRouter.get("/", async (req, res, next) => {
 
 mandantesRouter.post("/", async (req, res, next) => {
   try {
-    const data = mandanteData(req.body);
     const session = parseSession(req);
-    if (session && !isAdmin(session) && hasMandanteRestriction(session) && !sessionCanUseMandante(session, null, data.name)) {
-      return res.status(403).json({ message: "No puedes crear información para un mandante no asignado." });
-    }
+    if (!isAdmin(session)) return res.status(403).json({ message: "Solo un administrador puede crear mandantes." });
+
+    const data = mandanteData(req.body);
 
     if (!data.name) {
       return res.status(400).json({ message: "Nombre de mandante requerido" });
@@ -110,11 +95,12 @@ mandantesRouter.post("/", async (req, res, next) => {
 
 mandantesRouter.put("/:id", async (req, res, next) => {
   try {
-    const data = mandanteData(req.body);
     const session = parseSession(req);
-    if (session && !isAdmin(session) && !sessionCanUseMandante(session, req.params.id, data.name)) {
-      return res.status(403).json({ message: "No puedes modificar un mandante no asignado." });
-    }
+    const existing = await prisma.mandante.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ message: "Mandante no encontrado" });
+    if (!ensureMandanteAccess(req as any, existing, res)) return;
+
+    const data = mandanteData(req.body);
 
     if (!data.name) {
       return res.status(400).json({ message: "Nombre de mandante requerido" });
@@ -143,8 +129,6 @@ mandantesRouter.put("/:id", async (req, res, next) => {
 mandantesRouter.delete("/:id", async (req, res) => {
   try {
     const mandanteId = req.params.id;
-    const session = parseSession(req);
-    if (session && !isAdmin(session)) return res.status(403).json({ message: "Solo un administrador puede eliminar mandantes." });
     const force = String(req.query.force || "").toLowerCase() === "true";
 
     const mandante = await prisma.mandante.findUnique({

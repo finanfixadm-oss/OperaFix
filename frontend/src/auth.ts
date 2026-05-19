@@ -7,6 +7,7 @@ export type CurrentUser = {
   role: UserRole | string;
   mandante_id?: string | null;
   mandante_name?: string | null;
+  assigned_mandantes?: { id: string; name: string }[];
   assigned_mandante_ids?: string[];
   assigned_mandante_names?: string[];
 };
@@ -24,9 +25,9 @@ export const MODULE_PERMISSIONS: Record<string, UserRole[]> = {
   portal: ["admin", "interno", "kam", "cliente"],
   ia: ["admin", "interno", "kam"],
   informes: ["admin", "interno", "kam", "cliente"],
-  cargaMasiva: ["admin", "interno"],
+  cargaMasiva: ["admin", "interno", "kam"],
   usuarios: ["admin"],
-  mandantes: ["admin", "interno"],
+  mandantes: ["admin", "interno", "kam"],
 };
 
 export function getCurrentUser(): CurrentUser | null {
