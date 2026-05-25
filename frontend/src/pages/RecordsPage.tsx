@@ -12,6 +12,7 @@ import RecordQuickFilters, { type RecordQuickFilterKey } from "../components/rec
 import RecordStatusBadge from "../components/records/RecordStatusBadge";
 import RecordsKanbanView from "../components/records/RecordsKanbanView";
 import RecordsAfpSummary, { type RecordsAfpSummaryGroup } from "../components/records/RecordsAfpSummary";
+import RecordColumnMenu from "../components/records/RecordColumnMenu";
 
 type MandanteOption = {
   id: string;
@@ -175,6 +176,7 @@ type RecordsScopedSettings = {
   quickSearch: string;
   visibleColumns: string[];
   columnOrder: string[];
+  pinnedColumns: string[];
   sort: RecordsSortState;
 };
 
@@ -227,20 +229,27 @@ function cleanRecordColumnOrder(fields: unknown) {
   return [...clean, ...missing];
 }
 
+function cleanPinnedColumns(fields: unknown) {
+  const allowed = new Set(recordColumns.map((column) => column.field));
+  if (!Array.isArray(fields)) return [];
+  return fields.filter((field) => typeof field === "string" && allowed.has(field));
+}
+
 function readRecordsScopedSettings(view: string): RecordsScopedSettings {
   try {
     const saved = localStorage.getItem(recordsScopedKey(view));
-    if (!saved) return { activeRules: [], quickSearch: "", visibleColumns: defaultRecordColumnFields, columnOrder: cleanRecordColumnOrder(null), sort: defaultRecordSort() };
+    if (!saved) return { activeRules: [], quickSearch: "", visibleColumns: defaultRecordColumnFields, columnOrder: cleanRecordColumnOrder(null), pinnedColumns: [], sort: defaultRecordSort() };
     const parsed = JSON.parse(saved);
     return {
       activeRules: Array.isArray(parsed?.activeRules) ? parsed.activeRules : [],
       quickSearch: typeof parsed?.quickSearch === "string" ? parsed.quickSearch : "",
       visibleColumns: cleanRecordColumns(parsed?.visibleColumns),
       columnOrder: cleanRecordColumnOrder(parsed?.columnOrder),
+      pinnedColumns: cleanPinnedColumns(parsed?.pinnedColumns),
       sort: cleanRecordSort(parsed?.sort),
     };
   } catch {
-    return { activeRules: [], quickSearch: "", visibleColumns: defaultRecordColumnFields, columnOrder: cleanRecordColumnOrder(null), sort: defaultRecordSort() };
+    return { activeRules: [], quickSearch: "", visibleColumns: defaultRecordColumnFields, columnOrder: cleanRecordColumnOrder(null), pinnedColumns: [], sort: defaultRecordSort() };
   }
 }
 
@@ -250,6 +259,7 @@ function saveRecordsScopedSettings(view: string, settings: RecordsScopedSettings
     quickSearch: settings.quickSearch || "",
     visibleColumns: cleanRecordColumns(settings.visibleColumns),
     columnOrder: cleanRecordColumnOrder(settings.columnOrder),
+    pinnedColumns: cleanPinnedColumns(settings.pinnedColumns),
     sort: cleanRecordSort(settings.sort),
   }));
 }
@@ -422,6 +432,7 @@ export default function RecordsPage() {
   const initialRecordsSettings = readRecordsScopedSettings("todos");
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => initialRecordsSettings.visibleColumns);
   const [columnOrder, setColumnOrder] = useState<string[]>(() => initialRecordsSettings.columnOrder);
+  const [pinnedColumns, setPinnedColumns] = useState<string[]>(() => initialRecordsSettings.pinnedColumns);
   const [sort, setSort] = useState<RecordsSortState>(() => initialRecordsSettings.sort);
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -482,16 +493,17 @@ export default function RecordsPage() {
   }, [selectedRecordId, rows]);
 
   useEffect(() => {
-    saveRecordsScopedSettings(activeView, { activeRules, quickSearch, visibleColumns, columnOrder, sort });
-  }, [activeView, activeRules, quickSearch, visibleColumns, columnOrder, sort]);
+    saveRecordsScopedSettings(activeView, { activeRules, quickSearch, visibleColumns, columnOrder, pinnedColumns, sort });
+  }, [activeView, activeRules, quickSearch, visibleColumns, columnOrder, pinnedColumns, sort]);
 
   function switchActiveView(nextView: string) {
-    saveRecordsScopedSettings(activeView, { activeRules, quickSearch, visibleColumns, columnOrder, sort });
+    saveRecordsScopedSettings(activeView, { activeRules, quickSearch, visibleColumns, columnOrder, pinnedColumns, sort });
     const nextSettings = readRecordsScopedSettings(nextView);
     setActiveRules(nextSettings.activeRules);
     setQuickSearch(nextSettings.quickSearch);
     setVisibleColumns(nextSettings.visibleColumns);
     setColumnOrder(nextSettings.columnOrder);
+    setPinnedColumns(nextSettings.pinnedColumns);
     setSort(nextSettings.sort);
     setActiveView(nextView);
   }
@@ -592,11 +604,17 @@ export default function RecordsPage() {
 
   const fields = recordFilterFields;
   const selectedColumns = useMemo(() => {
-    return columnOrder
-      .filter((field) => visibleColumns.includes(field))
+    const visibleSet = new Set(visibleColumns);
+    const pinnedSet = new Set(pinnedColumns.filter((field) => visibleSet.has(field)));
+    const orderedFields = [
+      ...pinnedColumns.filter((field) => visibleSet.has(field)),
+      ...columnOrder.filter((field) => visibleSet.has(field) && !pinnedSet.has(field)),
+    ];
+
+    return orderedFields
       .map((field) => recordColumns.find((column) => column.field === field))
       .filter(Boolean) as typeof recordColumns;
-  }, [visibleColumns, columnOrder]);
+  }, [visibleColumns, columnOrder, pinnedColumns]);
 
   function toggleColumn(field: string) {
     setVisibleColumns((prev) => prev.includes(field) ? prev.filter((item) => item !== field) : [...prev, field]);
@@ -638,11 +656,49 @@ export default function RecordsPage() {
   function resetColumns() {
     setVisibleColumns(defaultRecordColumnFields);
     setColumnOrder(cleanRecordColumnOrder(null));
+    setPinnedColumns([]);
   }
 
   function selectAllColumns() {
     setVisibleColumns(recordColumns.map((column) => column.field));
     setColumnOrder(cleanRecordColumnOrder(columnOrder));
+  }
+
+
+  function sortByColumn(field: string, direction: SortDirection) {
+    setSort({ field, direction });
+  }
+
+  function hideColumn(field: string) {
+    setVisibleColumns((prev) => prev.filter((item) => item !== field));
+    setPinnedColumns((prev) => prev.filter((item) => item !== field));
+  }
+
+  function togglePinnedColumn(field: string) {
+    setPinnedColumns((prev) => prev.includes(field) ? prev.filter((item) => item !== field) : [field, ...prev]);
+    setColumnOrder((prev) => {
+      const clean = cleanRecordColumnOrder(prev);
+      return [field, ...clean.filter((item) => item !== field)];
+    });
+  }
+
+  function filterByColumn(column: (typeof recordColumns)[number]) {
+    const value = window.prompt(`Filtrar ${column.label} por:`);
+    if (value === null) return;
+    const cleanValue = value.trim();
+    if (!cleanValue) return;
+
+    const nextRule: FilterRule = {
+      field: column.field,
+      label: column.label,
+      type: column.type,
+      enabled: true,
+      operator: column.type === "text" || column.type === "select" ? "contains" : "equals",
+      value: cleanValue,
+    };
+
+    setActiveRules((prev) => [...prev.filter((rule) => rule.field !== column.field), nextRule]);
+    setFilterModalOpen(false);
   }
 
   const baseFilteredRows = useMemo(() => {
@@ -815,7 +871,24 @@ export default function RecordsPage() {
                 <tr>
                   <th className="records-sticky-check"><input type="checkbox" checked={allVisibleSelected} onChange={(e) => toggleAllVisible(e.target.checked)} /></th>
                   <th>Prioridad</th>
-                  {selectedColumns.map((column) => <th key={column.field}>{column.label}</th>)}
+                  {selectedColumns.map((column) => (
+                    <th key={column.field} className={pinnedColumns.includes(column.field) ? "records-pinned-column-heading" : ""}>
+                      <div className="records-column-heading-inner">
+                        <span>{column.label}</span>
+                        {sort.field === column.field && <em>{sort.direction === "asc" ? "↑" : "↓"}</em>}
+                        {pinnedColumns.includes(column.field) && <strong title="Columna fijada">Fijada</strong>}
+                        <RecordColumnMenu
+                          column={column}
+                          isPinned={pinnedColumns.includes(column.field)}
+                          sortDirection={sort.field === column.field ? sort.direction : undefined}
+                          onSort={(direction) => sortByColumn(column.field, direction)}
+                          onPin={() => togglePinnedColumn(column.field)}
+                          onFilter={() => filterByColumn(column)}
+                          onHide={() => hideColumn(column.field)}
+                        />
+                      </div>
+                    </th>
+                  ))}
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -833,7 +906,7 @@ export default function RecordsPage() {
                         const isStatus = column.field === "estado_gestion";
                         const isMoney = column.money;
                         return (
-                          <td key={`${row.id}-${column.field}`} className={isMoney ? "records-money-cell" : ""}>
+                          <td key={`${row.id}-${column.field}`} className={(isMoney ? "records-money-cell " : "") + (pinnedColumns.includes(column.field) ? "records-pinned-column-cell" : "")}>
                             {isStatus ? <RecordStatusBadge status={String(value || "")} /> : formatCellValue(value, column)}
                           </td>
                         );
