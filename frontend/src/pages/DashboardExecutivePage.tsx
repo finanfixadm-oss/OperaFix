@@ -125,6 +125,105 @@ function daysSince(value?: string | null) {
   return Math.floor((Date.now() - date.getTime()) / 86400000);
 }
 
+
+const MONTH_ALIASES: Record<string, number> = {
+  enero: 1, ene: 1,
+  febrero: 2, feb: 2,
+  marzo: 3, mar: 3,
+  abril: 4, abr: 4,
+  mayo: 5, may: 5,
+  junio: 6, jun: 6,
+  julio: 7, jul: 7,
+  agosto: 8, ago: 8,
+  septiembre: 9, setiembre: 9, sep: 9, sept: 9,
+  octubre: 10, oct: 10,
+  noviembre: 11, nov: 11,
+  diciembre: 12, dic: 12,
+};
+
+function monthKey(year: number, month: number) {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function addMonthsToKey(key: string, amount: number) {
+  const [yearRaw, monthRaw] = key.split("-").map(Number);
+  const date = new Date(yearRaw, (monthRaw || 1) - 1 + amount, 1);
+  return monthKey(date.getFullYear(), date.getMonth() + 1);
+}
+
+function currentOperationalMonthKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  return date.getDate() > 25 ? addMonthsToKey(monthKey(year, month), 1) : monthKey(year, month);
+}
+
+function parseDashboardMonth(value: unknown, fallbackYear = 2026): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+
+  const normalized = raw
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/_/g, " ")
+    .trim();
+
+  const compact = normalized.replace(/[^a-z0-9]/g, "");
+  const yyyymm = compact.match(/^(20\d{2})(0[1-9]|1[0-2])$/);
+  if (yyyymm) return `${yyyymm[1]}-${yyyymm[2]}`;
+
+  const mmyyyy = compact.match(/^(0[1-9]|1[0-2])(20\d{2})$/);
+  if (mmyyyy) return `${mmyyyy[2]}-${mmyyyy[1]}`;
+
+  const iso = normalized.match(/(20\d{2})\D+(0?[1-9]|1[0-2])/);
+  if (iso) return monthKey(Number(iso[1]), Number(iso[2]));
+
+  const cl = normalized.match(/(0?[1-9]|1[0-2])\D+(20\d{2})/);
+  if (cl) return monthKey(Number(cl[2]), Number(cl[1]));
+
+  for (const [name, month] of Object.entries(MONTH_ALIASES)) {
+    if (normalized.includes(name)) {
+      const yearMatch = normalized.match(/20\d{2}/);
+      const year = yearMatch ? Number(yearMatch[0]) : fallbackYear;
+      return monthKey(year, month);
+    }
+  }
+
+  return null;
+}
+
+function formatDashboardMonth(key: string) {
+  const [yearRaw, monthRaw] = key.split("-").map(Number);
+  const date = new Date(yearRaw, (monthRaw || 1) - 1, 1);
+  return new Intl.DateTimeFormat("es-CL", { month: "long", year: "numeric" }).format(date);
+}
+
+function statusIsClosedOrPaid(row: RecordItem) {
+  const status = stripAccents((row as any).estado_gestion ?? (row as any).management_status ?? "");
+  return status.includes("pag") || status.includes("cerr") || status.includes("factur");
+}
+
+function projectedMonthOf(row: RecordItem) {
+  return parseDashboardMonth(valueByDashboardField(row, "mes_ingreso_solicitud"));
+}
+
+function materializedMonthOf(row: RecordItem) {
+  return parseDashboardMonth(valueByDashboardField(row, "mes_produccion_2026"));
+}
+
+function dashboardRefundAmount(row: RecordItem) {
+  return numberValue(valueByDashboardField(row, "monto_devolucion"));
+}
+
+function dashboardPaidAmount(row: RecordItem) {
+  const paid = numberValue(valueByDashboardField(row, "monto_pagado"));
+  return paid > 0 ? paid : dashboardRefundAmount(row);
+}
+
+function groupCycleRows(rows: RecordItem[], keyGetter: (row: RecordItem) => string, amountGetter: (row: RecordItem) => number) {
+  return groupSum(rows, keyGetter, amountGetter).slice(0, 7);
+}
+
 function groupSum(rows: RecordItem[], keyGetter: (row: RecordItem) => string, amountGetter: (row: RecordItem) => number) {
   const map = new Map<string, { name: string; count: number; amount: number }>();
   rows.forEach((row) => {
@@ -654,6 +753,7 @@ export default function DashboardExecutivePage() {
   const [columnOrder, setColumnOrder] = useState<string[]>(() => initialDashboardSettings.columnOrder);
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [metaMensual, setMetaMensual] = useState(83000000);
+  const [selectedCycleMonth, setSelectedCycleMonth] = useState(() => currentOperationalMonthKey());
   const [panels, setPanels] = useState<PanelConfig[]>(() => readDashboardPanels("todos"));
   const [panelDraft, setPanelDraft] = useState<PanelDraft>(() => blankPanelDraft("todos"));
   const [, setDashboardFieldsVersion] = useState(0);
@@ -751,6 +851,53 @@ export default function DashboardExecutivePage() {
 
     return true;
   }), [rows, mandante, estado, tipo]);
+
+
+  const cycleMonthOptions = useMemo(() => {
+    const keys = new Set<string>([currentOperationalMonthKey(), selectedCycleMonth]);
+
+    rows.forEach((row) => {
+      const projected = projectedMonthOf(row);
+      const materialized = materializedMonthOf(row);
+      if (projected) keys.add(projected);
+      if (materialized) keys.add(materialized);
+    });
+
+    return Array.from(keys).sort((a, b) => b.localeCompare(a));
+  }, [rows, selectedCycleMonth]);
+
+  const cycleSummary = useMemo(() => {
+    const projectedRows = data.filter((row) => projectedMonthOf(row) === selectedCycleMonth);
+    const materializedRows = data.filter((row) => materializedMonthOf(row) === selectedCycleMonth && statusIsClosedOrPaid(row));
+    const materializedIds = new Set(materializedRows.map((row) => String(row.id)));
+    const carryRows = projectedRows.filter((row) => !materializedIds.has(String(row.id)));
+    const backlogRows = data.filter((row) => {
+      const projected = projectedMonthOf(row);
+      if (!projected || projected > selectedCycleMonth) return false;
+      const materialized = materializedMonthOf(row);
+      return !(statusIsClosedOrPaid(row) && materialized && materialized <= selectedCycleMonth);
+    });
+
+    const projectedAmount = projectedRows.reduce((sum, row) => sum + dashboardRefundAmount(row), 0);
+    const materializedAmount = materializedRows.reduce((sum, row) => sum + dashboardPaidAmount(row), 0);
+    const carryAmount = carryRows.reduce((sum, row) => sum + dashboardRefundAmount(row), 0);
+    const backlogAmount = backlogRows.reduce((sum, row) => sum + dashboardRefundAmount(row), 0);
+    const conversion = projectedAmount > 0 ? (materializedAmount / projectedAmount) * 100 : 0;
+
+    return {
+      projectedRows,
+      materializedRows,
+      carryRows,
+      backlogRows,
+      projectedAmount,
+      materializedAmount,
+      carryAmount,
+      backlogAmount,
+      conversion,
+      byProjectedAfp: groupCycleRows(projectedRows, (row) => keyText(valueByDashboardField(row, "entidad"), "Sin AFP"), dashboardRefundAmount),
+      byMaterializedAfp: groupCycleRows(materializedRows, (row) => keyText(valueByDashboardField(row, "entidad"), "Sin AFP"), dashboardPaidAmount),
+    };
+  }, [data, selectedCycleMonth]);
 
   const totalDevolucion = data.reduce((sum, row) => sum + numberValue(parseMoney(row.monto_devolucion)), 0);
   const totalFinanfix = data.reduce((sum, row) => sum + numberValue(parseMoney(row.monto_real_finanfix_solutions) || row.monto_finanfix_solutions), 0);
@@ -882,6 +1029,12 @@ export default function DashboardExecutivePage() {
           <option value="TP">Solo TP</option>
         </select>
         <label className="dashboard-goal-input">
+          <span>Mes cierre operacional</span>
+          <select className="zoho-select" value={selectedCycleMonth} onChange={(e) => setSelectedCycleMonth(e.target.value)}>
+            {cycleMonthOptions.map((key) => <option key={key} value={key}>{formatDashboardMonth(key)}</option>)}
+          </select>
+        </label>
+        <label className="dashboard-goal-input">
           <span>Meta mensual CLP</span>
           <input className="zoho-input" type="number" value={metaMensual} onChange={(e) => setMetaMensual(Number(e.target.value || 0))} />
         </label>
@@ -896,6 +1049,55 @@ export default function DashboardExecutivePage() {
           </div>
 
           <IntelligenceSummaryPanel mandante={mandante} />
+
+          <section className="dashboard-cycle-card">
+            <div className="dashboard-cycle-header">
+              <div>
+                <span className="dashboard-cycle-eyebrow">Cierre mensual día 25</span>
+                <h2>Proyección vs materialización — {formatDashboardMonth(selectedCycleMonth)}</h2>
+                <p><strong>Mes de ingreso solicitud</strong> representa lo proyectado. <strong>Mes de producción 2026</strong> representa lo materializado cuando el caso cambia a pagado/cerrado. El cierre operativo del mes finaliza el día 25.</p>
+              </div>
+              <div className="dashboard-cycle-close-badge">
+                <span>Cierre</span>
+                <strong>25</strong>
+                <small>{formatDashboardMonth(selectedCycleMonth)}</small>
+              </div>
+            </div>
+
+            <div className="dashboard-cycle-kpis">
+              <div className="dashboard-cycle-kpi is-projected">
+                <span>Proyectado ingreso solicitud</span>
+                <strong>{money(cycleSummary.projectedAmount)}</strong>
+                <small>{cycleSummary.projectedRows.length} gestiones ingresadas para el mes</small>
+              </div>
+              <div className="dashboard-cycle-kpi is-materialized">
+                <span>Materializado producción 2026</span>
+                <strong>{money(cycleSummary.materializedAmount)}</strong>
+                <small>{cycleSummary.materializedRows.length} gestiones pagadas/cerradas</small>
+              </div>
+              <div className="dashboard-cycle-kpi is-carry">
+                <span>Pasa al mes siguiente</span>
+                <strong>{money(cycleSummary.carryAmount)}</strong>
+                <small>{cycleSummary.carryRows.length} gestiones del mes sin materializar</small>
+              </div>
+              <div className="dashboard-cycle-kpi is-backlog">
+                <span>Arrastre acumulado</span>
+                <strong>{money(cycleSummary.backlogAmount)}</strong>
+                <small>{cycleSummary.backlogRows.length} gestiones proyectadas no cerradas</small>
+              </div>
+            </div>
+
+            <div className="dashboard-cycle-progress">
+              <div className="dashboard-cycle-progress-head"><strong>Conversión del mes</strong><span>{Math.min(100, cycleSummary.conversion).toFixed(1)}%</span></div>
+              <div className="dashboard-cycle-progress-track"><div style={{ width: `${Math.max(2, Math.min(100, cycleSummary.conversion))}%` }} /></div>
+              <p>Materializado sobre lo proyectado en el mes seleccionado.</p>
+            </div>
+
+            <div className="dashboard-cycle-grid">
+              <CycleRanking title="Proyección por AFP" rows={cycleSummary.byProjectedAfp} />
+              <CycleRanking title="Materializado por AFP" rows={cycleSummary.byMaterializedAfp} />
+            </div>
+          </section>
 
           {loading ? <div className="zoho-empty">Cargando dashboard...</div> : (
             <>
@@ -1127,6 +1329,25 @@ export default function DashboardExecutivePage() {
           })}
         </div>
       </ZohoModal>
+    </div>
+  );
+}
+
+
+function CycleRanking({ title, rows }: { title: string; rows: { name: string; count: number; amount: number }[] }) {
+  const max = Math.max(...rows.map((row) => row.amount), 1);
+  return (
+    <div className="dashboard-cycle-ranking">
+      <h3>{title}</h3>
+      {rows.length === 0 ? <div className="zoho-empty small">Sin información para este mes.</div> : rows.map((row) => (
+        <div className="dashboard-cycle-ranking-row" key={row.name}>
+          <div>
+            <strong>{row.name}</strong>
+            <span>{row.count} gestiones · {money(row.amount)}</span>
+          </div>
+          <div className="dashboard-cycle-ranking-bar"><div style={{ width: `${Math.max(5, (row.amount / max) * 100)}%` }} /></div>
+        </div>
+      ))}
     </div>
   );
 }

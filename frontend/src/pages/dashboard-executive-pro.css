@@ -1111,3 +1111,236 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ===================== CIERRE OPERACIONAL MES 25 ===================== */
+.dashboard-cycle-card {
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 20px;
+  padding: 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07);
+}
+
+.dashboard-cycle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.dashboard-cycle-eyebrow {
+  display: block;
+  color: #7c3aed;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+.dashboard-cycle-header h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 23px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.dashboard-cycle-header p {
+  margin: 7px 0 0;
+  color: #475569;
+  line-height: 1.45;
+  max-width: 980px;
+}
+
+.dashboard-cycle-close-badge {
+  min-width: 118px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  background: linear-gradient(135deg, #eef2ff, #ffffff);
+  border: 1px solid #c7d2fe;
+  border-radius: 18px;
+  padding: 12px;
+  color: #312e81;
+}
+
+.dashboard-cycle-close-badge span {
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.dashboard-cycle-close-badge strong {
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.dashboard-cycle-close-badge small {
+  color: #4f46e5;
+  font-size: 11px;
+  text-transform: capitalize;
+  text-align: center;
+}
+
+.dashboard-cycle-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.dashboard-cycle-kpi {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 15px;
+  background: #f8fafc;
+  min-height: 112px;
+  box-shadow: inset 0 4px 0 #cbd5e1;
+}
+
+.dashboard-cycle-kpi span {
+  display: block;
+  font-size: 11px;
+  font-weight: 900;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+.dashboard-cycle-kpi strong {
+  display: block;
+  color: #0f172a;
+  font-size: 23px;
+  font-weight: 950;
+  letter-spacing: -0.03em;
+}
+
+.dashboard-cycle-kpi small {
+  display: block;
+  color: #64748b;
+  margin-top: 5px;
+  font-size: 12px;
+}
+
+.dashboard-cycle-kpi.is-projected { box-shadow: inset 0 4px 0 #2563eb; }
+.dashboard-cycle-kpi.is-materialized { box-shadow: inset 0 4px 0 #16a34a; }
+.dashboard-cycle-kpi.is-carry { box-shadow: inset 0 4px 0 #f59e0b; }
+.dashboard-cycle-kpi.is-backlog { box-shadow: inset 0 4px 0 #ef4444; }
+
+.dashboard-cycle-progress {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.dashboard-cycle-progress-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.dashboard-cycle-progress-head strong {
+  color: #0f172a;
+  font-weight: 900;
+}
+
+.dashboard-cycle-progress-head span {
+  color: #16a34a;
+  font-weight: 950;
+}
+
+.dashboard-cycle-progress-track {
+  height: 10px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.dashboard-cycle-progress-track > div {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #16a34a);
+}
+
+.dashboard-cycle-progress p {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.dashboard-cycle-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.dashboard-cycle-ranking {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.dashboard-cycle-ranking h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.dashboard-cycle-ranking-row {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.dashboard-cycle-ranking-row strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.dashboard-cycle-ranking-row span {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.dashboard-cycle-ranking-bar {
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.dashboard-cycle-ranking-bar > div {
+  height: 100%;
+  background: linear-gradient(90deg, #4f46e5, #38bdf8);
+}
+
+@media (max-width: 1100px) {
+  .dashboard-cycle-kpis,
+  .dashboard-cycle-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .dashboard-cycle-header {
+    flex-direction: column;
+  }
+
+  .dashboard-cycle-kpis,
+  .dashboard-cycle-grid {
+    grid-template-columns: 1fr;
+  }
+}

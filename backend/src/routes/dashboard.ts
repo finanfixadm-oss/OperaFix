@@ -13,6 +13,8 @@ type DashboardRecord = {
   status: string;
   business_name: string;
   rut: string;
+  production_months: string;
+  request_entry_month: string;
   refund_amount: number;
   actual_paid_amount: number;
   client_amount: number;
@@ -79,6 +81,8 @@ function mapRow(row: any, type: "LM" | "TP"): DashboardRecord {
     status: text(row.management_status || row.estado_gestion, "Sin estado"),
     business_name: text(row.business_name || row.razon_social || row.company_name, "Sin razón social"),
     rut: text(row.rut || row.company_rut, ""),
+    production_months: text(row.production_months || row.mes_produccion_2026, ""),
+    request_entry_month: text(row.request_entry_month || row.mes_ingreso_solicitud, ""),
     refund_amount: moneyNumber(row.refund_amount ?? row.monto_devolucion),
     actual_paid_amount: moneyNumber(row.actual_paid_amount ?? row.monto_pagado),
     client_amount: moneyNumber(row.client_amount ?? row.monto_cliente),
@@ -154,8 +158,8 @@ type DashboardFieldDefinition = {
 const DASHBOARD_FIELDS: DashboardFieldDefinition[] = [
   { field: "mandante.name", label: "Mandante", type: "text", sourceTable: "normalized", sourceColumn: "mandante", groupable: true },
   { field: "management_type", label: "Tipo de gestión", type: "select", sourceTable: "normalized", sourceColumn: "management_type", groupable: true },
-  { field: "mes_produccion_2026", label: "Mes de producción", type: "text", sourceTable: "lm_records", sourceColumn: "production_months", groupable: true },
-  { field: "mes_ingreso_solicitud", label: "Mes ingreso solicitud", type: "text", sourceTable: "lm_records", sourceColumn: "request_entry_month", groupable: true },
+  { field: "mes_produccion_2026", label: "Mes de producción 2026 (materializado/pagado)", type: "text", sourceTable: "lm_records", sourceColumn: "production_months", groupable: true },
+  { field: "mes_ingreso_solicitud", label: "Mes de ingreso solicitud (proyección)", type: "text", sourceTable: "lm_records", sourceColumn: "request_entry_month", groupable: true },
   { field: "acceso_portal", label: "Acceso portal", type: "text", sourceTable: "lm_records", sourceColumn: "portal_access", groupable: true },
   { field: "envio_afp", label: "Envío AFP", type: "text", sourceTable: "lm_records", sourceColumn: "afp_shipment", groupable: true },
   { field: "estado_contrato_cliente", label: "Estado contrato cliente", type: "text", sourceTable: "lm_records", sourceColumn: "client_contract_status", groupable: true },
