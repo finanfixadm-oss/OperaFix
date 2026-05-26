@@ -6,7 +6,7 @@ import IntelligenceSummaryPanel from "../components/intelligence/IntelligenceSum
 import "./dashboard-executive-pro.css";
 import type { FilterRule } from "../types";
 import type { RecordItem } from "../types-records";
-import { defaultRecordColumnFields, formatCellValue, getValueByPath, recordColumns, type RecordColumnDefinition } from "../utils-record-fields";
+import { defaultRecordColumnFields, formatCellValue, getValueByPath, recordColumns as baseRecordColumns, type RecordColumnDefinition } from "../utils-record-fields";
 
 import { parseMoney } from "../utils/number";
 function money(value: number) {
@@ -151,9 +151,57 @@ const moneyFieldAliases = new Set([
   "fee",
 ]);
 
-const numericColumns = recordColumns.filter((column) => column.type === "number" || column.money || moneyFieldAliases.has(column.field));
-const dateColumns = recordColumns.filter((column) => column.type === "date");
-const dimensionColumns = recordColumns.filter((column) => column.type !== "number" || !moneyFieldAliases.has(column.field));
+type DashboardFieldDefinition = {
+  field: string;
+  label: string;
+  type: "text" | "number" | "date" | "boolean" | "select";
+  money?: boolean;
+  sourceTable?: string;
+  sourceColumn?: string;
+  groupable?: boolean;
+  measurable?: boolean;
+};
+
+function valueByDashboardField(row: RecordItem, field: string) {
+  if (field === "documents") return (row as any).documents?.length || (row as any).documents_count || 0;
+  return getValueByPath(row, field);
+}
+
+function mergeDashboardColumns(apiFields: DashboardFieldDefinition[] = []) {
+  const map = new Map<string, RecordColumnDefinition>();
+
+  for (const column of baseRecordColumns) {
+    map.set(column.field, column);
+  }
+
+  for (const field of apiFields) {
+    const current = map.get(field.field);
+    map.set(field.field, {
+      field: field.field,
+      label: field.label,
+      type: field.type,
+      money: field.money,
+      defaultVisible: current?.defaultVisible,
+      width: current?.width,
+      options: current?.options,
+      value: current?.value || ((row: RecordItem) => valueByDashboardField(row, field.field)),
+    });
+  }
+
+  return Array.from(map.values());
+}
+
+let dashboardColumns = mergeDashboardColumns([]);
+let numericColumns = dashboardColumns.filter((column) => column.type === "number" || column.money || moneyFieldAliases.has(column.field));
+let dateColumns = dashboardColumns.filter((column) => column.type === "date");
+let dimensionColumns = dashboardColumns.filter((column) => column.type !== "number" || !moneyFieldAliases.has(column.field));
+
+function applyDashboardFields(apiFields: DashboardFieldDefinition[]) {
+  dashboardColumns = mergeDashboardColumns(apiFields);
+  numericColumns = dashboardColumns.filter((column) => column.type === "number" || column.money || moneyFieldAliases.has(column.field));
+  dateColumns = dashboardColumns.filter((column) => column.type === "date");
+  dimensionColumns = dashboardColumns.filter((column) => column.type !== "number" || !moneyFieldAliases.has(column.field));
+}
 
 const defaultPanels: PanelConfig[] = [
   {
@@ -201,12 +249,12 @@ function dashboardPanelsKey(mandante: string) {
 
 function cleanDashboardColumns(fields: unknown) {
   if (!Array.isArray(fields)) return defaultRecordColumnFields;
-  const clean = fields.filter((field) => typeof field === "string" && recordColumns.some((column) => column.field === field));
+  const clean = fields.filter((field) => typeof field === "string" && dashboardColumns.some((column) => column.field === field));
   return clean.length ? clean : defaultRecordColumnFields;
 }
 
 function cleanDashboardColumnOrder(fields: unknown) {
-  const allFields = recordColumns.map((column) => column.field);
+  const allFields = dashboardColumns.map((column) => column.field);
   if (!Array.isArray(fields)) return allFields;
   const clean = fields.filter((field) => typeof field === "string" && allFields.includes(field));
   const missing = allFields.filter((field) => !clean.includes(field));
@@ -241,20 +289,20 @@ function saveDashboardScopedSettings(mandante: string, settings: DashboardScoped
 function normalizeMetric(raw: any): PanelMetricConfig {
   if (raw && typeof raw === "object" && raw.aggregation) {
     const aggregation: MetricAggregation = ["count", "sum", "avg", "min", "max"].includes(raw.aggregation) ? raw.aggregation : "count";
-    const field = typeof raw.field === "string" && recordColumns.some((column) => column.field === raw.field) ? raw.field : undefined;
+    const field = typeof raw.field === "string" && dashboardColumns.some((column) => column.field === raw.field) ? raw.field : undefined;
     return aggregation === "count" ? { aggregation: "count" } : { aggregation, field: field || "monto_devolucion" };
   }
 
   if (typeof raw === "string") {
     if (raw === "count") return { aggregation: "count" };
-    if (recordColumns.some((column) => column.field === raw)) return { aggregation: "sum", field: raw };
+    if (dashboardColumns.some((column) => column.field === raw)) return { aggregation: "sum", field: raw };
   }
 
   return { aggregation: "count" };
 }
 
 function normalizeGroupFields(raw: any): PanelGroupField[] {
-  const allowedFields = new Set(recordColumns.map((column) => column.field));
+  const allowedFields = new Set(dashboardColumns.map((column) => column.field));
   if (!Array.isArray(raw)) return [];
   return raw
     .map((item, index) => {
@@ -270,7 +318,7 @@ function normalizeGroupFields(raw: any): PanelGroupField[] {
 }
 
 function normalizeFilters(raw: any): PanelFilter[] {
-  const allowedFields = new Set(recordColumns.map((column) => column.field));
+  const allowedFields = new Set(dashboardColumns.map((column) => column.field));
   if (!Array.isArray(raw)) return [];
   return raw
     .map((rule) => ({
@@ -311,7 +359,7 @@ function saveDashboardPanels(mandante: string, panels: PanelConfig[]) {
 }
 
 function fieldLabel(field: string) {
-  return recordColumns.find((column) => column.field === field)?.label || field;
+  return dashboardColumns.find((column) => column.field === field)?.label || field;
 }
 
 function fieldLongLabel(field: string) {
@@ -326,7 +374,7 @@ function metricLabel(metric: PanelMetricConfig) {
 
 function metricIsMoney(metric: PanelMetricConfig) {
   if (metric.aggregation === "count") return false;
-  const column = recordColumns.find((item) => item.field === metric.field);
+  const column = dashboardColumns.find((item) => item.field === metric.field);
   return Boolean(column?.money || moneyFieldAliases.has(metric.field || ""));
 }
 
@@ -335,7 +383,7 @@ function formatMetric(value: number, metric: PanelMetricConfig) {
 }
 
 function getColumnValue(row: RecordItem, field: string) {
-  const column = recordColumns.find((item) => item.field === field);
+  const column = dashboardColumns.find((item) => item.field === field);
   if (column) return column.value(row);
   return getValueByPath(row, field);
 }
@@ -351,7 +399,7 @@ function datePartValue(value: unknown, part?: DatePart) {
 }
 
 function formatGroupValue(row: RecordItem, group: PanelGroupField) {
-  const column = recordColumns.find((item) => item.field === group.field);
+  const column = dashboardColumns.find((item) => item.field === group.field);
   const value = getColumnValue(row, group.field);
   const dateValue = datePartValue(value, group.datePart);
   if (dateValue) return dateValue;
@@ -480,6 +528,17 @@ export default function DashboardExecutivePage() {
   const [metaMensual, setMetaMensual] = useState(83000000);
   const [panels, setPanels] = useState<PanelConfig[]>(() => readDashboardPanels("todos"));
   const [panelDraft, setPanelDraft] = useState<PanelDraft>(() => blankPanelDraft("todos"));
+  const [, setDashboardFieldsVersion] = useState(0);
+
+  async function loadDashboardFields() {
+    try {
+      const fields = await fetchJson<DashboardFieldDefinition[]>("/dashboard/fields");
+      applyDashboardFields(fields);
+      setDashboardFieldsVersion((version) => version + 1);
+    } catch (error) {
+      console.warn("No se pudieron cargar campos reales del dashboard; se usará configuración local.", error);
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -493,7 +552,7 @@ export default function DashboardExecutivePage() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { loadDashboardFields(); load(); }, []);
 
   useEffect(() => {
     saveDashboardScopedSettings(mandante, { activeRules: [], quickSearch: "", visibleColumns, columnOrder });
@@ -518,7 +577,7 @@ export default function DashboardExecutivePage() {
   const selectedColumns = useMemo(() => {
     return columnOrder
       .filter((field) => visibleColumns.includes(field))
-      .map((field) => recordColumns.find((column) => column.field === field))
+      .map((field) => dashboardColumns.find((column) => column.field === field))
       .filter(Boolean) as RecordColumnDefinition[];
   }, [visibleColumns, columnOrder]);
 
@@ -528,7 +587,7 @@ export default function DashboardExecutivePage() {
 
   const orderedRecordColumns = useMemo(() => {
     return columnOrder
-      .map((field) => recordColumns.find((column) => column.field === field))
+      .map((field) => dashboardColumns.find((column) => column.field === field))
       .filter(Boolean) as RecordColumnDefinition[];
   }, [columnOrder]);
 
@@ -550,7 +609,7 @@ export default function DashboardExecutivePage() {
   function handleColumnDragOver(event: DragEvent<HTMLDivElement>) { event.preventDefault(); }
   function handleColumnDrop(targetField: string) { if (draggedColumn) reorderColumn(draggedColumn, targetField); setDraggedColumn(null); }
   function resetColumns() { setVisibleColumns(defaultRecordColumnFields); setColumnOrder(cleanDashboardColumnOrder(null)); }
-  function selectAllColumns() { setVisibleColumns(recordColumns.map((column) => column.field)); setColumnOrder(cleanDashboardColumnOrder(columnOrder)); }
+  function selectAllColumns() { setVisibleColumns(dashboardColumns.map((column) => column.field)); setColumnOrder(cleanDashboardColumnOrder(columnOrder)); }
 
   const data = useMemo(() => rows.filter((row) => {
     const rowMandante = keyText(row.mandante?.name || (row as any).mandante, "Sin mandante");
@@ -670,7 +729,7 @@ export default function DashboardExecutivePage() {
       <div className="zoho-module-header dashboard-hero-header">
         <div>
           <h1>Dashboard ejecutivo</h1>
-          <p>Constructor de paneles tipo Zoho: módulos, medidas, agrupamientos múltiples y criterios de filtro.</p>
+          <p>Constructor de paneles tipo Zoho con campos reales de la base de datos, métricas, agrupamientos y criterios dinámicos.</p>
         </div>
         <div className="zoho-module-actions">
           <button className="zoho-btn" onClick={() => exportCsv("operafix_dashboard.csv", data, selectedColumns)}>Exportar CSV</button>
@@ -705,7 +764,7 @@ export default function DashboardExecutivePage() {
       <div className="dashboard-advanced-layout dashboard-dashboard-layout-fixed dashboard-without-side-filters">
         <div className="dashboard-main-workspace">
           <div className="dashboard-filter-help">
-            <strong>Constructor de paneles:</strong> crea componentes como los de Zoho seleccionando el módulo, una medida, varios agrupamientos y filtros con patrón <strong>{"((1 y 2) y 3)"}</strong>.
+            <strong>Constructor de paneles:</strong> crea componentes usando campos reales de Registros de empresas. Puedes seleccionar medidas, agrupamientos y filtros con patrón <strong>{"((1 y 2) y 3)"}</strong>.
           </div>
 
           <IntelligenceSummaryPanel mandante={mandante} />
@@ -880,7 +939,7 @@ export default function DashboardExecutivePage() {
                 <div className="panel-editor-row filter-criteria-row" key={rule.id}>
                   <span className="panel-index-badge">{index + 1}</span>
                   <select className="zoho-select" value={rule.field} onChange={(e) => updatePanelFilter(rule.id, { field: e.target.value })}>
-                    {recordColumns.map((column) => <option key={column.field} value={column.field}>{column.label}</option>)}
+                    {dashboardColumns.map((column) => <option key={column.field} value={column.field}>{column.label}</option>)}
                   </select>
                   <select className="zoho-select short" value={rule.operator} onChange={(e) => updatePanelFilter(rule.id, { operator: e.target.value as PanelOperator })}>
                     <option value="equals">es</option>

@@ -129,6 +129,75 @@ function groupBy(records: DashboardRecord[], key: keyof DashboardRecord) {
   return Array.from(map.values()).sort((a, b) => b.amount - a.amount || b.count - a.count);
 }
 
+
+type DashboardFieldDefinition = {
+  field: string;
+  label: string;
+  type: "text" | "number" | "date" | "boolean" | "select";
+  money?: boolean;
+  sourceTable?: "lm_records" | "tp_records" | "computed" | "normalized";
+  sourceColumn?: string;
+  groupable?: boolean;
+  measurable?: boolean;
+};
+
+const DASHBOARD_FIELDS: DashboardFieldDefinition[] = [
+  { field: "mandante.name", label: "Mandante", type: "text", sourceTable: "normalized", sourceColumn: "mandante", groupable: true },
+  { field: "management_type", label: "Tipo de gestión", type: "select", sourceTable: "normalized", sourceColumn: "management_type", groupable: true },
+  { field: "mes_produccion_2026", label: "Mes de producción", type: "text", sourceTable: "lm_records", sourceColumn: "production_months", groupable: true },
+  { field: "mes_ingreso_solicitud", label: "Mes ingreso solicitud", type: "text", sourceTable: "lm_records", sourceColumn: "request_entry_month", groupable: true },
+  { field: "acceso_portal", label: "Acceso portal", type: "text", sourceTable: "lm_records", sourceColumn: "portal_access", groupable: true },
+  { field: "envio_afp", label: "Envío AFP", type: "text", sourceTable: "lm_records", sourceColumn: "afp_shipment", groupable: true },
+  { field: "estado_contrato_cliente", label: "Estado contrato cliente", type: "text", sourceTable: "lm_records", sourceColumn: "client_contract_status", groupable: true },
+  { field: "estado_gestion", label: "Estado Gestión", type: "text", sourceTable: "lm_records", sourceColumn: "management_status", groupable: true },
+  { field: "numero_solicitud", label: "N° Solicitud", type: "text", sourceTable: "lm_records", sourceColumn: "request_number", groupable: true },
+  { field: "motivo_rechazo", label: "Motivo rechazo/anulación", type: "text", sourceTable: "lm_records", sourceColumn: "rejection_reason", groupable: true },
+  { field: "fecha_rechazo", label: "Fecha rechazo", type: "date", sourceTable: "lm_records", sourceColumn: "rejection_date", groupable: true },
+  { field: "grupo_empresa", label: "Grupo empresa", type: "text", sourceTable: "lm_records", sourceColumn: "search_group", groupable: true },
+  { field: "owner_name", label: "Propietario", type: "text", sourceTable: "lm_records", sourceColumn: "owner_name", groupable: true },
+  { field: "razon_social", label: "Razón Social", type: "text", sourceTable: "lm_records", sourceColumn: "business_name", groupable: true },
+  { field: "rut", label: "RUT", type: "text", sourceTable: "lm_records", sourceColumn: "rut", groupable: true },
+  { field: "direccion", label: "Dirección", type: "text", sourceTable: "lm_records", sourceColumn: "direccion", groupable: true },
+  { field: "entidad", label: "Entidad / AFP", type: "text", sourceTable: "lm_records", sourceColumn: "entity", groupable: true },
+  { field: "banco", label: "Banco", type: "text", sourceTable: "lm_records", sourceColumn: "bank_name", groupable: true },
+  { field: "tipo_cuenta", label: "Tipo de Cuenta", type: "text", sourceTable: "lm_records", sourceColumn: "account_type", groupable: true },
+  { field: "numero_cuenta", label: "Número cuenta", type: "text", sourceTable: "lm_records", sourceColumn: "account_number", groupable: true },
+  { field: "confirmacion_cc", label: "Confirmación CC", type: "boolean", sourceTable: "lm_records", sourceColumn: "confirmation_cc", groupable: true },
+  { field: "confirmacion_poder", label: "Confirmación Poder", type: "boolean", sourceTable: "lm_records", sourceColumn: "confirmation_power", groupable: true },
+  { field: "consulta_cen", label: "Consulta CEN", type: "text", sourceTable: "lm_records", sourceColumn: "cen_query", groupable: true },
+  { field: "contenido_cen", label: "Contenido CEN", type: "text", sourceTable: "lm_records", sourceColumn: "cen_content", groupable: true },
+  { field: "respuesta_cen", label: "Respuesta CEN", type: "text", sourceTable: "lm_records", sourceColumn: "cen_response", groupable: true },
+  { field: "estado_trabajador", label: "Estado Trabajador", type: "text", sourceTable: "lm_records", sourceColumn: "worker_status", groupable: true },
+  { field: "motivo_tipo_exceso", label: "Motivo Tipo de exceso", type: "text", sourceTable: "lm_records", sourceColumn: "excess_type_reason", groupable: true },
+  { field: "monto_devolucion", label: "Monto Devolución", type: "number", money: true, sourceTable: "lm_records", sourceColumn: "refund_amount", measurable: true },
+  { field: "monto_pagado", label: "Monto Real Pagado", type: "number", money: true, sourceTable: "lm_records", sourceColumn: "actual_paid_amount", measurable: true },
+  { field: "monto_cliente", label: "Monto cliente", type: "number", money: true, sourceTable: "lm_records", sourceColumn: "client_amount", measurable: true },
+  { field: "monto_finanfix_solutions", label: "Monto Finanfix", type: "number", money: true, sourceTable: "lm_records", sourceColumn: "finanfix_amount", measurable: true },
+  { field: "monto_real_cliente", label: "Monto real cliente", type: "number", money: true, sourceTable: "lm_records", sourceColumn: "actual_client_amount", measurable: true },
+  { field: "monto_real_finanfix_solutions", label: "Monto real Finanfix Solutions", type: "number", money: true, sourceTable: "lm_records", sourceColumn: "actual_finanfix_amount", measurable: true },
+  { field: "fee", label: "FEE", type: "number", money: true, sourceTable: "lm_records", sourceColumn: "fee", measurable: true },
+  { field: "facturado_cliente", label: "Facturado cliente", type: "text", sourceTable: "lm_records", sourceColumn: "facturado_cliente", groupable: true },
+  { field: "facturado_finanfix", label: "Facturado Finanfix", type: "text", sourceTable: "lm_records", sourceColumn: "facturado_finanfix", groupable: true },
+  { field: "fecha_pago_afp", label: "Fecha Pago AFP", type: "date", sourceTable: "lm_records", sourceColumn: "afp_payment_date", groupable: true },
+  { field: "fecha_factura_finanfix", label: "Fecha Factura Finanfix", type: "date", sourceTable: "lm_records", sourceColumn: "finanfix_invoice_date", groupable: true },
+  { field: "fecha_pago_factura_finanfix", label: "Fecha pago factura Finanfix", type: "date", sourceTable: "lm_records", sourceColumn: "finanfix_invoice_payment_date", groupable: true },
+  { field: "fecha_notificacion_cliente", label: "Fecha notificación cliente", type: "date", sourceTable: "lm_records", sourceColumn: "client_notification_date", groupable: true },
+  { field: "fecha_presentacion_afp", label: "Fecha Presentación AFP", type: "date", sourceTable: "lm_records", sourceColumn: "afp_submission_date", groupable: true },
+  { field: "fecha_ingreso_afp", label: "Fecha ingreso AFP", type: "date", sourceTable: "lm_records", sourceColumn: "afp_entry_date", groupable: true },
+  { field: "numero_factura", label: "N° Factura", type: "text", sourceTable: "lm_records", sourceColumn: "invoice_number", groupable: true },
+  { field: "numero_oc", label: "N° OC", type: "text", sourceTable: "lm_records", sourceColumn: "oc_number", groupable: true },
+  { field: "comment", label: "Comentario", type: "text", sourceTable: "lm_records", sourceColumn: "comment", groupable: true },
+  { field: "documents", label: "Cantidad documentos", type: "number", sourceTable: "computed", sourceColumn: "documents_count", measurable: true },
+  { field: "created_at", label: "Fecha creación", type: "date", sourceTable: "lm_records", sourceColumn: "created_at", groupable: true },
+  { field: "updated_at", label: "Fecha actualización", type: "date", sourceTable: "lm_records", sourceColumn: "updated_at", groupable: true },
+  { field: "last_activity_at", label: "Última actividad", type: "date", sourceTable: "lm_records", sourceColumn: "last_activity_at", groupable: true },
+];
+
+router.get("/fields", (_req, res) => {
+  res.json(DASHBOARD_FIELDS);
+});
+
+
 router.get("/metrics", async (req, res) => {
   try {
     const records = filterRowsBySession(await loadRecords(), req as any);

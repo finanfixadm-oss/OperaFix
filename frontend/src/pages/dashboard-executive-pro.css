@@ -932,3 +932,182 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* =========================================================
+   V84 - Dashboard Builder Campos Reales DB
+   ========================================================= */
+
+.dashboard-page .dashboard-filter-help {
+  background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.08);
+}
+
+.dashboard-page .dashboard-builder-title p,
+.dashboard-page .custom-panel-header small,
+.dashboard-page .panel-preview-label {
+  color: #64748b;
+}
+
+.dashboard-page .panel-editor-block {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px;
+  margin-top: 12px;
+}
+
+.dashboard-page .panel-editor-block strong {
+  color: #0f172a;
+}
+
+.dashboard-page .panel-editor-row {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.dashboard-page .panel-editor-row .zoho-select,
+.dashboard-page .panel-editor-row .zoho-input {
+  min-width: 0;
+}
+
+.dashboard-page .panel-index-badge {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-radius: 999px;
+  font-weight: 900;
+  font-size: 12px;
+}
+
+.dashboard-page .criteria-pattern {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  color: #334155;
+}
+
+.dashboard-page .custom-dashboard-panel {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.dashboard-page .custom-dashboard-panel:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.11);
+}
+
+.dashboard-page .custom-kpi-big {
+  min-height: 150px;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  background: linear-gradient(135deg, #eff6ff, #ffffff);
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+}
+
+.dashboard-page .custom-kpi-big strong {
+  font-size: 34px;
+  letter-spacing: -0.04em;
+  color: #1d4ed8;
+}
+
+.dashboard-page .custom-kpi-big span {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.dashboard-page .custom-bar-chart {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboard-page .custom-bar-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.dashboard-page .custom-bar-label span {
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.dashboard-page .custom-bar-track {
+  height: 10px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.dashboard-page .custom-bar-track div {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #38bdf8);
+  border-radius: 999px;
+}
+
+.dashboard-page .custom-panel-records {
+  margin-top: 12px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 10px;
+}
+
+.dashboard-page .custom-panel-records summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: #1d4ed8;
+}
+
+.dashboard-page .custom-panel-record-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.dashboard-page .custom-panel-record-list button {
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 10px;
+  padding: 8px 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dashboard-page .custom-panel-table-scroll {
+  max-height: 340px;
+  overflow: auto;
+}
+
+.dashboard-page .custom-panel-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f8fafc;
+}
+
+.dashboard-page .custom-panel-total-row td {
+  font-weight: 900;
+  background: #f8fafc;
+}
+
+@media (max-width: 900px) {
+  .dashboard-page .panel-editor-row {
+    grid-template-columns: 1fr;
+  }
+}
