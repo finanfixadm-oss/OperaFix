@@ -151,22 +151,46 @@ function addMonthsToKey(key: string, amount: number) {
   return monthKey(date.getFullYear(), date.getMonth() + 1);
 }
 
-function currentOperationalMonthKey(closeDay = 25, date = new Date()) {
-  const safeCloseDay = Math.min(31, Math.max(1, Number(closeDay || 25)));
+function clampCloseDay(value: unknown) {
+  const n = Number(value || 25);
+  if (!Number.isFinite(n)) return 25;
+  return Math.min(31, Math.max(1, Math.trunc(n)));
+}
+
+function initialCloseDay() {
+  try {
+    return clampCloseDay(localStorage.getItem("operafix_dashboard_close_day") || "25");
+  } catch {
+    return 25;
+  }
+}
+
+function currentOperationalMonthKey(date = new Date(), closeDay = 25) {
   const year = date.getFullYear();
   const month = date.getMonth() + 1;
+  const safeCloseDay = clampCloseDay(closeDay);
   return date.getDate() > safeCloseDay ? addMonthsToKey(monthKey(year, month), 1) : monthKey(year, month);
 }
 
-function cycleStartDate(key: string, closeDay = 25) {
-  const previousKey = addMonthsToKey(key, -1);
-  const [yearRaw, monthRaw] = previousKey.split("-").map(Number);
-  return new Date(yearRaw, (monthRaw || 1) - 1, Math.min(31, Math.max(1, closeDay)) + 1);
+function cycleWindowForMonth(key: string, closeDay = 25) {
+  const [yearRaw, monthRaw] = key.split("-").map(Number);
+  const safeCloseDay = clampCloseDay(closeDay);
+  const end = new Date(yearRaw, (monthRaw || 1) - 1, safeCloseDay);
+  const previousMonth = addMonthsToKey(key, -1);
+  const [prevYear, prevMonth] = previousMonth.split("-").map(Number);
+  const start = new Date(prevYear, (prevMonth || 1) - 1, safeCloseDay + 1);
+  return { start, end };
 }
 
-function cycleEndDate(key: string, closeDay = 25) {
-  const [yearRaw, monthRaw] = key.split("-").map(Number);
-  return new Date(yearRaw, (monthRaw || 1) - 1, Math.min(31, Math.max(1, closeDay)));
+function formatShortDate(date: Date) {
+  return new Intl.DateTimeFormat("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
+}
+
+function daysUntil(date: Date) {
+  const today = new Date();
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const end = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  return Math.max(0, Math.ceil((end - start) / 86400000));
 }
 
 function parseDashboardMonth(value: unknown, fallbackYear = 2026): string | null {
@@ -273,7 +297,6 @@ type PanelFilter = { id: string; field: string; operator: PanelOperator; value: 
 type PanelChartType = "table" | "bar" | "pie" | "kpi";
 type MetricAggregation = "count" | "sum" | "avg" | "min" | "max";
 type DatePart = "none" | "year" | "month" | "day";
-type DashboardCycleDetailKey = "projected" | "materialized" | "carry" | "backlog";
 type PanelGroupField = { id: string; field: string; datePart?: DatePart };
 type PanelMetricConfig = { aggregation: MetricAggregation; field?: string };
 type PanelConfig = {
@@ -766,9 +789,8 @@ export default function DashboardExecutivePage() {
   const [columnOrder, setColumnOrder] = useState<string[]>(() => initialDashboardSettings.columnOrder);
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [metaMensual, setMetaMensual] = useState(83000000);
-  const [closeDay, setCloseDay] = useState(() => Number(localStorage.getItem("operafix_dashboard_close_day") || 25));
-  const [selectedCycleMonth, setSelectedCycleMonth] = useState(() => currentOperationalMonthKey(Number(localStorage.getItem("operafix_dashboard_close_day") || 25)));
-  const [cycleDetail, setCycleDetail] = useState<{ title: string; rows: RecordItem[] } | null>(null);
+  const [cycleCloseDay, setCycleCloseDay] = useState(() => initialCloseDay());
+  const [selectedCycleMonth, setSelectedCycleMonth] = useState(() => currentOperationalMonthKey(new Date(), initialCloseDay()));
   const [panels, setPanels] = useState<PanelConfig[]>(() => readDashboardPanels("todos"));
   const [panelDraft, setPanelDraft] = useState<PanelDraft>(() => blankPanelDraft("todos"));
   const [, setDashboardFieldsVersion] = useState(0);
@@ -796,6 +818,10 @@ export default function DashboardExecutivePage() {
   }
 
   useEffect(() => { loadDashboardFields(); load(); }, []);
+
+  useEffect(() => {
+    localStorage.setItem("operafix_dashboard_close_day", String(cycleCloseDay));
+  }, [cycleCloseDay]);
 
   useEffect(() => {
     saveDashboardScopedSettings(mandante, { activeRules: [], quickSearch: "", visibleColumns, columnOrder });
@@ -869,7 +895,7 @@ export default function DashboardExecutivePage() {
 
 
   const cycleMonthOptions = useMemo(() => {
-    const keys = new Set<string>([currentOperationalMonthKey(closeDay), selectedCycleMonth]);
+    const keys = new Set<string>([currentOperationalMonthKey(new Date(), cycleCloseDay), selectedCycleMonth]);
 
     rows.forEach((row) => {
       const projected = projectedMonthOf(row);
@@ -879,7 +905,7 @@ export default function DashboardExecutivePage() {
     });
 
     return Array.from(keys).sort((a, b) => b.localeCompare(a));
-  }, [rows, closeDay, selectedCycleMonth]);
+  }, [rows, selectedCycleMonth, cycleCloseDay]);
 
   const cycleSummary = useMemo(() => {
     const projectedRows = data.filter((row) => projectedMonthOf(row) === selectedCycleMonth);
@@ -914,19 +940,8 @@ export default function DashboardExecutivePage() {
     };
   }, [data, selectedCycleMonth]);
 
-  const cycleStart = cycleStartDate(selectedCycleMonth, closeDay);
-  const cycleEnd = cycleEndDate(selectedCycleMonth, closeDay);
-  const daysToClose = Math.ceil((cycleEnd.getTime() - Date.now()) / 86400000);
-
-  function openCycleDetail(kind: DashboardCycleDetailKey) {
-    const map: Record<DashboardCycleDetailKey, { title: string; rows: RecordItem[] }> = {
-      projected: { title: `Proyectado ingreso solicitud — ${formatDashboardMonth(selectedCycleMonth)}`, rows: cycleSummary.projectedRows },
-      materialized: { title: `Materializado producción 2026 — ${formatDashboardMonth(selectedCycleMonth)}`, rows: cycleSummary.materializedRows },
-      carry: { title: `Pasa al mes siguiente — ${formatDashboardMonth(selectedCycleMonth)}`, rows: cycleSummary.carryRows },
-      backlog: { title: `Arrastre acumulado hasta ${formatDashboardMonth(selectedCycleMonth)}`, rows: cycleSummary.backlogRows },
-    };
-    setCycleDetail(map[kind]);
-  }
+  const cycleWindow = useMemo(() => cycleWindowForMonth(selectedCycleMonth, cycleCloseDay), [selectedCycleMonth, cycleCloseDay]);
+  const cycleDaysRemaining = useMemo(() => daysUntil(cycleWindow.end), [cycleWindow]);
 
   const totalDevolucion = data.reduce((sum, row) => sum + numberValue(parseMoney(row.monto_devolucion)), 0);
   const totalFinanfix = data.reduce((sum, row) => sum + numberValue(parseMoney(row.monto_real_finanfix_solutions) || row.monto_finanfix_solutions), 0);
@@ -1058,16 +1073,6 @@ export default function DashboardExecutivePage() {
           <option value="TP">Solo TP</option>
         </select>
         <label className="dashboard-goal-input">
-          <span>Mes cierre operacional</span>
-          <select className="zoho-select" value={selectedCycleMonth} onChange={(e) => setSelectedCycleMonth(e.target.value)}>
-            {cycleMonthOptions.map((key) => <option key={key} value={key}>{formatDashboardMonth(key)}</option>)}
-          </select>
-        </label>
-        <label className="dashboard-goal-input dashboard-close-day-input">
-          <span>Día cierre</span>
-          <input className="zoho-input" type="number" min={1} max={31} value={closeDay} onChange={(e) => setCloseDay(Math.min(31, Math.max(1, Number(e.target.value || 25))))} />
-        </label>
-        <label className="dashboard-goal-input">
           <span>Meta mensual CLP</span>
           <input className="zoho-input" type="number" value={metaMensual} onChange={(e) => setMetaMensual(Number(e.target.value || 0))} />
         </label>
@@ -1084,40 +1089,54 @@ export default function DashboardExecutivePage() {
           <IntelligenceSummaryPanel mandante={mandante} />
 
           <section className="dashboard-cycle-card">
-            <div className="dashboard-cycle-header">
+            <div className="dashboard-cycle-header dashboard-cycle-header-configurable">
               <div>
                 <span className="dashboard-cycle-eyebrow">Cierre mensual configurable</span>
                 <h2>Proyección vs materialización — {formatDashboardMonth(selectedCycleMonth)}</h2>
-                <p><strong>Mes de ingreso solicitud</strong> representa lo proyectado. <strong>Mes de producción 2026</strong> representa lo materializado cuando el caso cambia a pagado/cerrado. Ciclo: {cycleStart.toLocaleDateString("es-CL")} al {cycleEnd.toLocaleDateString("es-CL")}.</p>
+                <p>
+                  <strong>Mes de ingreso solicitud</strong> representa lo proyectado. <strong>Mes de producción 2026</strong> representa lo materializado cuando el caso cambia a pagado/cerrado. Ciclo: <strong>{formatShortDate(cycleWindow.start)} al {formatShortDate(cycleWindow.end)}</strong>.
+                </p>
               </div>
-              <div className="dashboard-cycle-close-badge">
-                <span>Cierre</span>
-                <strong>{closeDay}</strong>
-                <small>{daysToClose >= 0 ? `${daysToClose} días` : "Cerrado"}</small>
+              <div className="dashboard-cycle-controls">
+                <label>
+                  <span>Mes cierre operacional</span>
+                  <select className="zoho-select" value={selectedCycleMonth} onChange={(e) => setSelectedCycleMonth(e.target.value)}>
+                    {cycleMonthOptions.map((key) => <option key={key} value={key}>{formatDashboardMonth(key)}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>Día cierre</span>
+                  <input className="zoho-input" type="number" min={1} max={31} value={cycleCloseDay} onChange={(e) => setCycleCloseDay(clampCloseDay(e.target.value))} />
+                </label>
+                <div className="dashboard-cycle-close-badge">
+                  <span>Cierre</span>
+                  <strong>{cycleCloseDay}</strong>
+                  <small>{cycleDaysRemaining} días</small>
+                </div>
               </div>
             </div>
 
             <div className="dashboard-cycle-kpis">
-              <button className="dashboard-cycle-kpi is-projected" onClick={() => openCycleDetail("projected")}>
+              <div className="dashboard-cycle-kpi is-projected">
                 <span>Proyectado ingreso solicitud</span>
                 <strong>{money(cycleSummary.projectedAmount)}</strong>
-                <small>{cycleSummary.projectedRows.length} gestiones ingresadas para el mes · ver registros</small>
-              </button>
-              <button className="dashboard-cycle-kpi is-materialized" onClick={() => openCycleDetail("materialized")}>
+                <small>{cycleSummary.projectedRows.length} gestiones ingresadas para el mes</small>
+              </div>
+              <div className="dashboard-cycle-kpi is-materialized">
                 <span>Materializado producción 2026</span>
                 <strong>{money(cycleSummary.materializedAmount)}</strong>
-                <small>{cycleSummary.materializedRows.length} gestiones pagadas/cerradas · ver registros</small>
-              </button>
-              <button className="dashboard-cycle-kpi is-carry" onClick={() => openCycleDetail("carry")}>
+                <small>{cycleSummary.materializedRows.length} gestiones pagadas/cerradas</small>
+              </div>
+              <div className="dashboard-cycle-kpi is-carry">
                 <span>Pasa al mes siguiente</span>
                 <strong>{money(cycleSummary.carryAmount)}</strong>
-                <small>{cycleSummary.carryRows.length} gestiones del mes sin materializar · ver registros</small>
-              </button>
-              <button className="dashboard-cycle-kpi is-backlog" onClick={() => openCycleDetail("backlog")}>
+                <small>{cycleSummary.carryRows.length} gestiones del mes sin materializar</small>
+              </div>
+              <div className="dashboard-cycle-kpi is-backlog">
                 <span>Arrastre acumulado</span>
                 <strong>{money(cycleSummary.backlogAmount)}</strong>
-                <small>{cycleSummary.backlogRows.length} gestiones proyectadas no cerradas · ver registros</small>
-              </button>
+                <small>{cycleSummary.backlogRows.length} gestiones proyectadas no cerradas</small>
+              </div>
             </div>
 
             <div className="dashboard-cycle-progress">
@@ -1366,69 +1385,6 @@ export default function DashboardExecutivePage() {
   );
 }
 
-
-
-function DashboardCycleDetailPanel({
-  detail,
-  onClose,
-  onOpenRecord,
-}: {
-  detail: { title: string; rows: RecordItem[] } | null;
-  onClose: () => void;
-  onOpenRecord: (id: string) => void;
-}) {
-  if (!detail) return null;
-
-  const total = detail.rows.reduce((sum, row) => sum + dashboardRefundAmount(row), 0);
-
-  const columns: RecordColumnDefinition[] = [
-    dashboardColumns.find((column) => column.field === "razon_social")!,
-    dashboardColumns.find((column) => column.field === "rut")!,
-    dashboardColumns.find((column) => column.field === "entidad")!,
-    dashboardColumns.find((column) => column.field === "estado_gestion")!,
-    dashboardColumns.find((column) => column.field === "mes_ingreso_solicitud")!,
-    dashboardColumns.find((column) => column.field === "mes_produccion_2026")!,
-    dashboardColumns.find((column) => column.field === "monto_devolucion")!,
-  ].filter(Boolean);
-
-  return (
-    <aside className="dashboard-cycle-detail-drawer">
-      <div className="dashboard-cycle-detail-backdrop" onClick={onClose} />
-      <section className="dashboard-cycle-detail-panel">
-        <header>
-          <div>
-            <span>Detalle de registros</span>
-            <h2>{detail.title}</h2>
-            <p>{detail.rows.length} registros · {money(total)}</p>
-          </div>
-          <button className="zoho-btn" onClick={onClose}>Cerrar</button>
-        </header>
-        <div className="dashboard-cycle-detail-actions">
-          <button className="zoho-btn zoho-btn-primary" onClick={() => exportCsv("dashboard_detalle_ciclo.csv", detail.rows, columns)}>Exportar detalle</button>
-        </div>
-        <div className="dashboard-cycle-detail-table-wrap">
-          <table className="dashboard-cycle-detail-table">
-            <thead>
-              <tr>{columns.map((column) => <th key={column.field}>{column.label}</th>)}<th>Acción</th></tr>
-            </thead>
-            <tbody>
-              {detail.rows.length === 0 ? (
-                <tr><td colSpan={columns.length + 1}>Sin registros para este indicador.</td></tr>
-              ) : (
-                detail.rows.map((row) => (
-                  <tr key={row.id}>
-                    {columns.map((column) => <td key={`${row.id}-${column.field}`}>{formatCellValue(column.value(row), column)}</td>)}
-                    <td><button className="zoho-small-btn" onClick={() => onOpenRecord(String(row.id))}>Abrir</button></td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </aside>
-  );
-}
 
 function CycleRanking({ title, rows }: { title: string; rows: { name: string; count: number; amount: number }[] }) {
   const max = Math.max(...rows.map((row) => row.amount), 1);

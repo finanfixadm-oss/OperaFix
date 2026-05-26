@@ -17,6 +17,21 @@ type EditState = {
   options?: Array<{ label: string; value: string }>;
 };
 
+const MONTH_OPTIONS = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+].map((month) => ({ label: month, value: month }));
+
 type EmailDraft = {
   to: string;
   cc?: string;
@@ -695,12 +710,12 @@ export default function RecordDetailPage() {
         </DetailSection>
 
         <DetailSection title="INFORMACIÓN DE GESTIÓN">
-          <EditableInfo label="Mes de producción 2026" value={record.mes_produccion_2026} field="mes_produccion_2026" onEdit={openEdit} />
+          <EditableInfo label="Mes de producción 2026" value={record.mes_produccion_2026} field="mes_produccion_2026" type="select" options={MONTH_OPTIONS} onEdit={openEdit} />
           <EditableInfo label="Motivo (Tipo de exceso)" value={record.motivo_tipo_exceso} field="motivo_tipo_exceso" onEdit={openEdit} />
           <EditableInfo label="Confirmación Poder" value={boolString(record.confirmacion_poder)} displayValue={valueOrDash(record.confirmacion_poder)} field="confirmacion_poder" type="select" options={[{label:"Sí", value:"true"}, {label:"No", value:"false"}]} onEdit={openEdit} />
           <EditableInfo label="Estado Gestión" value={record.estado_gestion} field="estado_gestion" type="select" options={["Pendiente Gestión","En preparación","Enviada AFP","Respondida AFP","Pagada","Facturada","Cerrada","Rechazada"].map(x => ({label:x,value:x}))} onEdit={openEdit} />
           <EditableInfo label="Consulta CEN" value={record.consulta_cen} field="consulta_cen" onEdit={openEdit} />
-          <EditableInfo label="Mes de ingreso solicitud" value={record.mes_ingreso_solicitud || record.mes_produccion_2026} field="mes_ingreso_solicitud" onEdit={openEdit} />
+          <EditableInfo label="Mes de ingreso solicitud" value={record.mes_ingreso_solicitud || record.mes_produccion_2026} field="mes_ingreso_solicitud" type="select" options={MONTH_OPTIONS} onEdit={openEdit} />
           <EditableInfo label="Envío AFP" value={record.envio_afp} field="envio_afp" type="select" options={["Pendiente","Enviado","Respondido","Rechazado"].map(x => ({label:x,value:x}))} onEdit={openEdit} />
           <EditableInfo label="Confirmación CC" value={boolString(record.confirmacion_cc)} displayValue={valueOrDash(record.confirmacion_cc)} field="confirmacion_cc" type="select" options={[{label:"Sí", value:"true"}, {label:"No", value:"false"}]} onEdit={openEdit} />
           <EditableInfo label="Fecha Presentación AFP" value={toDateInput(record.fecha_presentacion_afp)} displayValue={formatDate(record.fecha_presentacion_afp)} field="fecha_presentacion_afp" type="date" onEdit={openEdit} />

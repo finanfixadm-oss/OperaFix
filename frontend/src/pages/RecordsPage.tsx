@@ -119,6 +119,21 @@ const emptyForm: FormState = {
   comment: "",
 };
 
+const MONTH_OPTIONS = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+];
+
 function matchRule(value: unknown, rule: FilterRule) {
   const normalized = String(value ?? "").toLowerCase();
   const query = String(rule.value ?? "").toLowerCase();
@@ -1053,8 +1068,8 @@ export default function RecordsPage() {
 
         <FormSection title="1. Ingreso de caso">
           <Field label="Tipo"><select className="zoho-select" value={form.management_type} onChange={(e) => updateForm("management_type", e.target.value)}><option value="LM">LM</option><option value="TP">TP</option></select></Field>
-          <Field label="Mes de producción"><input className="zoho-input" value={form.mes_produccion_2026} onChange={(e) => updateForm("mes_produccion_2026", e.target.value)} /></Field>
-          <Field label="Mes de ingreso solicitud"><input className="zoho-input" value={form.mes_ingreso_solicitud} onChange={(e) => updateForm("mes_ingreso_solicitud", e.target.value)} /></Field>
+          <Field label="Mes de producción 2026"><SelectStatus value={form.mes_produccion_2026} onChange={(v) => updateForm("mes_produccion_2026", v)} options={MONTH_OPTIONS} /></Field>
+          <Field label="Mes de ingreso solicitud"><SelectStatus value={form.mes_ingreso_solicitud} onChange={(v) => updateForm("mes_ingreso_solicitud", v)} options={MONTH_OPTIONS} /></Field>
           <Field label="Acceso portal"><SelectYesNo value={form.acceso_portal} onChange={(v) => updateForm("acceso_portal", v)} /></Field>
           <Field label="Envío AFP"><SelectStatus value={form.envio_afp} onChange={(v) => updateForm("envio_afp", v)} options={["Pendiente", "Enviado", "Respondido", "Rechazado"]} /></Field>
           <Field label="Estado contrato con cliente"><SelectStatus value={form.estado_contrato_cliente} onChange={(v) => updateForm("estado_contrato_cliente", v)} options={["Vigente", "No vigente", "Pendiente"]} /></Field>
