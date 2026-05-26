@@ -14,8 +14,78 @@ function money(value: number) {
 }
 
 function numberValue(value: unknown) {
-  const n = Number(value || 0);
-  return Number.isFinite(n) ? n : 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+
+  const parsedMoney = parseMoney(value as any);
+  if (Number.isFinite(parsedMoney) && parsedMoney !== 0) return parsedMoney;
+
+  const parsed = Number(
+    String(value ?? "")
+      .replace(/\$/g, "")
+      .replace(/\./g, "")
+      .replace(/,/g, ".")
+      .replace(/[^0-9.-]/g, "")
+  );
+
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function firstValue(row: RecordItem, fields: string[]) {
+  for (const field of fields) {
+    const value = getValueByPath(row, field);
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return undefined;
+}
+
+function computedMoneyValue(row: RecordItem, field: string) {
+  const rowAny: any = row;
+
+  if (field === "monto_devolucion") {
+    return firstValue(row, ["monto_devolucion", "refund_amount"]);
+  }
+
+  if (field === "monto_pagado") {
+    return firstValue(row, ["monto_pagado", "actual_paid_amount", "monto_real_pagado"]);
+  }
+
+  if (field === "monto_cliente") {
+    return firstValue(row, ["monto_cliente", "client_amount"]);
+  }
+
+  if (field === "monto_finanfix_solutions") {
+    const direct = firstValue(row, ["monto_finanfix_solutions", "finanfix_amount"]);
+    if (direct !== undefined) return direct;
+
+    const refund = numberValue(rowAny.monto_devolucion ?? rowAny.refund_amount);
+    const fee = numberValue(rowAny.fee);
+    return refund && fee ? Math.round(refund * (fee / 100)) : 0;
+  }
+
+  if (field === "monto_real_cliente") {
+    const direct = firstValue(row, ["monto_real_cliente", "actual_client_amount"]);
+    if (numberValue(direct) > 0) return direct;
+
+    return firstValue(row, ["monto_cliente", "client_amount"]) ?? 0;
+  }
+
+  if (field === "monto_real_finanfix_solutions") {
+    const direct = firstValue(row, ["monto_real_finanfix_solutions", "actual_finanfix_amount"]);
+    if (numberValue(direct) > 0) return direct;
+
+    const estimated = firstValue(row, ["monto_finanfix_solutions", "finanfix_amount"]);
+    if (numberValue(estimated) > 0) return estimated;
+
+    const refund = numberValue(rowAny.monto_devolucion ?? rowAny.refund_amount);
+    const fee = numberValue(rowAny.fee);
+    return refund && fee ? Math.round(refund * (fee / 100)) : 0;
+  }
+
+  if (field === "fee") {
+    return firstValue(row, ["fee"]);
+  }
+
+  return undefined;
 }
 
 function keyText(value: unknown, fallback = "Sin información") {
@@ -163,8 +233,53 @@ type DashboardFieldDefinition = {
 };
 
 function valueByDashboardField(row: RecordItem, field: string) {
-  if (field === "documents") return (row as any).documents?.length || (row as any).documents_count || 0;
-  return getValueByPath(row, field);
+  const rowAny: any = row;
+
+  if (field === "documents") return rowAny.documents?.length || rowAny.documents_count || 0;
+
+  const moneyValue = computedMoneyValue(row, field);
+  if (moneyValue !== undefined) return moneyValue;
+
+  const aliases: Record<string, string[]> = {
+    "mandante.name": ["mandante.name", "mandante", "mandante_name"],
+    entidad: ["entidad", "entity", "lineAfp.afp_name"],
+    estado_gestion: ["estado_gestion", "management_status", "status"],
+    razon_social: ["razon_social", "business_name", "company.razon_social", "company_name"],
+    rut: ["rut", "company.rut", "company_rut"],
+    grupo_empresa: ["grupo_empresa", "search_group", "group.name"],
+    numero_solicitud: ["numero_solicitud", "request_number"],
+    mes_produccion_2026: ["mes_produccion_2026", "production_months"],
+    mes_ingreso_solicitud: ["mes_ingreso_solicitud", "request_entry_month"],
+    confirmacion_cc: ["confirmacion_cc", "confirmation_cc"],
+    confirmacion_poder: ["confirmacion_poder", "confirmation_power"],
+    envio_afp: ["envio_afp", "afp_shipment"],
+    estado_contrato_cliente: ["estado_contrato_cliente", "client_contract_status"],
+    motivo_tipo_exceso: ["motivo_tipo_exceso", "excess_type_reason"],
+    banco: ["banco", "bank_name"],
+    tipo_cuenta: ["tipo_cuenta", "account_type"],
+    numero_cuenta: ["numero_cuenta", "account_number"],
+    consulta_cen: ["consulta_cen", "cen_query"],
+    contenido_cen: ["contenido_cen", "cen_content"],
+    respuesta_cen: ["respuesta_cen", "cen_response"],
+    estado_trabajador: ["estado_trabajador", "worker_status"],
+    fecha_presentacion_afp: ["fecha_presentacion_afp", "afp_submission_date"],
+    fecha_ingreso_afp: ["fecha_ingreso_afp", "afp_entry_date"],
+    fecha_pago_afp: ["fecha_pago_afp", "afp_payment_date"],
+    fecha_factura_finanfix: ["fecha_factura_finanfix", "finanfix_invoice_date"],
+    fecha_pago_factura_finanfix: ["fecha_pago_factura_finanfix", "finanfix_invoice_payment_date"],
+    fecha_notificacion_cliente: ["fecha_notificacion_cliente", "client_notification_date"],
+    fecha_rechazo: ["fecha_rechazo", "rejection_date"],
+    motivo_rechazo: ["motivo_rechazo", "rejection_reason"],
+    numero_factura: ["numero_factura", "invoice_number"],
+    numero_oc: ["numero_oc", "oc_number"],
+    facturado_cliente: ["facturado_cliente"],
+    facturado_finanfix: ["facturado_finanfix"],
+    comment: ["comment"],
+  };
+
+  const value = firstValue(row, aliases[field] || [field]);
+
+  return value ?? getValueByPath(row, field);
 }
 
 function mergeDashboardColumns(apiFields: DashboardFieldDefinition[] = []) {
@@ -184,7 +299,11 @@ function mergeDashboardColumns(apiFields: DashboardFieldDefinition[] = []) {
       defaultVisible: current?.defaultVisible,
       width: current?.width,
       options: current?.options,
-      value: current?.value || ((row: RecordItem) => valueByDashboardField(row, field.field)),
+      value: (row: RecordItem) => {
+        const dynamicValue = valueByDashboardField(row, field.field);
+        if (dynamicValue !== undefined && dynamicValue !== null && dynamicValue !== "") return dynamicValue;
+        return current?.value ? current.value(row) : dynamicValue;
+      },
     });
   }
 
@@ -194,13 +313,13 @@ function mergeDashboardColumns(apiFields: DashboardFieldDefinition[] = []) {
 let dashboardColumns = mergeDashboardColumns([]);
 let numericColumns = dashboardColumns.filter((column) => column.type === "number" || column.money || moneyFieldAliases.has(column.field));
 let dateColumns = dashboardColumns.filter((column) => column.type === "date");
-let dimensionColumns = dashboardColumns.filter((column) => column.type !== "number" || !moneyFieldAliases.has(column.field));
+let dimensionColumns = dashboardColumns.filter((column) => column.type !== "number" && !column.money);
 
 function applyDashboardFields(apiFields: DashboardFieldDefinition[]) {
   dashboardColumns = mergeDashboardColumns(apiFields);
   numericColumns = dashboardColumns.filter((column) => column.type === "number" || column.money || moneyFieldAliases.has(column.field));
   dateColumns = dashboardColumns.filter((column) => column.type === "date");
-  dimensionColumns = dashboardColumns.filter((column) => column.type !== "number" || !moneyFieldAliases.has(column.field));
+  dimensionColumns = dashboardColumns.filter((column) => column.type !== "number" && !column.money);
 }
 
 const defaultPanels: PanelConfig[] = [
@@ -411,7 +530,16 @@ function formatGroupValue(row: RecordItem, group: PanelGroupField) {
 
 function rawMetricValue(row: RecordItem, metric: PanelMetricConfig) {
   if (metric.aggregation === "count") return 1;
-  return numberValue(getColumnValue(row, metric.field || "monto_devolucion"));
+
+  const field = metric.field || "monto_devolucion";
+  const column = dashboardColumns.find((item) => item.field === field);
+  const value = getColumnValue(row, field);
+
+  if (column?.money || moneyFieldAliases.has(field)) {
+    return numberValue(value);
+  }
+
+  return numberValue(value);
 }
 
 function aggregateMetric(values: number[], metric: PanelMetricConfig) {

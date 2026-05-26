@@ -15,6 +15,11 @@ type DashboardRecord = {
   rut: string;
   refund_amount: number;
   actual_paid_amount: number;
+  client_amount: number;
+  finanfix_amount: number;
+  actual_client_amount: number;
+  actual_finanfix_amount: number;
+  fee: number;
   confirmation_cc: boolean;
   confirmation_power: boolean;
   documents_count: number;
@@ -76,6 +81,11 @@ function mapRow(row: any, type: "LM" | "TP"): DashboardRecord {
     rut: text(row.rut || row.company_rut, ""),
     refund_amount: moneyNumber(row.refund_amount ?? row.monto_devolucion),
     actual_paid_amount: moneyNumber(row.actual_paid_amount ?? row.monto_pagado),
+    client_amount: moneyNumber(row.client_amount ?? row.monto_cliente),
+    finanfix_amount: moneyNumber(row.finanfix_amount ?? row.monto_finanfix_solutions),
+    actual_client_amount: moneyNumber(row.actual_client_amount ?? row.monto_real_cliente ?? row.client_amount ?? row.monto_cliente),
+    actual_finanfix_amount: moneyNumber(row.actual_finanfix_amount ?? row.monto_real_finanfix_solutions ?? row.finanfix_amount ?? row.monto_finanfix_solutions),
+    fee: moneyNumber(row.fee),
     confirmation_cc: bool(row.confirmation_cc ?? row.confirmacion_cc),
     confirmation_power: bool(row.confirmation_power ?? row.confirmacion_poder),
     documents_count: moneyNumber(row.documents_count),
