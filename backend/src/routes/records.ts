@@ -250,6 +250,7 @@ function legacyRowToRecord(row: any, managementType: "LM" | "TP") {
     acceso_portal: row.portal_access || row.acceso_portal || null,
     motivo_tipo_exceso: row.excess_type_reason || row.motivo_tipo_exceso || null,
     mes_produccion_2026: row.production_months || row.mes_produccion_2026 || null,
+    mes_ingreso_solicitud: row.request_entry_month || row.mes_ingreso_solicitud || null,
     estado_contrato_cliente: row.client_contract_status || row.estado_contrato_cliente || null,
     fecha_termino_contrato: row.contract_end_date || row.fecha_termino_contrato || null,
     fecha_rechazo: row.rejection_date || row.fecha_rechazo || null,
