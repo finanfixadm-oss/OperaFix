@@ -1344,3 +1344,121 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================================================
+   V87 - Dashboard ciclo operativo: cierre configurable + drill-down
+   ========================================================= */
+
+.dashboard-close-day-input {
+  max-width: 150px;
+}
+
+.dashboard-cycle-kpi {
+  border: 1px solid #dbe3ef;
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+button.dashboard-cycle-kpi:hover {
+  transform: translateY(-2px);
+  border-color: #93c5fd;
+  box-shadow: 0 16px 34px rgba(15, 23, 42, .12);
+}
+
+.dashboard-cycle-detail-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  pointer-events: auto;
+}
+
+.dashboard-cycle-detail-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, .36);
+}
+
+.dashboard-cycle-detail-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(980px, 92vw);
+  height: 100vh;
+  background: #ffffff;
+  border-left: 1px solid #dbe3ef;
+  box-shadow: -28px 0 70px rgba(15, 23, 42, .25);
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-cycle-detail-panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 20px 22px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.dashboard-cycle-detail-panel header span {
+  display: block;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 4px;
+}
+
+.dashboard-cycle-detail-panel header h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 22px;
+  font-weight: 950;
+  letter-spacing: -.04em;
+}
+
+.dashboard-cycle-detail-panel header p {
+  margin: 6px 0 0;
+  color: #64748b;
+}
+
+.dashboard-cycle-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 22px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.dashboard-cycle-detail-table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.dashboard-cycle-detail-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+}
+
+.dashboard-cycle-detail-table th,
+.dashboard-cycle-detail-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid #edf2f7;
+  text-align: left;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.dashboard-cycle-detail-table th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 900;
+}

@@ -3,6 +3,7 @@ import { publicBaseUrl, fetchJson } from "../api";
 import type { RecordItem } from "../types-records";
 
 type PortalView = "executive" | "cards" | "kanban" | "table";
+type PortalCycleDetailKey = "projected" | "materialized" | "carry" | "backlog";
 type QuickFilter =
   | "todos"
   | "listos"
@@ -152,6 +153,102 @@ function formatDate(value?: string | null) {
   return date.toLocaleDateString("es-CL");
 }
 
+const MONTH_ALIASES: Record<string, number> = {
+  enero: 1, ene: 1,
+  febrero: 2, feb: 2,
+  marzo: 3, mar: 3,
+  abril: 4, abr: 4,
+  mayo: 5, may: 5,
+  junio: 6, jun: 6,
+  julio: 7, jul: 7,
+  agosto: 8, ago: 8,
+  septiembre: 9, setiembre: 9, sep: 9, sept: 9,
+  octubre: 10, oct: 10,
+  noviembre: 11, nov: 11,
+  diciembre: 12, dic: 12,
+};
+
+function monthKey(year: number, month: number) {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function addMonthsToKey(key: string, amount: number) {
+  const [yearRaw, monthRaw] = key.split("-").map(Number);
+  const date = new Date(yearRaw, (monthRaw || 1) - 1 + amount, 1);
+  return monthKey(date.getFullYear(), date.getMonth() + 1);
+}
+
+function currentOperationalMonthKey(closeDay = 25, date = new Date()) {
+  const safeCloseDay = Math.min(31, Math.max(1, Number(closeDay || 25)));
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  return date.getDate() > safeCloseDay ? addMonthsToKey(monthKey(year, month), 1) : monthKey(year, month);
+}
+
+function parsePortalMonth(value: unknown, fallbackYear = 2026): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+
+  const normalized = raw
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/_/g, " ")
+    .trim();
+
+  const compact = normalized.replace(/[^a-z0-9]/g, "");
+  const yyyymm = compact.match(/^(20\d{2})(0[1-9]|1[0-2])$/);
+  if (yyyymm) return `${yyyymm[1]}-${yyyymm[2]}`;
+
+  const mmyyyy = compact.match(/^(0[1-9]|1[0-2])(20\d{2})$/);
+  if (mmyyyy) return `${mmyyyy[2]}-${mmyyyy[1]}`;
+
+  const iso = normalized.match(/(20\d{2})\D+(0?[1-9]|1[0-2])/);
+  if (iso) return monthKey(Number(iso[1]), Number(iso[2]));
+
+  const cl = normalized.match(/(0?[1-9]|1[0-2])\D+(20\d{2})/);
+  if (cl) return monthKey(Number(cl[2]), Number(cl[1]));
+
+  for (const [name, month] of Object.entries(MONTH_ALIASES)) {
+    if (normalized.includes(name)) {
+      const yearMatch = normalized.match(/20\d{2}/);
+      const year = yearMatch ? Number(yearMatch[0]) : fallbackYear;
+      return monthKey(year, month);
+    }
+  }
+
+  return null;
+}
+
+function formatPortalMonth(key: string) {
+  const [yearRaw, monthRaw] = key.split("-").map(Number);
+  const date = new Date(yearRaw, (monthRaw || 1) - 1, 1);
+  return new Intl.DateTimeFormat("es-CL", { month: "long", year: "numeric" }).format(date);
+}
+
+function cycleStartDate(key: string, closeDay = 25) {
+  const previousKey = addMonthsToKey(key, -1);
+  const [yearRaw, monthRaw] = previousKey.split("-").map(Number);
+  return new Date(yearRaw, (monthRaw || 1) - 1, Math.min(31, Math.max(1, closeDay)) + 1);
+}
+
+function cycleEndDate(key: string, closeDay = 25) {
+  const [yearRaw, monthRaw] = key.split("-").map(Number);
+  return new Date(yearRaw, (monthRaw || 1) - 1, Math.min(31, Math.max(1, closeDay)));
+}
+
+function projectedMonthOf(row: RecordItem) {
+  return parsePortalMonth((row as any).mes_ingreso_solicitud ?? (row as any).request_entry_month);
+}
+
+function materializedMonthOf(row: RecordItem) {
+  return parsePortalMonth((row as any).mes_produccion_2026 ?? (row as any).production_months);
+}
+
+function statusIsClosedOrPaid(row: RecordItem) {
+  return isPaid(row);
+}
+
 function stageIndex(status?: string | null) {
   const text = norm(status);
 
@@ -198,6 +295,8 @@ function exportCsv(filename: string, rows: RecordItem[]) {
     "Poder",
     "CC",
     "Tipo",
+    "Mes ingreso solicitud",
+    "Mes producción 2026",
     "Fecha Pago AFP",
     "Fecha notificación cliente",
     "Documentos",
@@ -216,6 +315,8 @@ function exportCsv(filename: string, rows: RecordItem[]) {
     bool(row.confirmacion_poder) ? "Sí" : "No",
     bool(row.confirmacion_cc) ? "Sí" : "No",
     safe(row.management_type || row.motivo_tipo_exceso, ""),
+    safe((row as any).mes_ingreso_solicitud, ""),
+    safe((row as any).mes_produccion_2026, ""),
     formatDate(row.fecha_pago_afp),
     formatDate(row.fecha_notificacion_cliente),
     String((row.documents || []).length),
@@ -356,6 +457,9 @@ export default function ClientPortalPage() {
   const [search, setSearch] = useState("");
   const [view, setView] = useState<PortalView>("executive");
   const [selectedRecord, setSelectedRecord] = useState<RecordItem | null>(null);
+  const [closeDay, setCloseDay] = useState(() => Number(localStorage.getItem("operafix_portal_close_day") || 25));
+  const [selectedCycleMonth, setSelectedCycleMonth] = useState(() => currentOperationalMonthKey(Number(localStorage.getItem("operafix_portal_close_day") || 25)));
+  const [cycleDetail, setCycleDetail] = useState<{ title: string; rows: RecordItem[] } | null>(null);
 
   async function load() {
     setLoading(true);
@@ -372,6 +476,10 @@ export default function ClientPortalPage() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("operafix_portal_close_day", String(closeDay));
+  }, [closeDay]);
 
   const user = useMemo(() => {
     try {
@@ -445,6 +553,67 @@ export default function ClientPortalPage() {
   const byAfp = useMemo(() => groupRows(visibleRows, rowEntity), [visibleRows]);
   const byStatus = useMemo(() => groupRows(visibleRows, rowStatus), [visibleRows]);
   const byMandante = useMemo(() => groupRows(visibleRows, rowMandante), [visibleRows]);
+
+
+  const cycleMonthOptions = useMemo(() => {
+    const keys = new Set<string>([currentOperationalMonthKey(closeDay), selectedCycleMonth]);
+
+    rows.forEach((row) => {
+      const projected = projectedMonthOf(row);
+      const materialized = materializedMonthOf(row);
+      if (projected) keys.add(projected);
+      if (materialized) keys.add(materialized);
+    });
+
+    return Array.from(keys).sort((a, b) => b.localeCompare(a));
+  }, [rows, closeDay, selectedCycleMonth]);
+
+  const cycleSummary = useMemo(() => {
+    const projectedRows = visibleRows.filter((row) => projectedMonthOf(row) === selectedCycleMonth);
+    const materializedRows = visibleRows.filter((row) => materializedMonthOf(row) === selectedCycleMonth && statusIsClosedOrPaid(row));
+    const materializedIds = new Set(materializedRows.map((row) => String(row.id)));
+    const carryRows = projectedRows.filter((row) => !materializedIds.has(String(row.id)));
+    const backlogRows = visibleRows.filter((row) => {
+      const projected = projectedMonthOf(row);
+      if (!projected || projected > selectedCycleMonth) return false;
+      const materialized = materializedMonthOf(row);
+      return !(statusIsClosedOrPaid(row) && materialized && materialized <= selectedCycleMonth);
+    });
+
+    const projectedAmount = projectedRows.reduce((sum, row) => sum + rowAmount(row), 0);
+    const materializedAmount = materializedRows.reduce((sum, row) => sum + (rowPaid(row) || rowAmount(row)), 0);
+    const carryAmount = carryRows.reduce((sum, row) => sum + rowAmount(row), 0);
+    const backlogAmount = backlogRows.reduce((sum, row) => sum + rowAmount(row), 0);
+    const conversion = projectedAmount > 0 ? (materializedAmount / projectedAmount) * 100 : 0;
+
+    return {
+      projectedRows,
+      materializedRows,
+      carryRows,
+      backlogRows,
+      projectedAmount,
+      materializedAmount,
+      carryAmount,
+      backlogAmount,
+      conversion,
+      byProjectedAfp: groupRows(projectedRows, rowEntity).slice(0, 8),
+      byMaterializedAfp: groupRows(materializedRows, rowEntity).slice(0, 8),
+    };
+  }, [visibleRows, selectedCycleMonth]);
+
+  const cycleStart = cycleStartDate(selectedCycleMonth, closeDay);
+  const cycleEnd = cycleEndDate(selectedCycleMonth, closeDay);
+  const daysToClose = Math.ceil((cycleEnd.getTime() - Date.now()) / 86400000);
+
+  function openCycleDetail(kind: PortalCycleDetailKey) {
+    const map: Record<PortalCycleDetailKey, { title: string; rows: RecordItem[] }> = {
+      projected: { title: `Proyectado ingreso solicitud — ${formatPortalMonth(selectedCycleMonth)}`, rows: cycleSummary.projectedRows },
+      materialized: { title: `Materializado producción 2026 — ${formatPortalMonth(selectedCycleMonth)}`, rows: cycleSummary.materializedRows },
+      carry: { title: `Pasa al mes siguiente — ${formatPortalMonth(selectedCycleMonth)}`, rows: cycleSummary.carryRows },
+      backlog: { title: `Arrastre acumulado hasta ${formatPortalMonth(selectedCycleMonth)}`, rows: cycleSummary.backlogRows },
+    };
+    setCycleDetail(map[kind]);
+  }
 
   const kanbanGroups = useMemo(() => {
     const stages = [
@@ -522,6 +691,30 @@ export default function ClientPortalPage() {
             ))}
           </select>
 
+          <select
+            className="zoho-select"
+            value={selectedCycleMonth}
+            onChange={(event) => setSelectedCycleMonth(event.target.value)}
+          >
+            {cycleMonthOptions.map((key) => (
+              <option key={key} value={key}>
+                Cierre {formatPortalMonth(key)}
+              </option>
+            ))}
+          </select>
+
+          <label className="portal-close-day-field">
+            <span>Día cierre</span>
+            <input
+              className="zoho-input"
+              type="number"
+              min={1}
+              max={31}
+              value={closeDay}
+              onChange={(event) => setCloseDay(Math.min(31, Math.max(1, Number(event.target.value || 25))))}
+            />
+          </label>
+
           <input
             className="zoho-input"
             placeholder="Buscar RUT, empresa, AFP o solicitud..."
@@ -553,6 +746,57 @@ export default function ClientPortalPage() {
         <PortalKpi title="Pagados/cerrados" value={totals.paidCount} helper="Casos con cierre positivo" />
         <PortalKpi title="Falta poder" value={totals.blockedPower} helper="Requieren acción legal/KAM" />
         <PortalKpi title="Falta CC" value={totals.blockedCc} helper="Requieren datos bancarios" />
+      </section>
+
+      <section className="portal-cycle-card">
+        <div className="portal-cycle-header">
+          <div>
+            <span className="portal-cycle-eyebrow">Calendario operacional cliente</span>
+            <h2>Proyección vs materialización — {formatPortalMonth(selectedCycleMonth)}</h2>
+            <p>
+              Ciclo desde {formatDate(cycleStart.toISOString())} hasta {formatDate(cycleEnd.toISOString())}.
+              El cierre se calcula con día {closeDay}. Mes de ingreso solicitud = proyección; Mes de producción 2026 = materialización.
+            </p>
+          </div>
+          <div className={`portal-cycle-status ${cycleSummary.conversion >= 90 ? "ok" : cycleSummary.conversion >= 60 ? "warn" : "risk"}`}>
+            <span>Conversión</span>
+            <strong>{Math.min(100, cycleSummary.conversion).toFixed(1)}%</strong>
+            <small>{daysToClose >= 0 ? `${daysToClose} días para cierre` : "Ciclo cerrado"}</small>
+          </div>
+        </div>
+
+        <div className="portal-cycle-kpis">
+          <button onClick={() => openCycleDetail("projected")}>
+            <span>Proyectado ingreso solicitud</span>
+            <strong>{money(cycleSummary.projectedAmount)}</strong>
+            <small>{cycleSummary.projectedRows.length} gestiones. Ver detalle</small>
+          </button>
+          <button onClick={() => openCycleDetail("materialized")}>
+            <span>Materializado producción 2026</span>
+            <strong>{money(cycleSummary.materializedAmount)}</strong>
+            <small>{cycleSummary.materializedRows.length} gestiones. Ver detalle</small>
+          </button>
+          <button onClick={() => openCycleDetail("carry")}>
+            <span>Pasa al mes siguiente</span>
+            <strong>{money(cycleSummary.carryAmount)}</strong>
+            <small>{cycleSummary.carryRows.length} gestiones. Ver detalle</small>
+          </button>
+          <button onClick={() => openCycleDetail("backlog")}>
+            <span>Arrastre acumulado</span>
+            <strong>{money(cycleSummary.backlogAmount)}</strong>
+            <small>{cycleSummary.backlogRows.length} gestiones. Ver detalle</small>
+          </button>
+        </div>
+
+        <div className="portal-cycle-progress">
+          <div><strong>Avance del ciclo</strong><span>{Math.min(100, cycleSummary.conversion).toFixed(1)}%</span></div>
+          <div className="portal-cycle-progress-track"><i style={{ width: `${Math.max(2, Math.min(100, cycleSummary.conversion))}%` }} /></div>
+        </div>
+
+        <div className="portal-cycle-rankings">
+          <PortalBarChart title="Proyección por AFP" rows={cycleSummary.byProjectedAfp} metric="amount" />
+          <PortalBarChart title="Materializado por AFP" rows={cycleSummary.byMaterializedAfp} metric="amount" />
+        </div>
       </section>
 
       <section className="portal-exec-filter-card">
@@ -710,8 +954,81 @@ export default function ClientPortalPage() {
         </>
       )}
 
+      <PortalCycleDetailPanel detail={cycleDetail} onClose={() => setCycleDetail(null)} onOpen={setSelectedRecord} />
       <PortalRecordDetail record={selectedRecord} onClose={() => setSelectedRecord(null)} />
     </div>
+  );
+}
+
+
+function PortalCycleDetailPanel({
+  detail,
+  onClose,
+  onOpen,
+}: {
+  detail: { title: string; rows: RecordItem[] } | null;
+  onClose: () => void;
+  onOpen: (record: RecordItem) => void;
+}) {
+  if (!detail) return null;
+
+  const total = detail.rows.reduce((sum, row) => sum + rowAmount(row), 0);
+
+  return (
+    <aside className="portal-cycle-detail-drawer">
+      <div className="portal-cycle-detail-backdrop" onClick={onClose} />
+      <section className="portal-cycle-detail-panel">
+        <header>
+          <div>
+            <span>Detalle de registros</span>
+            <h2>{detail.title}</h2>
+            <p>{detail.rows.length} registros · {money(total)}</p>
+          </div>
+          <button className="zoho-btn" onClick={onClose}>Cerrar</button>
+        </header>
+
+        <div className="portal-cycle-detail-actions">
+          <button className="zoho-btn zoho-btn-primary" onClick={() => exportCsv("portal_cliente_detalle_ciclo.csv", detail.rows)}>
+            Descargar Excel
+          </button>
+        </div>
+
+        <div className="portal-cycle-detail-table-wrap">
+          <table className="portal-cycle-detail-table">
+            <thead>
+              <tr>
+                <th>Razón Social</th>
+                <th>RUT</th>
+                <th>AFP</th>
+                <th>Estado</th>
+                <th>Mes ingreso solicitud</th>
+                <th>Mes producción 2026</th>
+                <th>Monto</th>
+                <th>Detalle</th>
+              </tr>
+            </thead>
+            <tbody>
+              {detail.rows.length === 0 ? (
+                <tr><td colSpan={8}>Sin registros para este indicador.</td></tr>
+              ) : (
+                detail.rows.map((row) => (
+                  <tr key={row.id}>
+                    <td>{rowCompany(row)}</td>
+                    <td>{rowRut(row)}</td>
+                    <td>{rowEntity(row)}</td>
+                    <td>{rowStatus(row)}</td>
+                    <td>{safe((row as any).mes_ingreso_solicitud)}</td>
+                    <td>{safe((row as any).mes_produccion_2026)}</td>
+                    <td>{money(rowAmount(row))}</td>
+                    <td><button className="zoho-small-btn" onClick={() => onOpen(row)}>Ver</button></td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </aside>
   );
 }
 
