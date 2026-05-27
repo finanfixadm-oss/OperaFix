@@ -239,6 +239,12 @@ function statusIsClosedOrPaid(row: RecordItem) {
   return status.includes("pag") || status.includes("cerr") || status.includes("factur");
 }
 
+function statusIsRejected(row: RecordItem) {
+  const status = stripAccents((row as any).estado_gestion ?? (row as any).management_status ?? "");
+  const reason = stripAccents((row as any).motivo_rechazo ?? (row as any).rejection_reason ?? "");
+  return status.includes("rechaz") || reason.includes("rechaz");
+}
+
 function projectedMonthOf(row: RecordItem) {
   return parseDashboardMonth(valueByDashboardField(row, "mes_ingreso_solicitud"));
 }
@@ -897,7 +903,7 @@ export default function DashboardExecutivePage() {
   const cycleMonthOptions = useMemo(() => {
     const keys = new Set<string>([currentOperationalMonthKey(new Date(), cycleCloseDay), selectedCycleMonth]);
 
-    rows.forEach((row) => {
+    rows.filter((row) => !statusIsRejected(row)).forEach((row) => {
       const projected = projectedMonthOf(row);
       const materialized = materializedMonthOf(row);
       if (projected) keys.add(projected);
@@ -908,11 +914,13 @@ export default function DashboardExecutivePage() {
   }, [rows, selectedCycleMonth, cycleCloseDay]);
 
   const cycleSummary = useMemo(() => {
-    const projectedRows = data.filter((row) => projectedMonthOf(row) === selectedCycleMonth);
-    const materializedRows = data.filter((row) => materializedMonthOf(row) === selectedCycleMonth && statusIsClosedOrPaid(row));
+    // Los rechazados no forman parte de la proyección, materialización, arrastre ni backlog.
+    const cycleBaseRows = data.filter((row) => !statusIsRejected(row));
+    const projectedRows = cycleBaseRows.filter((row) => projectedMonthOf(row) === selectedCycleMonth);
+    const materializedRows = cycleBaseRows.filter((row) => materializedMonthOf(row) === selectedCycleMonth && statusIsClosedOrPaid(row));
     const materializedIds = new Set(materializedRows.map((row) => String(row.id)));
     const carryRows = projectedRows.filter((row) => !materializedIds.has(String(row.id)));
-    const backlogRows = data.filter((row) => {
+    const backlogRows = cycleBaseRows.filter((row) => {
       const projected = projectedMonthOf(row);
       if (!projected || projected > selectedCycleMonth) return false;
       const materialized = materializedMonthOf(row);

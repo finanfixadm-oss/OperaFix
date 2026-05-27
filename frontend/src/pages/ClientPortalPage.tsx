@@ -582,7 +582,7 @@ export default function ClientPortalPage() {
   const cycleMonthOptions = useMemo(() => {
     const keys = new Set<string>([currentOperationalMonthKey(new Date(), cycleCloseDay), selectedCycleMonth]);
 
-    rows.forEach((row) => {
+    rows.filter((row) => !isRejected(row)).forEach((row) => {
       const projected = projectedMonthOf(row);
       const materialized = materializedMonthOf(row);
       if (projected) keys.add(projected);
@@ -596,11 +596,13 @@ export default function ClientPortalPage() {
   const cycleDaysRemaining = useMemo(() => daysUntil(cycleWindow.end), [cycleWindow]);
 
   const cycleSummary = useMemo(() => {
-    const projectedRows = visibleRows.filter((row) => projectedMonthOf(row) === selectedCycleMonth);
-    const materializedRows = visibleRows.filter((row) => materializedMonthOf(row) === selectedCycleMonth && isPaid(row));
+    // Los rechazados no forman parte de la proyección, materialización, arrastre ni backlog del ciclo.
+    const cycleBaseRows = visibleRows.filter((row) => !isRejected(row));
+    const projectedRows = cycleBaseRows.filter((row) => projectedMonthOf(row) === selectedCycleMonth);
+    const materializedRows = cycleBaseRows.filter((row) => materializedMonthOf(row) === selectedCycleMonth && isPaid(row));
     const materializedIds = new Set(materializedRows.map((row) => String(row.id)));
     const carryRows = projectedRows.filter((row) => !materializedIds.has(String(row.id)));
-    const backlogRows = visibleRows.filter((row) => {
+    const backlogRows = cycleBaseRows.filter((row) => {
       const projected = projectedMonthOf(row);
       if (!projected || projected > selectedCycleMonth) return false;
       const materialized = materializedMonthOf(row);

@@ -189,6 +189,7 @@ function normalizeLegacyRow(row: any, managementType: "LM" | "TP", body: any) {
     acceso_portal: nullableString(body.acceso_portal),
     motivo_tipo_exceso: nullableString(body.motivo_tipo_exceso),
     mes_produccion_2026: nullableString(body.mes_produccion_2026),
+    mes_ingreso_solicitud: nullableString(body.mes_ingreso_solicitud),
     mandante: body.mandante_name ? { name: nullableString(body.mandante_name) } : null,
     company: { razon_social: nullableString(body.razon_social), rut: nullableString(body.rut) },
     lineAfp: { afp_name: nullableString(body.entidad) },
