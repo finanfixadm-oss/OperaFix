@@ -5,7 +5,7 @@ type UserRow = {
   id: string;
   email: string;
   full_name: string;
-  role: "admin" | "interno" | "kam" | "cliente" | string;
+  role: "admin" | "interno" | "kam_admin" | "kam" | "cliente" | string;
   mandante_id?: string | null;
   mandante_name?: string | null;
   assigned_mandantes?: { id: string; name: string }[];
@@ -39,7 +39,8 @@ function roleLabel(role: string) {
   const labels: Record<string, string> = {
     admin: "Administrador",
     interno: "Interno",
-    kam: "KAM",
+    kam_admin: "KAM administrador",
+    kam: "KAM vendedor",
     cliente: "Cliente",
   };
 
@@ -88,7 +89,10 @@ export default function UsersPage() {
     }
   }, []);
 
-  const isAdmin = String(session?.role || "").toLowerCase() === "admin";
+  const sessionRole = String(session?.role || "").toLowerCase();
+  const isAdmin = sessionRole === "admin";
+  const isKamAdmin = sessionRole === "kam_admin";
+  const canManageUsers = isAdmin || isKamAdmin;
 
   async function load() {
     setLoading(true);
@@ -101,7 +105,7 @@ export default function UsersPage() {
       setUsers(userRows);
       setMandantes(mandanteRows);
     } catch (err: any) {
-      setError(err.message || "No se pudieron cargar los usuarios. Inicia sesión como admin.");
+      setError(err.message || "No se pudieron cargar los usuarios. Inicia sesión como administrador o KAM administrador.");
     } finally {
       setLoading(false);
     }
@@ -155,13 +159,18 @@ export default function UsersPage() {
   async function saveUser(e: FormEvent) {
     e.preventDefault();
 
-    if (!isAdmin) {
-      setError("Solo un administrador puede crear o modificar usuarios.");
+    if (!canManageUsers) {
+      setError("Solo un administrador o KAM administrador puede crear o modificar usuarios.");
+      return;
+    }
+
+    if (isKamAdmin && form.role !== "kam") {
+      setError("El KAM administrador solo puede crear o modificar usuarios KAM vendedor.");
       return;
     }
 
     if (form.role !== "admin" && form.assigned_mandante_ids.length === 0) {
-      setError("Debes asignar uno o más mandantes para usuarios internos, KAM o clientes.");
+      setError("Debes asignar uno o más mandantes para usuarios internos, KAM administrador, KAM vendedor o clientes.");
       return;
     }
 
@@ -183,9 +192,9 @@ export default function UsersPage() {
       full_name: form.full_name,
       email: form.email,
       password: form.password,
-      role: form.role,
+      role: isKamAdmin ? "kam" : form.role,
       active: form.active,
-      assigned_mandante_ids: form.role === "admin" ? [] : form.assigned_mandante_ids,
+      assigned_mandante_ids: (isKamAdmin ? "kam" : form.role) === "admin" ? [] : form.assigned_mandante_ids,
     };
 
     try {
@@ -208,8 +217,8 @@ export default function UsersPage() {
   }
 
   async function setUserActive(user: UserRow, active: boolean) {
-    if (!isAdmin) {
-      setError("Solo un administrador puede activar o desactivar usuarios.");
+    if (!canManageUsers) {
+      setError("Solo un administrador o KAM administrador puede activar o desactivar usuarios.");
       return;
     }
 
@@ -237,8 +246,8 @@ export default function UsersPage() {
   }
 
   async function deleteUser(user: UserRow) {
-    if (!isAdmin) {
-      setError("Solo un administrador puede eliminar usuarios.");
+    if (!canManageUsers) {
+      setError("Solo un administrador o KAM administrador puede eliminar usuarios.");
       return;
     }
 
@@ -276,8 +285,8 @@ export default function UsersPage() {
         <div>
           <h1>Control de usuarios</h1>
           <p>
-            Administra usuarios de OperaFix. Los internos y KAM pueden operar el CRM,
-            pero solo ven los mandantes asignados. Solo Admin puede crear, editar o eliminar usuarios.
+            Administra usuarios de OperaFix. Los internos, KAM administradores y KAM vendedores pueden operar el CRM,
+            pero solo ven los mandantes asignados. Admin administra todo; KAM administrador reparte mandantes/casos a KAM vendedores.
           </p>
         </div>
       </div>
@@ -285,9 +294,15 @@ export default function UsersPage() {
       {error && <div className="zoho-alert danger">{error}</div>}
       {success && <div className="zoho-alert success">{success}</div>}
 
-      {!isAdmin && (
+      {!canManageUsers && (
         <div className="zoho-alert warning">
           Tu rol no permite administrar usuarios. Puedes operar el CRM según tus mandantes asignados.
+        </div>
+      )}
+
+      {isKamAdmin && (
+        <div className="zoho-alert info">
+          Estás operando como KAM administrador: solo puedes crear, editar, activar o eliminar KAM vendedores y asignarles mandantes que estén dentro de tu propia cartera.
         </div>
       )}
 
@@ -311,7 +326,7 @@ export default function UsersPage() {
                 value={form.full_name}
                 onChange={(e) => setForm((prev) => ({ ...prev, full_name: e.target.value }))}
                 required
-                disabled={!isAdmin}
+                disabled={!canManageUsers}
               />
             </Field>
 
@@ -322,7 +337,7 @@ export default function UsersPage() {
                 value={form.email}
                 onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
                 required
-                disabled={!isAdmin}
+                disabled={!canManageUsers}
               />
             </Field>
 
@@ -333,7 +348,7 @@ export default function UsersPage() {
                 value={form.password}
                 onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
                 required={!editingUser}
-                disabled={!isAdmin}
+                disabled={!canManageUsers}
                 placeholder={editingUser ? "Dejar vacío para mantener contraseña actual" : "Contraseña temporal"}
               />
             </Field>
@@ -341,8 +356,8 @@ export default function UsersPage() {
             <Field label="Rol">
               <select
                 className="zoho-select"
-                value={form.role}
-                disabled={!isAdmin}
+                value={isKamAdmin ? "kam" : form.role}
+                disabled={!canManageUsers || isKamAdmin}
                 onChange={(e) =>
                   setForm((prev) => ({
                     ...prev,
@@ -353,7 +368,8 @@ export default function UsersPage() {
               >
                 <option value="admin">Administrador</option>
                 <option value="interno">Interno</option>
-                <option value="kam">KAM</option>
+                <option value="kam_admin">KAM administrador</option>
+                <option value="kam">KAM vendedor</option>
                 <option value="cliente">Cliente</option>
               </select>
             </Field>
@@ -363,7 +379,7 @@ export default function UsersPage() {
                 <select
                   className="zoho-select"
                   value={form.active ? "true" : "false"}
-                  disabled={!isAdmin}
+                  disabled={!canManageUsers}
                   onChange={(e) => setForm((prev) => ({ ...prev, active: e.target.value === "true" }))}
                 >
                   <option value="true">Activo</option>
@@ -376,10 +392,10 @@ export default function UsersPage() {
               <div className="zoho-form-field users-mandantes-field">
                 <label>Mandantes asignados</label>
                 <div className="users-mandantes-actions">
-                  <button type="button" className="zoho-small-btn" onClick={selectAllMandantes} disabled={!isAdmin}>
+                  <button type="button" className="zoho-small-btn" onClick={selectAllMandantes} disabled={!canManageUsers}>
                     Seleccionar todos
                   </button>
-                  <button type="button" className="zoho-small-btn" onClick={clearMandantes} disabled={!isAdmin}>
+                  <button type="button" className="zoho-small-btn" onClick={clearMandantes} disabled={!canManageUsers}>
                     Limpiar
                   </button>
                 </div>
@@ -391,7 +407,7 @@ export default function UsersPage() {
                         type="checkbox"
                         checked={form.assigned_mandante_ids.includes(mandante.id)}
                         onChange={() => toggleMandante(mandante.id)}
-                        disabled={!isAdmin}
+                        disabled={!canManageUsers}
                       />
                       <span>{mandante.name}</span>
                     </label>
@@ -426,8 +442,12 @@ export default function UsersPage() {
               <span>Ve todo y puede crear, editar, activar, desactivar y eliminar usuarios.</span>
             </div>
             <div>
-              <strong>Interno / KAM</strong>
-              <span>Opera el CRM completo, puede crear mandantes, pero solo sobre sus mandantes asignados. No puede administrar usuarios.</span>
+              <strong>Interno / KAM vendedor</strong>
+              <span>Opera el CRM según sus mandantes asignados. No puede administrar usuarios ni repartir cartera.</span>
+            </div>
+            <div>
+              <strong>KAM administrador</strong>
+              <span>Opera su cartera y puede crear/editar KAM vendedores, asignándoles solo mandantes que ya tiene asignados.</span>
             </div>
             <div>
               <strong>Cliente</strong>
@@ -474,7 +494,7 @@ export default function UsersPage() {
                   <td>{user.active ? "Activo" : "Inactivo"}</td>
                   <td>{user.created_at ? new Date(user.created_at).toLocaleDateString("es-CL") : "—"}</td>
                   <td>
-                    {isAdmin && (
+                    {canManageUsers && (
                       <div className="zoho-actions-row compact-actions">
                         <button className="zoho-small-btn" onClick={() => startEdit(user)}>
                           Editar

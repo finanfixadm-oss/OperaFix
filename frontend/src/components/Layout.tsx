@@ -10,6 +10,7 @@ const navItems = [
   { to: "/informes", label: "Informes", module: "informes" as const, side: "Informes Excel" },
   { to: "/carga-masiva", label: "Carga masiva", module: "cargaMasiva" as const, side: "Carga masiva inteligente" },
   { to: "/usuarios", label: "Usuarios", module: "usuarios" as const, side: "Control de usuarios" },
+  { to: "/kam-asignacion", label: "KAM", module: "kamAsignacion" as const, side: "Asignación KAM" },
   { to: "/mandantes", label: "Mandantes", module: "mandantes" as const, side: "Mandantes" },
 ];
 

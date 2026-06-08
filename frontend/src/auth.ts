@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "interno" | "kam" | "cliente";
+export type UserRole = "admin" | "interno" | "kam_admin" | "kam" | "cliente";
 
 export type CurrentUser = {
   id: string;
@@ -15,19 +15,21 @@ export type CurrentUser = {
 export const ROLE_LABELS: Record<string, string> = {
   admin: "Administrador",
   interno: "Equipo interno",
-  kam: "KAM",
+  kam_admin: "KAM administrador",
+  kam: "KAM vendedor",
   cliente: "Cliente / Mandante",
 };
 
 export const MODULE_PERMISSIONS: Record<string, UserRole[]> = {
-  dashboard: ["admin", "interno", "kam"],
-  records: ["admin", "interno", "kam"],
-  portal: ["admin", "interno", "kam", "cliente"],
-  ia: ["admin", "interno", "kam"],
-  informes: ["admin", "interno", "kam", "cliente"],
-  cargaMasiva: ["admin", "interno", "kam"],
-  usuarios: ["admin"],
-  mandantes: ["admin", "interno", "kam"],
+  dashboard: ["admin", "interno", "kam_admin", "kam"],
+  records: ["admin", "interno", "kam_admin", "kam"],
+  portal: ["admin", "interno", "kam_admin", "kam", "cliente"],
+  ia: ["admin", "interno", "kam_admin", "kam"],
+  informes: ["admin", "interno", "kam_admin", "kam", "cliente"],
+  cargaMasiva: ["admin", "interno", "kam_admin", "kam"],
+  usuarios: ["admin", "kam_admin"],
+  kamAsignacion: ["admin", "interno", "kam_admin", "kam"],
+  mandantes: ["admin", "interno", "kam_admin", "kam"],
 };
 
 export function getCurrentUser(): CurrentUser | null {

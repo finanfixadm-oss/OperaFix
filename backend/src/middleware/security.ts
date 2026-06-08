@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
 import { prisma } from "../config/prisma.js";
 
-type Role = "admin" | "interno" | "kam" | "cliente";
+type Role = "admin" | "interno" | "kam_admin" | "kam" | "cliente";
 
 export type AssignedMandante = {
   id: string;
@@ -97,8 +97,12 @@ export function isAdmin(session?: OperafixSession | null) {
   return String(session?.role || "").toLowerCase() === "admin";
 }
 
+export function isKamAdmin(session?: OperafixSession | null) {
+  return String(session?.role || "").toLowerCase() === "kam_admin";
+}
+
 export function isInternal(session?: OperafixSession | null) {
-  return ["admin", "interno", "kam"].includes(String(session?.role || "").toLowerCase());
+  return ["admin", "interno", "kam_admin", "kam"].includes(String(session?.role || "").toLowerCase());
 }
 
 export function assignedMandanteIds(session?: OperafixSession | null) {
@@ -130,7 +134,7 @@ export function assignedMandanteNames(session?: OperafixSession | null) {
 export function hasAssignedMandanteScope(session?: OperafixSession | null) {
   if (!session) return true;
   if (isAdmin(session)) return false;
-  return ["interno", "kam", "cliente"].includes(String(session.role || "").toLowerCase());
+  return ["interno", "kam_admin", "kam", "cliente"].includes(String(session.role || "").toLowerCase());
 }
 
 export function rowMandanteAllowed(row: any, session?: OperafixSession | null) {

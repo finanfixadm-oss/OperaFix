@@ -33,7 +33,15 @@ function getSession(req: any) {
   }
 }
 
-function requireAdmin(req: any, res: any) {
+function isAdminSession(session: any) {
+  return String(session?.role || "").toLowerCase() === "admin";
+}
+
+function isKamAdminSession(session: any) {
+  return String(session?.role || "").toLowerCase() === "kam_admin";
+}
+
+function requireUserManager(req: any, res: any) {
   const session = getSession(req);
 
   if (!session) {
@@ -41,14 +49,63 @@ function requireAdmin(req: any, res: any) {
     return null;
   }
 
-  if (String(session.role || "").toLowerCase() !== "admin") {
+  if (!isAdminSession(session) && !isKamAdminSession(session)) {
     res.status(403).json({
-      message: "Solo un administrador puede crear, modificar, activar, desactivar o eliminar usuarios.",
+      message: "Solo un administrador o KAM administrador puede crear, modificar, activar, desactivar o eliminar usuarios.",
     });
     return null;
   }
 
   return session;
+}
+
+function sessionMandanteIds(session: any) {
+  const ids = new Set<string>();
+  if (Array.isArray(session?.assigned_mandante_ids)) {
+    for (const id of session.assigned_mandante_ids) if (id) ids.add(String(id));
+  }
+  if (Array.isArray(session?.assigned_mandantes)) {
+    for (const item of session.assigned_mandantes) {
+      const id = item?.id || item?.mandante_id;
+      if (id) ids.add(String(id));
+    }
+  }
+  if (session?.mandante_id) ids.add(String(session.mandante_id));
+  return [...ids];
+}
+
+function validateKamAdminAssignments(session: any, role: string, mandanteIds: string[], res: any) {
+  if (!isKamAdminSession(session)) return true;
+
+  if (role !== "kam") {
+    res.status(403).json({ message: "El KAM administrador solo puede crear o modificar usuarios con rol KAM vendedor." });
+    return false;
+  }
+
+  const allowed = new Set(sessionMandanteIds(session));
+  if (!allowed.size) {
+    res.status(403).json({ message: "Tu usuario KAM administrador no tiene mandantes asignados para repartir." });
+    return false;
+  }
+
+  const invalid = mandanteIds.filter((id) => !allowed.has(String(id)));
+  if (invalid.length) {
+    res.status(403).json({ message: "Solo puedes asignar mandantes que estén dentro de tu cartera como KAM administrador." });
+    return false;
+  }
+
+  return true;
+}
+
+function userOverlapsKamAdminScope(user: UserRow, session: any) {
+  if (!isKamAdminSession(session)) return true;
+  if (String(user.role || "").toLowerCase() !== "kam") return false;
+
+  const allowed = new Set(sessionMandanteIds(session));
+  if (!allowed.size) return false;
+
+  const assigned = user.assigned_mandante_ids || user.assigned_mandantes?.map((item) => item.id) || (user.mandante_id ? [user.mandante_id] : []);
+  return assigned.some((id) => allowed.has(String(id)));
 }
 
 function cleanIds(value: unknown): string[] {
@@ -174,7 +231,7 @@ async function findUserById(userId: string) {
 usersRouter.get("/", async (req, res) => {
   await ensureUsersTable();
 
-  const session = requireAdmin(req, res);
+  const session = requireUserManager(req, res);
   if (!session) return;
 
   const rows = (await prisma.$queryRawUnsafe(`
@@ -183,26 +240,30 @@ usersRouter.get("/", async (req, res) => {
       order by created_at desc
     `)) as UserRow[];
 
-  res.json(await attachAssignments(rows));
+  const withAssignments = await attachAssignments(rows);
+  res.json(withAssignments.filter((user) => userOverlapsKamAdminScope(user, session)));
 });
 
 usersRouter.post("/", async (req, res) => {
   try {
     await ensureUsersTable();
 
-    const session = requireAdmin(req, res);
+    const session = requireUserManager(req, res);
     if (!session) return;
 
     const email = String(req.body.email || "").trim().toLowerCase();
     const password = String(req.body.password || "");
     const fullName = String(req.body.full_name || req.body.name || email).trim();
-    const role = normalizeRole(req.body.role);
+    const rawRole = normalizeRole(req.body.role);
+    const role = isKamAdminSession(session) ? "kam" : rawRole;
 
     const mandanteIds = [
       ...cleanIds(req.body.assigned_mandante_ids),
       ...cleanIds(req.body.mandante_ids),
       ...(req.body.mandante_id ? [String(req.body.mandante_id)] : []),
     ];
+
+    if (!validateKamAdminAssignments(session, role, mandanteIds, res)) return;
 
     if (!email || !password) {
       return res.status(400).json({ message: "Correo y contraseña son obligatorios." });
@@ -271,7 +332,7 @@ usersRouter.put("/:id", async (req, res) => {
   try {
     await ensureUsersTable();
 
-    const session = requireAdmin(req, res);
+    const session = requireUserManager(req, res);
     if (!session) return;
 
     const userId = String(req.params.id);
@@ -283,7 +344,8 @@ usersRouter.put("/:id", async (req, res) => {
 
     const email = String(req.body.email || existing.email || "").trim().toLowerCase();
     const fullName = String(req.body.full_name || req.body.name || existing.full_name || email).trim();
-    const role = normalizeRole(req.body.role || existing.role);
+    const rawRole = normalizeRole(req.body.role || existing.role);
+    const role = isKamAdminSession(session) ? "kam" : rawRole;
     const active = req.body.active === undefined ? Boolean(existing.active) : Boolean(req.body.active);
     const password = String(req.body.password || "");
 
@@ -292,6 +354,9 @@ usersRouter.put("/:id", async (req, res) => {
       ...cleanIds(req.body.mandante_ids),
       ...(req.body.mandante_id ? [String(req.body.mandante_id)] : []),
     ];
+
+    if (!validateKamAdminAssignments(session, role, mandanteIds, res)) return;
+    if (!userOverlapsKamAdminScope({ ...existing, assigned_mandante_ids: mandanteIds, role }, session)) return res.status(403).json({ message: "No puedes modificar usuarios fuera de tu cartera KAM." });
 
     if (!email) {
       return res.status(400).json({ message: "Correo es obligatorio." });
@@ -350,10 +415,14 @@ usersRouter.post("/:id/deactivate", async (req, res) => {
   try {
     await ensureUsersTable();
 
-    const session = requireAdmin(req, res);
+    const session = requireUserManager(req, res);
     if (!session) return;
 
     const userId = String(req.params.id);
+    const existing = await findUserById(userId);
+    if (!existing) return res.status(404).json({ message: "Usuario no encontrado." });
+    const [scopedExisting] = await attachAssignments([existing]);
+    if (!userOverlapsKamAdminScope(scopedExisting, session)) return res.status(403).json({ message: "No puedes desactivar usuarios fuera de tu cartera KAM." });
 
     await prisma.$executeRawUnsafe(
       `update operafix_users set active = false, updated_at = now() where id = $1`,
@@ -371,10 +440,14 @@ usersRouter.post("/:id/activate", async (req, res) => {
   try {
     await ensureUsersTable();
 
-    const session = requireAdmin(req, res);
+    const session = requireUserManager(req, res);
     if (!session) return;
 
     const userId = String(req.params.id);
+    const existing = await findUserById(userId);
+    if (!existing) return res.status(404).json({ message: "Usuario no encontrado." });
+    const [scopedExisting] = await attachAssignments([existing]);
+    if (!userOverlapsKamAdminScope(scopedExisting, session)) return res.status(403).json({ message: "No puedes activar usuarios fuera de tu cartera KAM." });
 
     await prisma.$executeRawUnsafe(
       `update operafix_users set active = true, updated_at = now() where id = $1`,
@@ -392,7 +465,7 @@ usersRouter.delete("/:id", async (req, res) => {
   try {
     await ensureUsersTable();
 
-    const session = requireAdmin(req, res);
+    const session = requireUserManager(req, res);
     if (!session) return;
 
     const userId = String(req.params.id);
@@ -400,6 +473,11 @@ usersRouter.delete("/:id", async (req, res) => {
     if (String(session.sub || session.id || "") === userId) {
       return res.status(400).json({ message: "No puedes eliminar tu propio usuario desde esta pantalla." });
     }
+
+    const existing = await findUserById(userId);
+    if (!existing) return res.status(404).json({ message: "Usuario no encontrado." });
+    const [scopedExisting] = await attachAssignments([existing]);
+    if (!userOverlapsKamAdminScope(scopedExisting, session)) return res.status(403).json({ message: "No puedes eliminar usuarios fuera de tu cartera KAM." });
 
     await prisma.$executeRawUnsafe(`delete from operafix_user_mandantes where user_id = $1`, userId);
     await prisma.$executeRawUnsafe(`delete from operafix_users where id = $1`, userId);

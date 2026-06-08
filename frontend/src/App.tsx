@@ -14,6 +14,7 @@ import LoginPage from "./pages/LoginPage";
 import { defaultPathForUser, getCurrentUser } from "./auth";
 import V66AutomationPage from "./pages/V66AutomationPage";
 import AICommandCenterPage from "./pages/AICommandCenterPage";
+import KamAssignmentPage from "./pages/KamAssignmentPage";
 
 function RootRedirect() {
   return <Navigate to={defaultPathForUser(getCurrentUser())} replace />;
@@ -32,7 +33,7 @@ export default function App() {
           <Route
             path="/ai-command-center"
             element={
-              <ProtectedRoute roles={["admin", "interno", "kam"]}>
+              <ProtectedRoute roles={["admin", "interno", "kam_admin", "kam"]}>
                 <AICommandCenterPage />
               </ProtectedRoute>
             }
@@ -41,7 +42,7 @@ export default function App() {
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute roles={["admin", "interno", "kam"]}>
+              <ProtectedRoute roles={["admin", "interno", "kam_admin", "kam"]}>
                 <DashboardExecutivePage />
               </ProtectedRoute>
             }
@@ -50,7 +51,7 @@ export default function App() {
           <Route
             path="/records"
             element={
-              <ProtectedRoute roles={["admin", "interno", "kam"]}>
+              <ProtectedRoute roles={["admin", "interno", "kam_admin", "kam"]}>
                 <RecordsPage />
               </ProtectedRoute>
             }
@@ -59,7 +60,7 @@ export default function App() {
           <Route
             path="/records/:id"
             element={
-              <ProtectedRoute roles={["admin", "interno", "kam"]}>
+              <ProtectedRoute roles={["admin", "interno", "kam_admin", "kam"]}>
                 <RecordDetailPage />
               </ProtectedRoute>
             }
@@ -68,7 +69,7 @@ export default function App() {
           <Route
             path="/portal-cliente"
             element={
-              <ProtectedRoute roles={["admin", "interno", "kam", "cliente"]}>
+              <ProtectedRoute roles={["admin", "interno", "kam_admin", "kam", "cliente"]}>
                 <ClientPortalPage />
               </ProtectedRoute>
             }
@@ -80,7 +81,7 @@ export default function App() {
           <Route
             path="/carga-masiva"
             element={
-              <ProtectedRoute roles={["admin", "interno", "kam"]}>
+              <ProtectedRoute roles={["admin", "interno", "kam_admin", "kam"]}>
                 <MassImportPage />
               </ProtectedRoute>
             }
@@ -89,8 +90,18 @@ export default function App() {
           <Route
             path="/informes"
             element={
-              <ProtectedRoute roles={["admin", "interno", "kam", "cliente"]}>
+              <ProtectedRoute roles={["admin", "interno", "kam_admin", "kam", "cliente"]}>
                 <ReportsBuilderPage />
+              </ProtectedRoute>
+            }
+          />
+
+
+          <Route
+            path="/kam-asignacion"
+            element={
+              <ProtectedRoute roles={["admin", "interno", "kam_admin", "kam"]}>
+                <KamAssignmentPage />
               </ProtectedRoute>
             }
           />
@@ -98,7 +109,7 @@ export default function App() {
           <Route
             path="/usuarios"
             element={
-              <ProtectedRoute roles={["admin"]}>
+              <ProtectedRoute roles={["admin", "kam_admin"]}>
                 <UsersPage />
               </ProtectedRoute>
             }
@@ -107,7 +118,7 @@ export default function App() {
           <Route
             path="/mandantes"
             element={
-              <ProtectedRoute roles={["admin", "interno", "kam"]}>
+              <ProtectedRoute roles={["admin", "interno", "kam_admin", "kam"]}>
                 <MandantesPage />
               </ProtectedRoute>
             }

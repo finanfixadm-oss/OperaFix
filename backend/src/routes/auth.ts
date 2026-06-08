@@ -54,7 +54,7 @@ async function ensureUsersTable() {
 
 function normalizeRole(value: unknown) {
   const role = String(value || "admin").toLowerCase().trim();
-  if (["admin", "interno", "kam", "cliente"].includes(role)) return role;
+  if (["admin", "interno", "kam_admin", "kam", "cliente"].includes(role)) return role;
   return "cliente";
 }
 
