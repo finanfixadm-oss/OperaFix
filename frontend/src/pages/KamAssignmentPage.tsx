@@ -28,6 +28,12 @@ type KamCompany = {
   proxima_gestion?: string | null;
   probabilidad_cierre?: number | null;
   canal_origen?: string | null;
+  source_company_id?: string | null;
+  source_mandante_id?: string | null;
+  source_mandante_name?: string | null;
+  fecha_ultimo_contacto?: string | null;
+  resultado_gestion?: string | null;
+  motivo_perdida?: string | null;
 };
 
 type KamProfile = {
@@ -64,6 +70,21 @@ type RuleRow = {
   peso: number;
   accion: string;
   activa: boolean;
+};
+
+type KamMetrics = {
+  summary?: any;
+  byKam?: Array<{
+    kam: string;
+    total: number;
+    ganadas: number;
+    perdidas: number;
+    en_gestion: number;
+    probabilidad_promedio: number | string;
+    monto_potencial: number | string;
+    monto_ganado: number | string;
+    ultimo_contacto?: string | null;
+  }>;
 };
 
 const emptyCompany = {
@@ -126,7 +147,7 @@ export default function KamAssignmentPage() {
   const user = getCurrentUser();
   const canAdmin = ["admin", "kam_admin", "interno"].includes(String(user?.role || ""));
   const canConfigure = ["admin", "kam_admin"].includes(String(user?.role || ""));
-  const [tab, setTab] = useState<"companies" | "profiles" | "rules">("companies");
+  const [tab, setTab] = useState<"companies" | "profiles" | "rules" | "tracking">("companies");
   const [companies, setCompanies] = useState<KamCompany[]>([]);
   const [profiles, setProfiles] = useState<KamProfile[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -137,21 +158,25 @@ export default function KamAssignmentPage() {
   const [profileForm, setProfileForm] = useState<any>(emptyProfile);
   const [ruleForm, setRuleForm] = useState<any>(emptyRule);
   const [recommendations, setRecommendations] = useState<KamProfile[]>([]);
+  const [metrics, setMetrics] = useState<KamMetrics>({});
+  const [manualKamId, setManualKamId] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function loadAll() {
     setLoading(true);
     try {
-      const [companyRows, profileRows, ruleRows] = await Promise.all([
+      const [companyRows, profileRows, ruleRows, metricRows] = await Promise.all([
         fetchJson<KamCompany[]>("/kam/companies"),
         fetchJson<KamProfile[]>("/kam/profiles"),
         fetchJson<RuleRow[]>("/kam/rules"),
+        fetchJson<KamMetrics>("/kam/metrics"),
       ]);
       setCompanies(companyRows);
       setProfiles(profileRows);
       setRules(ruleRows);
+      setMetrics(metricRows || {});
       if (canConfigure) {
-        const userRows = await fetchJson<UserRow[]>("/users").catch(() => [] as UserRow[]);
+        const userRows = await fetchJson<UserRow[]>("/kam/users").catch(() => [] as UserRow[]);
         setUsers(userRows.filter((item) => String(item.role).toLowerCase() === "kam" && item.active !== false));
       }
     } finally {
@@ -193,6 +218,7 @@ export default function KamAssignmentPage() {
       probabilidad_cierre: row.probabilidad_cierre || "",
       proxima_gestion: row.proxima_gestion ? String(row.proxima_gestion).slice(0, 10) : "",
     });
+    setManualKamId(row.kam_asignado_id || "");
     setRecommendations([]);
   }
 
@@ -221,6 +247,24 @@ export default function KamAssignmentPage() {
       score_match: profile.score_match,
       motivo_asignacion: `Asignado por compatibilidad: score ${profile.score_match}`,
       observacion: (profile.motivos || []).join("; "),
+    });
+    setRecommendations([]);
+    await loadAll();
+  }
+
+  async function assignManual() {
+    if (!selected) {
+      alert("Primero selecciona una empresa.");
+      return;
+    }
+    if (!manualKamId) {
+      alert("Debes seleccionar un KAM vendedor.");
+      return;
+    }
+    await postJson(`/kam/companies/${selected.id}/assign`, {
+      kam_asignado_id: manualKamId,
+      motivo_asignacion: "Asignación manual por KAM administrador",
+      observacion: companyForm.observacion || "Asignación manual",
     });
     setRecommendations([]);
     await loadAll();
@@ -268,28 +312,47 @@ export default function KamAssignmentPage() {
     <div className="zoho-module-page kam-module-page">
       <div className="zoho-module-header">
         <div>
-          <h1>Asignación Inteligente KAM</h1>
-          <p>Segmenta empresas por rubro, región, cantidad de trabajadores y monto potencial para asignarlas al KAM correcto.</p>
+          <h1>Asignación y Seguimiento KAM</h1>
+          <p>Empresas potenciales desde Registro Empresas de Finanfix Solutions SPA, asignación manual a KAM vendedor, ranking y seguimiento comercial.</p>
         </div>
         <div className="zoho-module-actions">
           <button className={tab === "companies" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("companies")}>Empresas</button>
+          <button className={tab === "tracking" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("tracking")}>Seguimiento</button>
           <button className={tab === "profiles" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("profiles")}>Ranking KAM</button>
           <button className={tab === "rules" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("rules")}>Reglas</button>
         </div>
       </div>
 
       <div className="zoho-kpi-grid">
-        <div className="zoho-card"><strong>{kpis.total}</strong><span>Empresas en cartera</span></div>
-        <div className="zoho-card"><strong>{kpis.strategic}</strong><span>Estratégicas</span></div>
-        <div className="zoho-card"><strong>{kpis.unassigned}</strong><span>Sin asignar</span></div>
-        <div className="zoho-card"><strong>{money(kpis.totalAmount)}</strong><span>Monto potencial</span></div>
+        <div className="zoho-card"><strong>{metrics.summary?.total_empresas ?? kpis.total}</strong><span>Empresas potenciales</span></div>
+        <div className="zoho-card"><strong>{metrics.summary?.ganadas ?? 0}</strong><span>Ganadas</span></div>
+        <div className="zoho-card"><strong>{metrics.summary?.sin_asignar ?? kpis.unassigned}</strong><span>Sin asignar</span></div>
+        <div className="zoho-card"><strong>{money(metrics.summary?.monto_potencial ?? kpis.totalAmount)}</strong><span>Monto potencial</span></div>
       </div>
 
       {tab === "companies" && (
         <div className="mandantes-layout">
           <aside className="zoho-filter-panel">
             <h2>{selected ? "Editar empresa" : "Nueva empresa"}</h2>
-            {!canAdmin && <p className="zoho-help-text">Como KAM vendedor puedes revisar y actualizar tu cartera, pero la asignación la realiza el KAM administrador.</p>}
+            {!canAdmin && (
+              selected ? (
+                <div className="zoho-form-grid single-column-form">
+                  <p className="zoho-help-text">Actualiza el seguimiento de la empresa asignada. Solo ves empresas de tu cartera.</p>
+                  <Field label="Empresa"><input className="zoho-input" value={companyForm.razon_social} disabled /></Field>
+                  <Field label="Estado">
+                    <select className="zoho-input" value={companyForm.estado} onChange={(e) => setCompanyForm({ ...companyForm, estado: e.target.value })}>
+                      <option>Asignada</option><option>En prospección</option><option>Contactada</option><option>Interesada</option><option>Propuesta enviada</option><option>En negociación</option><option>Ganada</option><option>Perdida</option><option>Congelada</option><option>Reasignar</option>
+                    </select>
+                  </Field>
+                  <Field label="Próxima gestión"><input className="zoho-input" type="date" value={companyForm.proxima_gestion} onChange={(e) => setCompanyForm({ ...companyForm, proxima_gestion: e.target.value })} /></Field>
+                  <Field label="Probabilidad cierre %"><input className="zoho-input" type="number" min={0} max={100} value={companyForm.probabilidad_cierre} onChange={(e) => setCompanyForm({ ...companyForm, probabilidad_cierre: e.target.value })} /></Field>
+                  <Field label="Resultado gestión"><input className="zoho-input" value={companyForm.resultado_gestion || ""} onChange={(e) => setCompanyForm({ ...companyForm, resultado_gestion: e.target.value })} /></Field>
+                  <Field label="Motivo pérdida"><input className="zoho-input" value={companyForm.motivo_perdida || ""} onChange={(e) => setCompanyForm({ ...companyForm, motivo_perdida: e.target.value })} /></Field>
+                  <Field label="Observación"><textarea className="zoho-input" rows={4} value={companyForm.observacion} onChange={(e) => setCompanyForm({ ...companyForm, observacion: e.target.value })} /></Field>
+                  <button className="zoho-btn zoho-btn-primary" onClick={saveCompany}>Guardar seguimiento</button>
+                </div>
+              ) : <p className="zoho-help-text">Selecciona una empresa de tu cartera para actualizar el seguimiento.</p>
+            )}
             {canAdmin && (
               <div className="zoho-form-grid single-column-form">
                 <Field label="RUT"><input className="zoho-input" value={companyForm.rut} onChange={(e) => setCompanyForm({ ...companyForm, rut: e.target.value })} /></Field>
@@ -312,6 +375,21 @@ export default function KamAssignmentPage() {
                     <option>Sin asignar</option><option>Asignada</option><option>En prospección</option><option>Contactada</option><option>Interesada</option><option>Propuesta enviada</option><option>En negociación</option><option>Ganada</option><option>Perdida</option><option>Congelada</option><option>Reasignar</option>
                   </select>
                 </Field>
+                <Field label="Próxima gestión"><input className="zoho-input" type="date" value={companyForm.proxima_gestion} onChange={(e) => setCompanyForm({ ...companyForm, proxima_gestion: e.target.value })} /></Field>
+                <Field label="Probabilidad cierre %"><input className="zoho-input" type="number" min={0} max={100} value={companyForm.probabilidad_cierre} onChange={(e) => setCompanyForm({ ...companyForm, probabilidad_cierre: e.target.value })} /></Field>
+                <Field label="Resultado gestión"><input className="zoho-input" value={companyForm.resultado_gestion || ""} onChange={(e) => setCompanyForm({ ...companyForm, resultado_gestion: e.target.value })} /></Field>
+                <Field label="Motivo pérdida"><input className="zoho-input" value={companyForm.motivo_perdida || ""} onChange={(e) => setCompanyForm({ ...companyForm, motivo_perdida: e.target.value })} /></Field>
+                {selected && canConfigure && (
+                  <Field label="Asignar manualmente a KAM vendedor">
+                    <div className="zoho-actions-row">
+                      <select className="zoho-input" value={manualKamId} onChange={(e) => setManualKamId(e.target.value)}>
+                        <option value="">Seleccionar KAM</option>
+                        {users.map((u) => <option key={u.id} value={u.id}>{u.full_name || u.email}</option>)}
+                      </select>
+                      <button className="zoho-small-btn primary" type="button" onClick={assignManual}>Asignar</button>
+                    </div>
+                  </Field>
+                )}
                 <Field label="Observación"><textarea className="zoho-input" rows={3} value={companyForm.observacion} onChange={(e) => setCompanyForm({ ...companyForm, observacion: e.target.value })} /></Field>
                 <div className="zoho-form-actions">
                   <button className="zoho-btn zoho-btn-primary" onClick={saveCompany}>{selected ? "Guardar cambios" : "Crear empresa"}</button>
@@ -330,7 +408,7 @@ export default function KamAssignmentPage() {
               <table className="zoho-table kam-wide-table">
                 <thead>
                   <tr>
-                    <th>RUT</th><th>Razón Social</th><th>Nro Empleados</th><th>Monto Dev.</th><th>Rubro</th><th>Región</th><th>Nombre</th><th>Cargo</th><th>Correo</th><th>Nro Telefónico</th><th>Estado</th><th>Prioridad</th><th>Score</th><th>KAM</th><th>Acciones</th>
+                    <th>RUT</th><th>Razón Social</th><th>Mandante origen</th><th>Nro Empleados</th><th>Monto Dev.</th><th>Rubro</th><th>Región</th><th>Nombre</th><th>Cargo</th><th>Correo</th><th>Nro Telefónico</th><th>Estado</th><th>Próxima gestión</th><th>Prob.</th><th>Prioridad</th><th>Score</th><th>KAM</th><th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -338,6 +416,7 @@ export default function KamAssignmentPage() {
                     <tr key={row.id}>
                       <td>{row.rut}</td>
                       <td className="zoho-link-cell" onClick={() => editCompany(row)}>{row.razon_social}</td>
+                      <td>{row.source_mandante_name || "Finanfix Solutions SPA"}</td>
                       <td>{row.nro_empleados || "—"}</td>
                       <td>{money(row.monto_devolucion)}</td>
                       <td>{row.rubro || "—"}</td>
@@ -347,6 +426,8 @@ export default function KamAssignmentPage() {
                       <td>{row.correo || "—"}</td>
                       <td>{row.telefono || "—"}</td>
                       <td>{row.estado || "—"}</td>
+                      <td>{row.proxima_gestion ? String(row.proxima_gestion).slice(0, 10) : "—"}</td>
+                      <td>{row.probabilidad_cierre ?? "—"}</td>
                       <td><span className={`priority-chip priority-${String(row.prioridad || "").toLowerCase()}`}>{row.prioridad || "—"}</span></td>
                       <td>{row.score_empresa ?? 0}</td>
                       <td>{row.kam_asignado_nombre || "Sin asignar"}</td>
@@ -358,7 +439,7 @@ export default function KamAssignmentPage() {
                       </td>
                     </tr>
                   ))}
-                  {!filteredCompanies.length && <tr><td colSpan={15}>Sin empresas KAM cargadas.</td></tr>}
+                  {!filteredCompanies.length && <tr><td colSpan={18}>Sin empresas KAM cargadas.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -387,6 +468,31 @@ export default function KamAssignmentPage() {
             )}
           </section>
         </div>
+      )}
+
+      {tab === "tracking" && (
+        <section className="zoho-table-wrap">
+          <div className="zoho-table-toolbar"><span>Seguimiento y medición KAM</span></div>
+          <table className="zoho-table">
+            <thead><tr><th>KAM</th><th>Asignadas</th><th>En gestión</th><th>Ganadas</th><th>Perdidas</th><th>Prob. promedio</th><th>Monto potencial</th><th>Monto ganado</th><th>Último contacto</th></tr></thead>
+            <tbody>
+              {(metrics.byKam || []).map((row) => (
+                <tr key={row.kam}>
+                  <td>{row.kam}</td>
+                  <td>{row.total}</td>
+                  <td>{row.en_gestion}</td>
+                  <td>{row.ganadas}</td>
+                  <td>{row.perdidas}</td>
+                  <td>{Number(row.probabilidad_promedio || 0).toFixed(0)}%</td>
+                  <td>{money(row.monto_potencial)}</td>
+                  <td>{money(row.monto_ganado)}</td>
+                  <td>{row.ultimo_contacto ? String(row.ultimo_contacto).slice(0, 10) : "—"}</td>
+                </tr>
+              ))}
+              {!(metrics.byKam || []).length && <tr><td colSpan={9}>Sin métricas disponibles.</td></tr>}
+            </tbody>
+          </table>
+        </section>
       )}
 
       {tab === "profiles" && (
