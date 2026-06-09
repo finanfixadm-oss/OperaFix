@@ -1,9 +1,12 @@
 import { Router } from "express";
+import multer from "multer";
+import * as XLSX from "xlsx";
 import { prisma } from "../config/prisma.js";
 import { parseSession } from "../middleware/security.js";
 import { ensureUsersTable } from "./auth.js";
 
 const kamRouter = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 
 type SessionLike = { id?: string; sub?: string; role?: string; assigned_mandante_ids?: string[]; mandante_id?: string | null } | null;
 
@@ -62,6 +65,8 @@ type KamCompany = {
   motivo_perdida?: string | null;
   probabilidad_cierre?: number | null;
   canal_origen?: string | null;
+  campaign_id?: string | null;
+  campaign_nombre?: string | null;
 };
 
 const ROLE_KAM_ADMIN = "kam_admin";
@@ -328,6 +333,22 @@ async function ensureKamTables() {
   `);
 
 
+
+  await prisma.$executeRawUnsafe(`
+    create table if not exists operafix_kam_campaigns (
+      id text primary key,
+      nombre text not null,
+      descripcion text,
+      estado text not null default 'Activa',
+      fecha_inicio date,
+      fecha_fin date,
+      objetivo_monto numeric(18,2),
+      created_by text,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `);
+
   await prisma.$executeRawUnsafe(`
     create table if not exists operafix_kam_company_contacts (
       id text primary key,
@@ -358,7 +379,7 @@ async function ensureKamTables() {
     ['cargo_contacto', 'text'], ['correo', 'text'], ['telefono', 'text'], ['telefono_central', 'text'], ['linkedin_url', 'text'], ['estado', `text not null default 'Sin asignar'`], ['observacion', 'text'], ['rubro', 'text'], ['region', 'text'],
     ['prioridad', 'text'], ['score_empresa', 'integer not null default 0'], ['segmento_empresa', 'text'], ['segmento_monto', 'text'], ['tipo_oportunidad', 'text'], ['origen', 'text'],
     ['kam_asignado_id', 'text'], ['kam_admin_id', 'text'], ['fecha_asignacion', 'timestamptz'], ['fecha_ultimo_contacto', 'timestamptz'], ['proxima_gestion', 'date'],
-    ['resultado_gestion', 'text'], ['motivo_perdida', 'text'], ['probabilidad_cierre', 'integer'], ['canal_origen', 'text'], ['source_company_id', 'text'], ['source_mandante_id', 'text'],
+    ['resultado_gestion', 'text'], ['motivo_perdida', 'text'], ['probabilidad_cierre', 'integer'], ['canal_origen', 'text'], ['campaign_id', 'text'], ['source_company_id', 'text'], ['source_mandante_id', 'text'],
     ['source_mandante_name', 'text'], ['created_at', 'timestamptz not null default now()'], ['updated_at', 'timestamptz not null default now()'],
   ];
   for (const [col, def] of companyColumns) await addColumnIfMissing('operafix_kam_companies', col, def);
@@ -390,9 +411,19 @@ async function ensureKamTables() {
   ];
   for (const [col, def] of contactColumns) await addColumnIfMissing('operafix_kam_company_contacts', col, def);
 
+  const campaignColumns: Array<[string, string]> = [
+    ['nombre', 'text'], ['descripcion', 'text'], ['estado', `text not null default 'Activa'`], ['fecha_inicio', 'date'],
+    ['fecha_fin', 'date'], ['objetivo_monto', 'numeric(18,2)'], ['created_by', 'text'],
+    ['created_at', 'timestamptz not null default now()'], ['updated_at', 'timestamptz not null default now()'],
+  ];
+  for (const [col, def] of campaignColumns) await addColumnIfMissing('operafix_kam_campaigns', col, def);
+
+
   await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_activities_company on operafix_kam_activities(company_id)`).catch(() => null);
   await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_activities_kam on operafix_kam_activities(kam_id)`).catch(() => null);
   await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_contacts_company on operafix_kam_company_contacts(company_id)`).catch(() => null);
+  await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_campaigns_estado on operafix_kam_campaigns(estado)`).catch(() => null);
+  await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_companies_campaign on operafix_kam_companies(campaign_id)`).catch(() => null);
 
   await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_companies_rut on operafix_kam_companies(rut)`).catch(() => null);
   await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_companies_kam on operafix_kam_companies(kam_asignado_id)`).catch(() => null);
@@ -663,6 +694,7 @@ function companyPayload(body: any) {
     tipo_oportunidad: strOrNull(body.tipo_oportunidad) || "Recuperaciones",
     origen: strOrNull(body.origen) || "Carga manual",
     canal_origen: strOrNull(body.canal_origen),
+    campaign_id: strOrNull(body.campaign_id),
     probabilidad_cierre: integerOrNull(body.probabilidad_cierre),
     proxima_gestion: strOrNull(body.proxima_gestion),
     resultado_gestion: strOrNull(body.resultado_gestion),
@@ -705,11 +737,12 @@ kamRouter.get("/companies", async (req, res) => {
     }
 
     const rows = await prisma.$queryRawUnsafe<any[]>(`
-      select c.*, ka.full_name as kam_asignado_nombre, kad.full_name as kam_admin_nombre, coalesce(cc.contactos_count,0)::integer as contactos_count
+      select c.*, ka.full_name as kam_asignado_nombre, kad.full_name as kam_admin_nombre, camp.nombre as campaign_nombre, coalesce(cc.contactos_count,0)::integer as contactos_count
       from operafix_kam_companies c
       left join operafix_users ka on ka.id = c.kam_asignado_id
       left join operafix_users kad on kad.id = c.kam_admin_id
       left join (select company_id, count(*)::integer as contactos_count from operafix_kam_company_contacts group by company_id) cc on cc.company_id = c.id
+      left join operafix_kam_campaigns camp on camp.id = c.campaign_id
       ${where.length ? `where ${where.join(" and ")}` : ""}
       order by c.score_empresa desc, c.created_at desc
     `, ...params);
@@ -738,14 +771,14 @@ kamRouter.post("/companies", async (req, res) => {
     insert into operafix_kam_companies (
       id, rut, razon_social, nro_empleados, monto_devolucion, nombre_contacto, cargo_contacto, correo, telefono, telefono_central, linkedin_url,
       estado, observacion, rubro, region, prioridad, score_empresa, segmento_empresa, segmento_monto,
-      tipo_oportunidad, origen, kam_admin_id, proxima_gestion, resultado_gestion, motivo_perdida, probabilidad_cierre, canal_origen
-    ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
+      tipo_oportunidad, origen, kam_admin_id, proxima_gestion, resultado_gestion, motivo_perdida, probabilidad_cierre, canal_origen, campaign_id
+    ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
     returning *
   `,
     companyId, data.rut, data.razon_social, data.nro_empleados, data.monto_devolucion, data.nombre_contacto,
     data.cargo_contacto, data.correo, data.telefono, data.telefono_central, data.linkedin_url, data.estado, data.observacion, data.rubro, data.region,
     data.prioridad, data.score_empresa, data.segmento_empresa, data.segmento_monto, data.tipo_oportunidad,
-    data.origen, kamAdminId, data.proxima_gestion, data.resultado_gestion, data.motivo_perdida, data.probabilidad_cierre, data.canal_origen
+    data.origen, kamAdminId, data.proxima_gestion, data.resultado_gestion, data.motivo_perdida, data.probabilidad_cierre, data.canal_origen, data.campaign_id
   );
   res.status(201).json(rows[0]);
 });
@@ -778,15 +811,15 @@ kamRouter.put("/companies/:id", async (req, res) => {
         rut=$2, razon_social=$3, nro_empleados=$4, monto_devolucion=$5, nombre_contacto=$6, cargo_contacto=$7,
         correo=$8, telefono=$9, telefono_central=$10, linkedin_url=$11, estado=$12, observacion=$13, rubro=$14, region=$15, prioridad=$16,
         score_empresa=$17, segmento_empresa=$18, segmento_monto=$19, tipo_oportunidad=$20, origen=$21,
-        proxima_gestion=$22, resultado_gestion=$23, motivo_perdida=$24, probabilidad_cierre=$25, canal_origen=$26,
-        fecha_ultimo_contacto=case when $27::boolean then now() else fecha_ultimo_contacto end,
+        proxima_gestion=$22, resultado_gestion=$23, motivo_perdida=$24, probabilidad_cierre=$25, canal_origen=$26, campaign_id=$27,
+        fecha_ultimo_contacto=case when $28::boolean then now() else fecha_ultimo_contacto end,
         updated_at=now()
       where id=$1 returning *
     `,
       req.params.id, data.rut, data.razon_social, data.nro_empleados, data.monto_devolucion, data.nombre_contacto,
       data.cargo_contacto, data.correo, data.telefono, data.telefono_central, data.linkedin_url, data.estado, data.observacion, data.rubro, data.region,
       data.prioridad, data.score_empresa, data.segmento_empresa, data.segmento_monto, data.tipo_oportunidad,
-      data.origen, data.proxima_gestion, data.resultado_gestion, data.motivo_perdida, data.probabilidad_cierre, data.canal_origen,
+      data.origen, data.proxima_gestion, data.resultado_gestion, data.motivo_perdida, data.probabilidad_cierre, data.canal_origen, data.campaign_id,
       ["Contactada", "Interesada", "Propuesta enviada", "En negociación", "Ganada", "Perdida"].includes(String(data.estado || ""))
     );
 
@@ -1152,6 +1185,161 @@ kamRouter.get("/history/:companyId", async (req, res) => {
     where h.empresa_id=$1
     order by h.created_at desc
   `, req.params.companyId);
+  res.json(rows);
+});
+
+function normalizeHeader(value: unknown) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function pickExcel(row: Record<string, any>, names: string[]) {
+  const normalized: Record<string, any> = {};
+  Object.entries(row).forEach(([key, value]) => { normalized[normalizeHeader(key)] = value; });
+  for (const name of names) {
+    const key = normalizeHeader(name);
+    if (normalized[key] !== undefined && normalized[key] !== null && String(normalized[key]).trim() !== '') return normalized[key];
+  }
+  return null;
+}
+
+function workbookBuffer(rows: any[], sheetName = 'Datos') {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+}
+
+kamRouter.get('/campaigns', async (req, res) => {
+  const session = requireKamAccess(req, res);
+  if (!session) return;
+  const rows = await prisma.$queryRawUnsafe<any[]>(`
+    select camp.*,
+      count(c.id)::integer as empresas,
+      count(c.id) filter (where c.estado = 'Contactada')::integer as contactadas,
+      count(c.id) filter (where c.estado = 'Interesada')::integer as interesadas,
+      count(c.id) filter (where c.estado = 'Propuesta enviada')::integer as propuestas,
+      count(c.id) filter (where c.estado = 'Ganada')::integer as ganadas,
+      count(c.id) filter (where c.estado = 'Perdida')::integer as perdidas,
+      coalesce(sum(c.monto_devolucion),0)::numeric as monto_potencial,
+      coalesce(sum(c.monto_devolucion) filter (where c.estado = 'Ganada'),0)::numeric as monto_ganado
+    from operafix_kam_campaigns camp
+    left join operafix_kam_companies c on c.campaign_id = camp.id
+    group by camp.id
+    order by camp.created_at desc
+  `).catch(() => [] as any[]);
+  res.json(rows);
+});
+
+kamRouter.post('/campaigns', async (req, res) => {
+  const session = requireKamAccess(req, res);
+  if (!session) return;
+  if (!isAdmin(session) && !isKamAdmin(session)) return res.status(403).json({ message: 'Solo admin o KAM administrador puede crear campañas.' });
+  const nombre = strOrNull(req.body.nombre);
+  if (!nombre) return res.status(400).json({ message: 'Debes ingresar nombre de campaña.' });
+  const rows = await prisma.$queryRawUnsafe<any[]>(`
+    insert into operafix_kam_campaigns (id,nombre,descripcion,estado,fecha_inicio,fecha_fin,objetivo_monto,created_by)
+    values ($1,$2,$3,$4,$5,$6,$7,$8) returning *
+  `, id('kcp'), nombre, strOrNull(req.body.descripcion), strOrNull(req.body.estado) || 'Activa', strOrNull(req.body.fecha_inicio), strOrNull(req.body.fecha_fin), numberOrNull(req.body.objetivo_monto), sessionUserId(session));
+  res.status(201).json(rows[0]);
+});
+
+kamRouter.post('/companies/import-excel', upload.single('file'), async (req, res) => {
+  const session = requireKamAccess(req, res);
+  if (!session) return;
+  if (isKam(session)) return res.status(403).json({ message: 'El KAM vendedor no puede importar empresas.' });
+  if (!req.file?.buffer) return res.status(400).json({ message: 'Debes adjuntar un archivo Excel.' });
+  const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: '' });
+  const campaignId = strOrNull(req.body.campaign_id);
+  let creadas = 0, duplicadas = 0, conError = 0;
+  const detalle: any[] = [];
+  for (const row of rows) {
+    const data = companyPayload({
+      rut: pickExcel(row, ['RUT','Rut empresa','RUT Empresa']),
+      razon_social: pickExcel(row, ['Razon Social','Razón Social','Empresa','Nombre empresa']),
+      nro_empleados: pickExcel(row, ['Nro Empleados','Nro Trabajadores','Cantidad trabajadores','Trabajadores']),
+      monto_devolucion: pickExcel(row, ['Monto Devolucion','Monto Devolución','Monto','Monto potencial']),
+      rubro: pickExcel(row, ['Rubro','Industria']),
+      region: pickExcel(row, ['Region','Región']),
+      nombre_contacto: pickExcel(row, ['Nombre contacto','Contacto','Nombre']),
+      cargo_contacto: pickExcel(row, ['Cargo','Cargo contacto']),
+      correo: pickExcel(row, ['Correo','Email','Mail']),
+      telefono: pickExcel(row, ['Telefono contacto','Teléfono contacto','Nro Telefonico','Nro Telefónico']),
+      telefono_central: pickExcel(row, ['Telefono empresa','Teléfono central','Telefono central','Central']),
+      linkedin_url: pickExcel(row, ['LinkedIn empresa','Linkedin','LinkedIn']),
+      observacion: pickExcel(row, ['Observacion','Observación']),
+      campaign_id: campaignId,
+      tipo_oportunidad: pickExcel(row, ['Tipo oportunidad','Oportunidad']) || 'Campaña',
+      origen: 'Importación Excel KAM',
+    });
+    if (!data.rut || !data.razon_social) { conError++; detalle.push({ rut: data.rut, razon_social: data.razon_social, estado: 'Error', motivo: 'Falta RUT o Razón Social' }); continue; }
+    const duplicate = await findDuplicateCompany(data.rut, data.razon_social);
+    if (duplicate) { duplicadas++; detalle.push({ rut: data.rut, razon_social: data.razon_social, estado: 'Duplicada', motivo: `Ya existe ${duplicate.razon_social}` }); continue; }
+    await prisma.$executeRawUnsafe(`
+      insert into operafix_kam_companies (id,rut,razon_social,nro_empleados,monto_devolucion,nombre_contacto,cargo_contacto,correo,telefono,telefono_central,linkedin_url,estado,observacion,rubro,region,prioridad,score_empresa,segmento_empresa,segmento_monto,tipo_oportunidad,origen,campaign_id,kam_admin_id)
+      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'Sin asignar',$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+    `, id('kco'), data.rut, data.razon_social, data.nro_empleados, data.monto_devolucion, data.nombre_contacto, data.cargo_contacto, data.correo, data.telefono, data.telefono_central, data.linkedin_url, data.observacion, data.rubro, data.region, data.prioridad, data.score_empresa, data.segmento_empresa, data.segmento_monto, data.tipo_oportunidad, data.origen, data.campaign_id, isKamAdmin(session) ? sessionUserId(session) : null).catch((e: any) => { conError++; detalle.push({ rut: data.rut, razon_social: data.razon_social, estado: 'Error', motivo: String(e?.message || e) }); });
+    creadas++;
+    detalle.push({ rut: data.rut, razon_social: data.razon_social, estado: 'Creada', motivo: '' });
+  }
+  res.json({ total: rows.length, creadas, duplicadas, conError, detalle });
+});
+
+kamRouter.post('/companies/export-excel', async (req, res) => {
+  const session = requireKamAccess(req, res);
+  if (!session) return;
+  const userId = sessionUserId(session);
+  const where: string[] = [];
+  const params: any[] = [];
+  if (isKam(session)) { params.push(userId); where.push(`c.kam_asignado_id = $${params.length}`); }
+  for (const [field, column] of [['estado','c.estado'], ['rubro','c.rubro'], ['region','c.region'], ['prioridad','c.prioridad'], ['campaign_id','c.campaign_id']] as any[]) {
+    if (req.body?.[field]) { params.push(String(req.body[field])); where.push(`${column} = $${params.length}`); }
+  }
+  const rows = await prisma.$queryRawUnsafe<any[]>(`
+    select c.rut as "RUT", c.razon_social as "Razón Social", c.nro_empleados as "Nro Empleados", c.monto_devolucion as "Monto Devolución",
+      c.rubro as "Rubro", c.region as "Región", camp.nombre as "Campaña", coalesce(u.full_name,u.email,'Sin asignar') as "KAM",
+      c.estado as "Estado", c.prioridad as "Prioridad", c.score_empresa as "Score", c.nombre_contacto as "Contacto", c.cargo_contacto as "Cargo",
+      c.correo as "Correo", c.telefono as "Teléfono contacto", c.telefono_central as "Teléfono central", c.linkedin_url as "LinkedIn", c.proxima_gestion as "Próxima gestión", c.observacion as "Observación"
+    from operafix_kam_companies c
+    left join operafix_users u on u.id = c.kam_asignado_id
+    left join operafix_kam_campaigns camp on camp.id = c.campaign_id
+    ${where.length ? `where ${where.join(' and ')}` : ''}
+    order by c.created_at desc
+  `, ...params).catch(() => [] as any[]);
+  const buffer = workbookBuffer(rows, 'Empresas KAM');
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="empresas_kam.xlsx"');
+  res.send(buffer);
+});
+
+kamRouter.get('/agenda', async (req, res) => {
+  const session = requireKamAccess(req, res);
+  if (!session) return;
+  const userId = sessionUserId(session);
+  const where = isKam(session) ? 'where c.kam_asignado_id = $1' : '';
+  const params = isKam(session) ? [userId] : [];
+  const rows = await prisma.$queryRawUnsafe<any[]>(`
+    select c.id, c.razon_social, c.rut, c.estado, c.prioridad, c.proxima_gestion, c.fecha_ultimo_contacto,
+      c.monto_devolucion, coalesce(u.full_name,u.email,'Sin asignar') as kam,
+      case
+        when c.proxima_gestion < current_date then 'Vencida'
+        when c.proxima_gestion = current_date then 'Hoy'
+        when c.proxima_gestion = current_date + interval '1 day' then 'Mañana'
+        when c.kam_asignado_id is not null and c.fecha_ultimo_contacto is null then 'Sin primer contacto'
+        else 'Próxima'
+      end as alerta
+    from operafix_kam_companies c
+    left join operafix_users u on u.id = c.kam_asignado_id
+    ${where}
+    order by c.proxima_gestion nulls last, c.prioridad desc, c.score_empresa desc
+    limit 200
+  `, ...params).catch(() => [] as any[]);
   res.json(rows);
 });
 

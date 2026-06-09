@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type DragEvent } from "react";
-import { deleteJson, fetchJson, postJson, putJson } from "../api";
+import { deleteJson, downloadBlob, fetchJson, postJson, putJson, uploadForm } from "../api";
 import { getCurrentUser } from "../auth";
 
 type KamCompany = {
@@ -31,6 +31,8 @@ type KamCompany = {
   proxima_gestion?: string | null;
   probabilidad_cierre?: number | null;
   canal_origen?: string | null;
+  campaign_id?: string | null;
+  campaign_nombre?: string | null;
   source_company_id?: string | null;
   source_mandante_id?: string | null;
   source_mandante_name?: string | null;
@@ -63,6 +65,37 @@ type KamProfile = {
 };
 
 type UserRow = { id: string; full_name: string; email: string; role: string; active?: boolean };
+
+type KamCampaign = {
+  id: string;
+  nombre: string;
+  descripcion?: string | null;
+  estado?: string | null;
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
+  objetivo_monto?: number | string | null;
+  empresas?: number;
+  contactadas?: number;
+  interesadas?: number;
+  propuestas?: number;
+  ganadas?: number;
+  perdidas?: number;
+  monto_potencial?: number | string;
+  monto_ganado?: number | string;
+};
+
+type AgendaRow = {
+  id: string;
+  razon_social: string;
+  rut: string;
+  estado?: string | null;
+  prioridad?: string | null;
+  proxima_gestion?: string | null;
+  fecha_ultimo_contacto?: string | null;
+  monto_devolucion?: number | string | null;
+  kam?: string | null;
+  alerta?: string | null;
+};
 
 type RuleRow = {
   id: string;
@@ -145,6 +178,7 @@ const emptyCompany = {
   tipo_oportunidad: "Recuperaciones",
   origen: "Carga manual",
   canal_origen: "",
+  campaign_id: "",
   probabilidad_cierre: "",
   proxima_gestion: "",
 };
@@ -228,8 +262,10 @@ export default function KamAssignmentPage() {
   const user = getCurrentUser();
   const canAdmin = ["admin", "kam_admin", "interno"].includes(String(user?.role || ""));
   const canConfigure = ["admin", "kam_admin"].includes(String(user?.role || ""));
-  const [tab, setTab] = useState<"companies" | "profiles" | "rules" | "tracking" | "kanban">("tracking");
+  const [tab, setTab] = useState<"companies" | "profiles" | "rules" | "tracking" | "kanban" | "campaigns" | "agenda">("tracking");
   const [companies, setCompanies] = useState<KamCompany[]>([]);
+  const [campaigns, setCampaigns] = useState<KamCampaign[]>([]);
+  const [agenda, setAgenda] = useState<AgendaRow[]>([]);
   const [profiles, setProfiles] = useState<KamProfile[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [rules, setRules] = useState<RuleRow[]>([]);
@@ -241,6 +277,7 @@ export default function KamAssignmentPage() {
   const [filterPriority, setFilterPriority] = useState("");
   const [filterSegment, setFilterSegment] = useState("");
   const [filterQuick, setFilterQuick] = useState("");
+  const [filterCampaign, setFilterCampaign] = useState("");
   const [selected, setSelected] = useState<KamCompany | null>(null);
   const [activities, setActivities] = useState<KamActivity[]>([]);
   const [contacts, setContacts] = useState<KamContact[]>([]);
@@ -250,6 +287,8 @@ export default function KamAssignmentPage() {
   const [companyForm, setCompanyForm] = useState<any>(emptyCompany);
   const [profileForm, setProfileForm] = useState<any>(emptyProfile);
   const [ruleForm, setRuleForm] = useState<any>(emptyRule);
+  const [campaignForm, setCampaignForm] = useState<any>({ nombre: "", descripcion: "", estado: "Activa", fecha_inicio: "", fecha_fin: "", objetivo_monto: "" });
+  const [importCampaignId, setImportCampaignId] = useState("");
   const [recommendations, setRecommendations] = useState<KamProfile[]>([]);
   const [metrics, setMetrics] = useState<KamMetrics>({});
   const [manualKamId, setManualKamId] = useState("");
@@ -269,18 +308,24 @@ export default function KamAssignmentPage() {
         ? fetchJson<RuleRow[]>("/kam/rules")
         : Promise.resolve([] as RuleRow[]);
       const metricsPromise = fetchJson<KamMetrics>("/kam/metrics");
+      const campaignPromise = canAdmin ? fetchJson<KamCampaign[]>("/kam/campaigns") : Promise.resolve([] as KamCampaign[]);
+      const agendaPromise = fetchJson<AgendaRow[]>("/kam/agenda").catch(() => [] as AgendaRow[]);
 
-      const [companyRows, profileRows, ruleRows, metricRows] = await Promise.all([
+      const [companyRows, profileRows, ruleRows, metricRows, campaignRows, agendaRows] = await Promise.all([
         companyPromise,
         profilePromise,
         rulePromise,
         metricsPromise,
+        campaignPromise,
+        agendaPromise,
       ]);
 
       setCompanies(companyRows || []);
       setProfiles(profileRows || []);
       setRules(ruleRows || []);
       setMetrics(metricRows || {});
+      setCampaigns(campaignRows || []);
+      setAgenda(agendaRows || []);
 
       if (canConfigure) {
         const userRows = await fetchJson<UserRow[]>("/kam/users").catch(() => [] as UserRow[]);
@@ -308,6 +353,7 @@ export default function KamAssignmentPage() {
     rubros: uniqueSorted(companies.map((x) => x.rubro)),
     regiones: uniqueSorted(companies.map((x) => x.region)),
     segmentos: uniqueSorted(companies.map((x) => x.segmento_empresa)),
+    campaigns: uniqueSorted(companies.map((x) => x.campaign_nombre)),
   }), [companies]);
 
   const filteredCompanies = useMemo(() => {
@@ -332,9 +378,10 @@ export default function KamAssignmentPage() {
         && (!filterRegion || row.region === filterRegion)
         && (!filterPriority || row.prioridad === filterPriority)
         && (!filterSegment || row.segmento_empresa === filterSegment)
+        && (!filterCampaign || row.campaign_nombre === filterCampaign || row.campaign_id === filterCampaign)
         && quickOk;
     });
-  }, [companies, search, filterKam, filterEstado, filterRubro, filterRegion, filterPriority, filterSegment, filterQuick]);
+  }, [companies, search, filterKam, filterEstado, filterRubro, filterRegion, filterPriority, filterSegment, filterQuick, filterCampaign]);
 
   const dashboard = useMemo(() => {
     const rows = filteredCompanies;
@@ -386,6 +433,7 @@ export default function KamAssignmentPage() {
     setFilterPriority("");
     setFilterSegment("");
     setFilterQuick("");
+    setFilterCampaign("");
   };
 
   const kpis = useMemo(() => {
@@ -408,6 +456,7 @@ export default function KamAssignmentPage() {
       telefono_central: row.telefono_central || "",
       linkedin_url: row.linkedin_url || "",
       probabilidad_cierre: row.probabilidad_cierre || "",
+      campaign_id: row.campaign_id || "",
       proxima_gestion: row.proxima_gestion ? String(row.proxima_gestion).slice(0, 10) : "",
     });
     setManualKamId(row.kam_asignado_id || "");
@@ -645,6 +694,45 @@ export default function KamAssignmentPage() {
     setSaveMessage("Regla guardada correctamente.");
   }
 
+
+  async function saveCampaign() {
+    if (!campaignForm.nombre) {
+      alert("Debes ingresar el nombre de la campaña.");
+      return;
+    }
+    await postJson("/kam/campaigns", campaignForm);
+    setCampaignForm({ nombre: "", descripcion: "", estado: "Activa", fecha_inicio: "", fecha_fin: "", objetivo_monto: "" });
+    await loadAll();
+    setSaveMessage("Campaña guardada correctamente.");
+  }
+
+  async function importExcel(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const form = new FormData();
+    form.append("file", file);
+    if (importCampaignId) form.append("campaign_id", importCampaignId);
+    try {
+      const result = await uploadForm<any>("/kam/companies/import-excel", form);
+      setSaveMessage(`Importación lista: ${result.creadas || 0} creadas, ${result.duplicadas || 0} duplicadas, ${result.conError || 0} con error.`);
+      await loadAll();
+    } catch (error: any) {
+      alert(error?.message || "No se pudo importar el Excel.");
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  async function exportCompanies() {
+    await downloadBlob("/kam/companies/export-excel", {
+      estado: filterEstado || undefined,
+      rubro: filterRubro || undefined,
+      region: filterRegion || undefined,
+      prioridad: filterPriority || undefined,
+      campaign_id: filterCampaign && campaigns.find((c) => c.nombre === filterCampaign)?.id ? campaigns.find((c) => c.nombre === filterCampaign)?.id : undefined,
+    }, "empresas_kam.xlsx");
+  }
+
   function tomorrowDate() {
     const d = new Date();
     d.setDate(d.getDate() + 1);
@@ -716,6 +804,8 @@ export default function KamAssignmentPage() {
           <button className={tab === "companies" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("companies")}>Empresas</button>
           <button className={tab === "tracking" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("tracking")}>Dashboard KAM</button>
           <button className={tab === "kanban" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("kanban")}>Kanban</button>
+          <button className={tab === "agenda" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("agenda")}>Agenda</button>
+          {canAdmin && <button className={tab === "campaigns" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("campaigns")}>Campañas / Excel</button>}
           <button className={tab === "profiles" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("profiles")}>Ranking KAM</button>
           <button className={tab === "rules" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("rules")}>Reglas</button>
         </div>
@@ -734,6 +824,7 @@ export default function KamAssignmentPage() {
         <div className="zoho-table-toolbar">
           <strong>Filtros comerciales</strong>
           <button className="zoho-small-btn" type="button" onClick={clearFilters}>Limpiar filtros</button>
+          <button className="zoho-small-btn primary" type="button" onClick={exportCompanies}>Exportar Excel</button>
         </div>
         <div className="zoho-form-grid kam-filter-grid">
           <Field label="Buscar"><input className="zoho-input" placeholder="RUT, razón social, rubro, región, correo, teléfono" value={search} onChange={(e) => setSearch(e.target.value)} /></Field>
@@ -741,6 +832,7 @@ export default function KamAssignmentPage() {
           <Field label="Estado venta"><select className="zoho-input" value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)}><option value="">Todos</option>{ESTADOS_VENTA.map((x) => <option key={x} value={x}>{x}</option>)}</select></Field>
           <Field label="Rubro"><select className="zoho-input" value={filterRubro} onChange={(e) => setFilterRubro(e.target.value)}><option value="">Todos</option>{filterOptions.rubros.map((x) => <option key={x} value={x}>{x}</option>)}</select></Field>
           <Field label="Región"><select className="zoho-input" value={filterRegion} onChange={(e) => setFilterRegion(e.target.value)}><option value="">Todas</option>{filterOptions.regiones.map((x) => <option key={x} value={x}>{x}</option>)}</select></Field>
+          <Field label="Campaña"><select className="zoho-input" value={filterCampaign} onChange={(e) => setFilterCampaign(e.target.value)}><option value="">Todas</option>{filterOptions.campaigns.map((x) => <option key={x} value={x}>{x}</option>)}</select></Field>
           <Field label="Prioridad"><select className="zoho-input" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}><option value="">Todas</option><option>Estratégica</option><option>Alta</option><option>Media</option><option>Baja</option></select></Field>
           <Field label="Tamaño empresa"><select className="zoho-input" value={filterSegment} onChange={(e) => setFilterSegment(e.target.value)}><option value="">Todos</option>{filterOptions.segmentos.map((x) => <option key={x} value={x}>{x}</option>)}</select></Field>
           <Field label="Vista rápida"><select className="zoho-input" value={filterQuick} onChange={(e) => setFilterQuick(e.target.value)}><option value="">Todas</option><option value="sin_asignar">Sin asignar</option><option value="estrategicas">Estratégicas</option><option value="vencidas">Gestiones vencidas</option><option value="sin_contacto">Sin primer contacto</option><option value="ganadas">Ganadas</option><option value="perdidas">Perdidas</option><option value="reasignar">Reasignar</option></select></Field>
@@ -784,6 +876,12 @@ export default function KamAssignmentPage() {
                 <Field label="Nro Telefónico contacto"><input className="zoho-input" value={companyForm.telefono} onChange={(e) => setCompanyForm({ ...companyForm, telefono: e.target.value })} /></Field>
                 <Field label="Nro Telefónico central / empresa"><input className="zoho-input" value={companyForm.telefono_central} onChange={(e) => setCompanyForm({ ...companyForm, telefono_central: e.target.value })} /></Field>
                 <Field label="LinkedIn empresa"><input className="zoho-input" placeholder="https://www.linkedin.com/company/..." value={companyForm.linkedin_url} onChange={(e) => setCompanyForm({ ...companyForm, linkedin_url: e.target.value })} /></Field>
+                <Field label="Campaña comercial">
+                  <select className="zoho-input" value={companyForm.campaign_id || ""} onChange={(e) => setCompanyForm({ ...companyForm, campaign_id: e.target.value })}>
+                    <option value="">Sin campaña</option>
+                    {campaigns.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                  </select>
+                </Field>
                 <Field label="Tipo oportunidad">
                   <select className="zoho-input" value={companyForm.tipo_oportunidad} onChange={(e) => setCompanyForm({ ...companyForm, tipo_oportunidad: e.target.value })}>
                     <option>Recuperaciones</option><option>Ventas propias</option><option>Licitaciones</option><option>Referido</option><option>Campaña</option>
@@ -828,7 +926,7 @@ export default function KamAssignmentPage() {
               <table className="zoho-table kam-wide-table">
                 <thead>
                   <tr>
-                    <th>RUT</th><th>Razón Social</th><th>Mandante origen</th><th>Nro Empleados</th><th>Monto Dev.</th><th>Rubro</th><th>Región</th><th>Contactos</th><th>Nombre</th><th>Cargo</th><th>Correo</th><th>Tel. contacto</th><th>Tel. central</th><th>LinkedIn</th><th>Estado</th><th>Próxima gestión</th><th>Prob.</th><th>Prioridad</th><th>Score</th><th>KAM</th><th>Acciones</th>
+                    <th>RUT</th><th>Razón Social</th><th>Mandante origen</th><th>Campaña</th><th>Nro Empleados</th><th>Monto Dev.</th><th>Rubro</th><th>Región</th><th>Contactos</th><th>Nombre</th><th>Cargo</th><th>Correo</th><th>Tel. contacto</th><th>Tel. central</th><th>LinkedIn</th><th>Estado</th><th>Próxima gestión</th><th>Prob.</th><th>Prioridad</th><th>Score</th><th>KAM</th><th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -837,6 +935,7 @@ export default function KamAssignmentPage() {
                       <td>{row.rut}</td>
                       <td className="zoho-link-cell" onClick={() => editCompany(row)}>{row.razon_social}</td>
                       <td>{row.source_mandante_name || "Finanfix Solutions SPA"}</td>
+                      <td>{row.campaign_nombre || "—"}</td>
                       <td>{row.nro_empleados || "—"}</td>
                       <td>{money(row.monto_devolucion)}</td>
                       <td>{row.rubro || "—"}</td>
@@ -863,7 +962,7 @@ export default function KamAssignmentPage() {
                       </td>
                     </tr>
                   ))}
-                  {!filteredCompanies.length && <tr><td colSpan={21}>Sin empresas KAM cargadas.</td></tr>}
+                  {!filteredCompanies.length && <tr><td colSpan={22}>Sin empresas KAM cargadas.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -1072,6 +1171,50 @@ export default function KamAssignmentPage() {
             </div>
           </section>
         </section>
+      )}
+
+
+      {tab === "agenda" && (
+        <section className="zoho-table-wrap">
+          <div className="zoho-table-toolbar"><span>Agenda comercial y alertas</span><span className="zoho-help-text">Gestiones vencidas, de hoy, mañana y empresas sin primer contacto.</span></div>
+          <div className="zoho-table-scroll-x">
+            <table className="zoho-table kam-wide-table">
+              <thead><tr><th>Alerta</th><th>Empresa</th><th>RUT</th><th>KAM</th><th>Estado</th><th>Prioridad</th><th>Monto</th><th>Próxima gestión</th><th>Último contacto</th><th>Acción</th></tr></thead>
+              <tbody>
+                {agenda.map((row) => <tr key={row.id}>
+                  <td><strong>{row.alerta || "Próxima"}</strong></td><td>{row.razon_social}</td><td>{row.rut}</td><td>{row.kam || "Sin asignar"}</td><td>{row.estado || "—"}</td><td>{row.prioridad || "—"}</td><td>{money(row.monto_devolucion)}</td><td>{row.proxima_gestion ? String(row.proxima_gestion).slice(0,10) : "—"}</td><td>{row.fecha_ultimo_contacto ? String(row.fecha_ultimo_contacto).slice(0,10) : "—"}</td><td><button className="zoho-small-btn" onClick={() => { const company = companies.find((c) => c.id === row.id); if (company) { setTab("companies"); editCompany(company); } }}>Abrir</button></td>
+                </tr>)}
+                {!agenda.length && <tr><td colSpan={10}>Sin agenda comercial disponible.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {tab === "campaigns" && canAdmin && (
+        <div className="mandantes-layout">
+          <aside className="zoho-filter-panel">
+            <h2>Campañas e importación Excel</h2>
+            <div className="zoho-form-grid single-column-form">
+              <Field label="Nombre campaña"><input className="zoho-input" value={campaignForm.nombre} onChange={(e) => setCampaignForm({ ...campaignForm, nombre: e.target.value })} /></Field>
+              <Field label="Descripción"><textarea className="zoho-input" rows={3} value={campaignForm.descripcion} onChange={(e) => setCampaignForm({ ...campaignForm, descripcion: e.target.value })} /></Field>
+              <Field label="Estado"><select className="zoho-input" value={campaignForm.estado} onChange={(e) => setCampaignForm({ ...campaignForm, estado: e.target.value })}><option>Activa</option><option>Pausada</option><option>Cerrada</option></select></Field>
+              <Field label="Fecha inicio"><input className="zoho-input" type="date" value={campaignForm.fecha_inicio} onChange={(e) => setCampaignForm({ ...campaignForm, fecha_inicio: e.target.value })} /></Field>
+              <Field label="Fecha fin"><input className="zoho-input" type="date" value={campaignForm.fecha_fin} onChange={(e) => setCampaignForm({ ...campaignForm, fecha_fin: e.target.value })} /></Field>
+              <Field label="Objetivo monto"><input className="zoho-input" type="number" value={campaignForm.objetivo_monto} onChange={(e) => setCampaignForm({ ...campaignForm, objetivo_monto: e.target.value })} /></Field>
+              <button className="zoho-btn zoho-btn-primary" onClick={saveCampaign}>Guardar campaña</button>
+              <hr />
+              <Field label="Campaña para importar"><select className="zoho-input" value={importCampaignId} onChange={(e) => setImportCampaignId(e.target.value)}><option value="">Sin campaña</option>{campaigns.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select></Field>
+              <Field label="Importar Excel"><input className="zoho-input" type="file" accept=".xlsx,.xls" onChange={importExcel} /></Field>
+              <button className="zoho-btn" onClick={exportCompanies}>Exportar empresas filtradas</button>
+              <p className="zoho-help-text">Columnas aceptadas: RUT, Razón Social, Nro Empleados, Monto Devolución, Rubro, Región, Contacto, Cargo, Correo, Teléfono, Teléfono central y LinkedIn.</p>
+            </div>
+          </aside>
+          <section className="zoho-table-wrap">
+            <div className="zoho-table-toolbar"><span>Campañas comerciales {campaigns.length}</span></div>
+            <table className="zoho-table kam-wide-table"><thead><tr><th>Campaña</th><th>Estado</th><th>Empresas</th><th>Contactadas</th><th>Interesadas</th><th>Propuestas</th><th>Ganadas</th><th>Perdidas</th><th>Monto potencial</th><th>Monto ganado</th></tr></thead><tbody>{campaigns.map((c) => <tr key={c.id}><td>{c.nombre}</td><td>{c.estado || "—"}</td><td>{c.empresas || 0}</td><td>{c.contactadas || 0}</td><td>{c.interesadas || 0}</td><td>{c.propuestas || 0}</td><td>{c.ganadas || 0}</td><td>{c.perdidas || 0}</td><td>{money(c.monto_potencial)}</td><td>{money(c.monto_ganado)}</td></tr>)}{!campaigns.length && <tr><td colSpan={10}>Sin campañas creadas.</td></tr>}</tbody></table>
+          </section>
+        </div>
       )}
 
       {tab === "profiles" && (
