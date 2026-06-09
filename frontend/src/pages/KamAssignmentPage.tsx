@@ -229,20 +229,39 @@ export default function KamAssignmentPage() {
   async function loadAll() {
     setLoading(true);
     try {
+      const companyPromise = fetchJson<KamCompany[]>("/kam/companies");
+      const profilePromise = canAdmin || canConfigure
+        ? fetchJson<KamProfile[]>("/kam/profiles")
+        : Promise.resolve([] as KamProfile[]);
+      const rulePromise = canConfigure
+        ? fetchJson<RuleRow[]>("/kam/rules")
+        : Promise.resolve([] as RuleRow[]);
+      const metricsPromise = fetchJson<KamMetrics>("/kam/metrics");
+
       const [companyRows, profileRows, ruleRows, metricRows] = await Promise.all([
-        fetchJson<KamCompany[]>("/kam/companies"),
-        fetchJson<KamProfile[]>("/kam/profiles"),
-        fetchJson<RuleRow[]>("/kam/rules"),
-        fetchJson<KamMetrics>("/kam/metrics"),
+        companyPromise,
+        profilePromise,
+        rulePromise,
+        metricsPromise,
       ]);
-      setCompanies(companyRows);
-      setProfiles(profileRows);
-      setRules(ruleRows);
+
+      setCompanies(companyRows || []);
+      setProfiles(profileRows || []);
+      setRules(ruleRows || []);
       setMetrics(metricRows || {});
+
       if (canConfigure) {
         const userRows = await fetchJson<UserRow[]>("/kam/users").catch(() => [] as UserRow[]);
         setUsers(userRows.filter((item) => String(item.role).toLowerCase() === "kam" && item.active !== false));
       }
+    } catch (error: any) {
+      const message = String(error?.message || "");
+      if (message.toLowerCase().includes("debes iniciar sesión") || message.includes("401")) {
+        alert("Tu sesión venció o el token anterior quedó inválido después de la actualización. Inicia sesión nuevamente.");
+        window.location.href = "/login";
+        return;
+      }
+      alert(message || "No se pudo cargar el módulo KAM.");
     } finally {
       setLoading(false);
     }

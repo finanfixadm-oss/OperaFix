@@ -111,7 +111,7 @@ function isKam(session: SessionLike) {
 }
 
 function requireKamAccess(req: any, res: any) {
-  const session = parseSession(req) as SessionLike;
+  const session = (req.user || parseSession(req)) as SessionLike;
   if (!session) {
     res.status(401).json({ message: "Debes iniciar sesión." });
     return null;

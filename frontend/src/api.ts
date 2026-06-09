@@ -92,6 +92,7 @@ export async function fetchJson<T>(
 
   if (response.status === 401) {
     clearSession();
+    throw new Error("Debes iniciar sesión.");
   }
 
   if (!response.ok) {
