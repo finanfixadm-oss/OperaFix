@@ -298,3 +298,30 @@
   width: 100%;
   margin-top: 18px;
 }
+
+/* V108 - Popup único para crear, modificar, eliminar y administrar contactos */
+.kam-company-modal-grid {
+  grid-template-columns: repeat(3, minmax(190px, 1fr));
+  gap: 14px;
+}
+.kam-modal-large .kam-contact-builder-grid {
+  grid-template-columns: repeat(3, minmax(170px, 1fr));
+}
+.existing-contacts-list {
+  margin-bottom: 14px;
+}
+.kam-modal-footer .zoho-btn-danger {
+  margin-right: auto;
+}
+@media (max-width: 1100px) {
+  .kam-company-modal-grid,
+  .kam-modal-large .kam-contact-builder-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .kam-company-modal-grid,
+  .kam-modal-large .kam-contact-builder-grid {
+    grid-template-columns: 1fr;
+  }
+}

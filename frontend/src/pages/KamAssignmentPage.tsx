@@ -195,6 +195,8 @@ const emptyCompany = {
   canal_origen: "",
   campaign_id: "",
   probabilidad_cierre: "",
+  resultado_gestion: "",
+  motivo_perdida: "",
   proxima_gestion: "",
 };
 
@@ -3514,10 +3516,13 @@ export default function KamAssignmentPage() {
             </div>
             <div className="kam-modal-body">
               <div className="kam-modal-section">
-                <strong>Datos empresa</strong>
-                <span>Identificación, segmentación y potencial.</span>
+                <strong>{selected ? "Modificar empresa" : "Nueva empresa"}</strong>
+                <span>
+                  Usa este formulario para crear, modificar o preparar la eliminación de una empresa potencial.
+                </span>
               </div>
-              <div className="zoho-form-grid kam-filter-grid">
+
+              <div className="zoho-form-grid kam-company-modal-grid">
                 <Field label="RUT">
                   <input
                     className="zoho-input"
@@ -3585,154 +3590,6 @@ export default function KamAssignmentPage() {
                     }
                   />
                 </Field>
-                <Field label="Teléfono central / empresa">
-                  <input
-                    className="zoho-input"
-                    value={companyForm.telefono_central}
-                    onChange={(e) =>
-                      setCompanyForm({
-                        ...companyForm,
-                        telefono_central: e.target.value,
-                      })
-                    }
-                  />
-                </Field>
-                <Field label="LinkedIn empresa">
-                  <input
-                    className="zoho-input"
-                    placeholder="https://www.linkedin.com/company/..."
-                    value={companyForm.linkedin_url}
-                    onChange={(e) =>
-                      setCompanyForm({
-                        ...companyForm,
-                        linkedin_url: e.target.value,
-                      })
-                    }
-                  />
-                </Field>
-              </div>
-
-              <div className="kam-modal-section">
-                <strong>Asignación y seguimiento</strong>
-                <span>Estado comercial, campaña y próxima gestión.</span>
-              </div>
-              <div className="zoho-form-grid kam-filter-grid">
-                <Field label="Estado">
-                  <select
-                    className="zoho-input"
-                    value={companyForm.estado}
-                    onChange={(e) =>
-                      setCompanyForm({ ...companyForm, estado: e.target.value })
-                    }
-                  >
-                    {ESTADOS_VENTA.map((x) => (
-                      <option key={x}>{x}</option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Campaña">
-                  <select
-                    className="zoho-input"
-                    value={companyForm.campaign_id || ""}
-                    onChange={(e) =>
-                      setCompanyForm({
-                        ...companyForm,
-                        campaign_id: e.target.value,
-                      })
-                    }
-                  >
-                    <option value="">Sin campaña</option>
-                    {campaigns.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Tipo oportunidad">
-                  <input
-                    className="zoho-input"
-                    value={companyForm.tipo_oportunidad}
-                    onChange={(e) =>
-                      setCompanyForm({
-                        ...companyForm,
-                        tipo_oportunidad: e.target.value,
-                      })
-                    }
-                  />
-                </Field>
-                <Field label="Canal origen">
-                  <input
-                    className="zoho-input"
-                    value={companyForm.canal_origen}
-                    onChange={(e) =>
-                      setCompanyForm({
-                        ...companyForm,
-                        canal_origen: e.target.value,
-                      })
-                    }
-                  />
-                </Field>
-                <Field label="Próxima gestión">
-                  <input
-                    className="zoho-input"
-                    type="date"
-                    value={companyForm.proxima_gestion}
-                    onChange={(e) =>
-                      setCompanyForm({
-                        ...companyForm,
-                        proxima_gestion: e.target.value,
-                      })
-                    }
-                  />
-                </Field>
-                <Field label="Probabilidad cierre %">
-                  <input
-                    className="zoho-input"
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={companyForm.probabilidad_cierre}
-                    onChange={(e) =>
-                      setCompanyForm({
-                        ...companyForm,
-                        probabilidad_cierre: e.target.value,
-                      })
-                    }
-                  />
-                </Field>
-                <Field label="Motivo pérdida">
-                  <input
-                    className="zoho-input"
-                    value={companyForm.motivo_perdida || ""}
-                    onChange={(e) =>
-                      setCompanyForm({
-                        ...companyForm,
-                        motivo_perdida: e.target.value,
-                      })
-                    }
-                  />
-                </Field>
-                <Field label="Observación">
-                  <textarea
-                    className="zoho-input"
-                    rows={2}
-                    value={companyForm.observacion}
-                    onChange={(e) =>
-                      setCompanyForm({
-                        ...companyForm,
-                        observacion: e.target.value,
-                      })
-                    }
-                  />
-                </Field>
-              </div>
-
-              <div className="kam-modal-section">
-                <strong>Contacto principal</strong>
-                <span>Estos datos quedan visibles en la tabla principal.</span>
-              </div>
-              <div className="zoho-form-grid kam-filter-grid">
                 <Field label="Nombre contacto">
                   <input
                     className="zoho-input"
@@ -3766,7 +3623,7 @@ export default function KamAssignmentPage() {
                     }
                   />
                 </Field>
-                <Field label="Nro telefónico contacto">
+                <Field label="Nro Telefónico contacto">
                   <input
                     className="zoho-input"
                     value={companyForm.telefono}
@@ -3778,117 +3635,289 @@ export default function KamAssignmentPage() {
                     }
                   />
                 </Field>
+                <Field label="Nro Telefónico central / empresa">
+                  <input
+                    className="zoho-input"
+                    value={companyForm.telefono_central}
+                    onChange={(e) =>
+                      setCompanyForm({
+                        ...companyForm,
+                        telefono_central: e.target.value,
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="LinkedIn empresa">
+                  <input
+                    className="zoho-input"
+                    placeholder="https://www.linkedin.com/company/..."
+                    value={companyForm.linkedin_url}
+                    onChange={(e) =>
+                      setCompanyForm({
+                        ...companyForm,
+                        linkedin_url: e.target.value,
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="Campaña comercial">
+                  <select
+                    className="zoho-input"
+                    value={companyForm.campaign_id || ""}
+                    onChange={(e) =>
+                      setCompanyForm({
+                        ...companyForm,
+                        campaign_id: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="">Sin campaña</option>
+                    {campaigns.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Tipo oportunidad">
+                  <select
+                    className="zoho-input"
+                    value={companyForm.tipo_oportunidad}
+                    onChange={(e) =>
+                      setCompanyForm({
+                        ...companyForm,
+                        tipo_oportunidad: e.target.value,
+                      })
+                    }
+                  >
+                    <option>Recuperaciones</option>
+                    <option>Licitaciones</option>
+                    <option>Venta directa</option>
+                    <option>Regularización</option>
+                    <option>Renovación</option>
+                    <option>Otra</option>
+                  </select>
+                </Field>
+                <Field label="Estado">
+                  <select
+                    className="zoho-input"
+                    value={companyForm.estado}
+                    onChange={(e) =>
+                      setCompanyForm({ ...companyForm, estado: e.target.value })
+                    }
+                  >
+                    {ESTADOS_VENTA.map((x) => (
+                      <option key={x}>{x}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Próxima gestión">
+                  <input
+                    className="zoho-input"
+                    type="date"
+                    value={companyForm.proxima_gestion}
+                    onChange={(e) =>
+                      setCompanyForm({
+                        ...companyForm,
+                        proxima_gestion: e.target.value,
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="Probabilidad cierre %">
+                  <input
+                    className="zoho-input"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={companyForm.probabilidad_cierre}
+                    onChange={(e) =>
+                      setCompanyForm({
+                        ...companyForm,
+                        probabilidad_cierre: e.target.value,
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="Resultado gestión">
+                  <input
+                    className="zoho-input"
+                    value={companyForm.resultado_gestion || ""}
+                    onChange={(e) =>
+                      setCompanyForm({
+                        ...companyForm,
+                        resultado_gestion: e.target.value,
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="Motivo pérdida">
+                  <input
+                    className="zoho-input"
+                    value={companyForm.motivo_perdida || ""}
+                    onChange={(e) =>
+                      setCompanyForm({
+                        ...companyForm,
+                        motivo_perdida: e.target.value,
+                      })
+                    }
+                  />
+                </Field>
               </div>
 
-              {!selected && canAdmin && (
-                <div className="kam-contact-builder">
-                  <div className="kam-section-title">
-                    <strong>Contactos adicionales</strong>
-                    <span>
-                      Puedes agregar 1, 2, 3, 4 o más contactos antes de
-                      guardar.
-                    </span>
-                  </div>
-                  <div className="kam-contact-builder-grid">
-                    <input
-                      className="zoho-input"
-                      placeholder="Nombre contacto"
-                      value={contactForm.nombre}
-                      onChange={(e) =>
-                        setContactForm({
-                          ...contactForm,
-                          nombre: e.target.value,
-                        })
-                      }
-                    />
-                    <input
-                      className="zoho-input"
-                      placeholder="Cargo"
-                      value={contactForm.cargo}
-                      onChange={(e) =>
-                        setContactForm({
-                          ...contactForm,
-                          cargo: e.target.value,
-                        })
-                      }
-                    />
-                    <input
-                      className="zoho-input"
-                      placeholder="Correo"
-                      value={contactForm.correo}
-                      onChange={(e) =>
-                        setContactForm({
-                          ...contactForm,
-                          correo: e.target.value,
-                        })
-                      }
-                    />
-                    <input
-                      className="zoho-input"
-                      placeholder="Teléfono directo"
-                      value={contactForm.telefono_contacto}
-                      onChange={(e) =>
-                        setContactForm({
-                          ...contactForm,
-                          telefono_contacto: e.target.value,
-                        })
-                      }
-                    />
-                    <input
-                      className="zoho-input"
-                      placeholder="LinkedIn contacto"
-                      value={contactForm.linkedin_url}
-                      onChange={(e) =>
-                        setContactForm({
-                          ...contactForm,
-                          linkedin_url: e.target.value,
-                        })
-                      }
-                    />
-                    <label className="kam-checkbox-line">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(contactForm.es_principal)}
-                        onChange={(e) =>
-                          setContactForm({
-                            ...contactForm,
-                            es_principal: e.target.checked,
-                          })
-                        }
-                      />{" "}
-                      Marcar como principal
-                    </label>
-                    <button
-                      className="zoho-small-btn primary"
-                      type="button"
-                      onClick={addDraftContact}
-                    >
-                      Agregar contacto
-                    </button>
-                  </div>
-                  <div className="kam-draft-contact-list">
-                    {draftContacts.map((c, idx) => (
-                      <div
-                        className="kam-draft-contact"
-                        key={`${c.nombre}-${idx}`}
-                      >
+              <div className="kam-contact-builder">
+                <div className="kam-section-title">
+                  <strong>Contactos adicionales</strong>
+                  <span>
+                    Puedes crear 1, 2, 3 o más contactos antes de guardar la empresa. En empresas existentes puedes agregar, modificar o eliminar contactos.
+                  </span>
+                </div>
+
+                {selected && contacts.length > 0 && (
+                  <div className="kam-draft-contact-list existing-contacts-list">
+                    {contacts.map((contact) => (
+                      <div className="kam-draft-contact" key={contact.id}>
                         <div>
                           <strong>
-                            {c.nombre} {c.es_principal ? "· Principal" : ""}
+                            {contact.nombre} {contact.es_principal ? "· Principal" : ""}
                           </strong>
                           <span>
-                            {c.cargo || "Sin cargo"} ·{" "}
-                            {c.correo || c.telefono_contacto || c.linkedin_url}
+                            {contact.cargo || "Sin cargo"} · {contact.correo || contact.telefono_contacto || contact.linkedin_url || "Sin datos de contacto"}
                           </span>
                         </div>
                         <div className="zoho-actions-row compact-actions">
                           <button
                             className="zoho-small-btn"
                             type="button"
-                            onClick={() => promoteDraftContact(idx)}
+                            onClick={() => editContact(contact)}
                           >
-                            Principal
+                            Modificar
                           </button>
+                          <button
+                            className="zoho-small-btn danger"
+                            type="button"
+                            onClick={() => deleteContact(contact)}
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="kam-contact-builder-grid">
+                  <input
+                    className="zoho-input"
+                    placeholder="Nombre contacto"
+                    value={contactForm.nombre}
+                    onChange={(e) =>
+                      setContactForm({
+                        ...contactForm,
+                        nombre: e.target.value,
+                      })
+                    }
+                  />
+                  <input
+                    className="zoho-input"
+                    placeholder="Cargo"
+                    value={contactForm.cargo}
+                    onChange={(e) =>
+                      setContactForm({
+                        ...contactForm,
+                        cargo: e.target.value,
+                      })
+                    }
+                  />
+                  <input
+                    className="zoho-input"
+                    placeholder="Correo"
+                    value={contactForm.correo}
+                    onChange={(e) =>
+                      setContactForm({
+                        ...contactForm,
+                        correo: e.target.value,
+                      })
+                    }
+                  />
+                  <input
+                    className="zoho-input"
+                    placeholder="Teléfono contacto"
+                    value={contactForm.telefono_contacto}
+                    onChange={(e) =>
+                      setContactForm({
+                        ...contactForm,
+                        telefono_contacto: e.target.value,
+                      })
+                    }
+                  />
+                  <input
+                    className="zoho-input"
+                    placeholder="LinkedIn contacto"
+                    value={contactForm.linkedin_url}
+                    onChange={(e) =>
+                      setContactForm({
+                        ...contactForm,
+                        linkedin_url: e.target.value,
+                      })
+                    }
+                  />
+                  <label className="kam-checkbox-line">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(contactForm.es_principal)}
+                      onChange={(e) =>
+                        setContactForm({
+                          ...contactForm,
+                          es_principal: e.target.checked,
+                        })
+                      }
+                    />{" "}
+                    Principal
+                  </label>
+                  <button
+                    className="zoho-small-btn primary"
+                    type="button"
+                    onClick={selected ? saveContact : addDraftContact}
+                  >
+                    {selected ? (editingContactId ? "Guardar contacto" : "Agregar contacto") : "Agregar contacto"}
+                  </button>
+                  {editingContactId && (
+                    <button
+                      className="zoho-small-btn"
+                      type="button"
+                      onClick={() => {
+                        setEditingContactId(null);
+                        setContactForm(emptyContact);
+                      }}
+                    >
+                      Cancelar edición
+                    </button>
+                  )}
+                </div>
+
+                {!selected && (
+                  <div className="kam-draft-contact-list">
+                    {draftContacts.map((c, idx) => (
+                      <div className="kam-draft-contact" key={`${c.nombre}-${idx}`}>
+                        <div>
+                          <strong>
+                            {c.nombre} {c.es_principal ? "· Principal" : ""}
+                          </strong>
+                          <span>
+                            {c.cargo || "Sin cargo"} · {c.correo || c.telefono_contacto || c.linkedin_url}
+                          </span>
+                        </div>
+                        <div className="zoho-actions-row compact-actions">
+                          {!c.es_principal && (
+                            <button
+                              className="zoho-small-btn"
+                              type="button"
+                              onClick={() => promoteDraftContact(idx)}
+                            >
+                              Principal
+                            </button>
+                          )}
                           <button
                             className="zoho-small-btn danger"
                             type="button"
@@ -3905,8 +3934,28 @@ export default function KamAssignmentPage() {
                       </p>
                     )}
                   </div>
-                </div>
-              )}
+                )}
+
+                {selected && !contacts.length && (
+                  <p className="zoho-help-text">
+                    Esta empresa aún no tiene contactos adicionales registrados.
+                  </p>
+                )}
+              </div>
+
+              <Field label="Observación">
+                <textarea
+                  className="zoho-input"
+                  rows={3}
+                  value={companyForm.observacion}
+                  onChange={(e) =>
+                    setCompanyForm({
+                      ...companyForm,
+                      observacion: e.target.value,
+                    })
+                  }
+                />
+              </Field>
             </div>
             <div className="kam-modal-footer">
               <button
@@ -3916,6 +3965,15 @@ export default function KamAssignmentPage() {
               >
                 Cancelar
               </button>
+              {selected && canAdmin && (
+                <button
+                  className="zoho-btn zoho-btn-danger"
+                  type="button"
+                  onClick={() => deleteCompany(selected)}
+                >
+                  Eliminar empresa
+                </button>
+              )}
               <button
                 className="zoho-btn zoho-btn-primary"
                 type="button"
