@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { fetchJson, postJson, putJson } from "../api";
 import { getCurrentUser } from "../auth";
 
@@ -223,6 +223,8 @@ export default function KamAssignmentPage() {
   const [metrics, setMetrics] = useState<KamMetrics>({});
   const [manualKamId, setManualKamId] = useState("");
   const [loading, setLoading] = useState(false);
+  const [draggingCompanyId, setDraggingCompanyId] = useState<string | null>(null);
+  const [kanbanUpdatingId, setKanbanUpdatingId] = useState<string | null>(null);
 
   async function loadAll() {
     setLoading(true);
@@ -484,6 +486,65 @@ export default function KamAssignmentPage() {
     await loadAll();
   }
 
+  function tomorrowDate() {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }
+
+  async function moveKanbanCard(row: KamCompany, nuevoEstado: string) {
+    const estadoActual = String(row.estado || "Sin asignar");
+    if (estadoActual === nuevoEstado || kanbanUpdatingId) return;
+
+    let motivo_perdida = row.motivo_perdida || "";
+    if (nuevoEstado === "Perdida" && !motivo_perdida) {
+      const motivo = window.prompt("Indica el motivo de pérdida para mover esta empresa a Perdida:");
+      if (!motivo || !motivo.trim()) return;
+      motivo_perdida = motivo.trim();
+    }
+
+    const proximaGestion = row.proxima_gestion
+      ? String(row.proxima_gestion).slice(0, 10)
+      : row.kam_asignado_id && !["Ganada", "Perdida", "Congelada"].includes(nuevoEstado)
+        ? tomorrowDate()
+        : "";
+
+    setKanbanUpdatingId(row.id);
+    try {
+      await putJson(`/kam/companies/${row.id}`, {
+        estado: nuevoEstado,
+        motivo_perdida,
+        proxima_gestion: proximaGestion || null,
+        actividad_tipo: "Cambio de estado por Kanban",
+        actividad_observacion: `Tarjeta movida desde ${estadoActual} a ${nuevoEstado}.`,
+      });
+      setCompanies((prev) => prev.map((item) => item.id === row.id ? { ...item, estado: nuevoEstado, motivo_perdida, proxima_gestion: proximaGestion || item.proxima_gestion } : item));
+      await loadAll();
+    } catch (error: any) {
+      alert(error?.message || "No se pudo cambiar el estado desde el Kanban.");
+    } finally {
+      setKanbanUpdatingId(null);
+      setDraggingCompanyId(null);
+    }
+  }
+
+  function onKanbanDragStart(event: DragEvent<HTMLElement>, row: KamCompany) {
+    event.dataTransfer.setData("text/plain", row.id);
+    event.dataTransfer.effectAllowed = "move";
+    setDraggingCompanyId(row.id);
+  }
+
+  async function onKanbanDrop(event: DragEvent<HTMLElement>, nuevoEstado: string) {
+    event.preventDefault();
+    const id = event.dataTransfer.getData("text/plain") || draggingCompanyId;
+    const row = companies.find((item) => item.id === id);
+    if (!row) {
+      setDraggingCompanyId(null);
+      return;
+    }
+    await moveKanbanCard(row, nuevoEstado);
+  }
+
   return (
     <div className="zoho-module-page kam-module-page">
       <div className="zoho-module-header">
@@ -696,23 +757,43 @@ export default function KamAssignmentPage() {
 
       {tab === "kanban" && (
         <section className="zoho-dashboard-stack">
-          <div className="zoho-table-toolbar"><span>Tablero Kanban comercial</span><span className="zoho-help-text">Arrastra visualmente la gestión desde pendiente hasta ganada/perdida. Para cambiar el estado, abre la tarjeta y guarda el seguimiento.</span></div>
+          <div className="zoho-table-toolbar">
+            <span>Tablero Kanban comercial</span>
+            <span className="zoho-help-text">Arrastra una tarjeta a otra columna para cambiar automáticamente el estado de venta. El cambio queda registrado en la bitácora.</span>
+          </div>
           <div className="kam-kanban-board">
             {ESTADOS_VENTA.filter((estado) => estado !== "Sin asignar").map((estado) => {
               const items = filteredCompanies.filter((row) => String(row.estado || "") === estado).slice(0, 50);
+              const isDropTarget = Boolean(draggingCompanyId);
               return (
-                <div className="kam-kanban-column" key={estado}>
+                <div
+                  className={`kam-kanban-column ${isDropTarget ? "kam-kanban-column-droppable" : ""}`}
+                  key={estado}
+                  onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }}
+                  onDrop={(event) => onKanbanDrop(event, estado)}
+                >
                   <h3>{estado} <span>{items.length}</span></h3>
                   {items.map((row) => (
-                    <button type="button" className="kam-kanban-card" key={row.id} onClick={() => { setTab("companies"); editCompany(row); }}>
+                    <button
+                      type="button"
+                      className={`kam-kanban-card ${draggingCompanyId === row.id ? "kam-kanban-card-dragging" : ""}`}
+                      key={row.id}
+                      draggable={kanbanUpdatingId !== row.id}
+                      onDragStart={(event) => onKanbanDragStart(event, row)}
+                      onDragEnd={() => setDraggingCompanyId(null)}
+                      onClick={() => { setTab("companies"); editCompany(row); }}
+                      disabled={kanbanUpdatingId === row.id}
+                      title="Arrastra esta tarjeta a otra columna para cambiar su estado"
+                    >
                       <strong>{row.razon_social}</strong>
                       <span>{row.kam_asignado_nombre || "Sin asignar"}</span>
                       <span>{money(row.monto_devolucion)} · {row.nro_empleados || "—"} trab.</span>
                       <span>{row.rubro || "Sin rubro"} · {row.region || "Sin región"}</span>
                       <span className={isOverdue(row.proxima_gestion) ? "kam-alert-text" : ""}>Próxima: {row.proxima_gestion ? String(row.proxima_gestion).slice(0, 10) : "sin fecha"}</span>
+                      {kanbanUpdatingId === row.id && <span className="kam-saving-text">Actualizando estado...</span>}
                     </button>
                   ))}
-                  {!items.length && <p className="zoho-help-text">Sin empresas</p>}
+                  {!items.length && <p className="zoho-help-text">Suelta aquí una tarjeta para cambiarla a este estado.</p>}
                 </div>
               );
             })}
