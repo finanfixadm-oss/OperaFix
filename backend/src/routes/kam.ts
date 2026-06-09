@@ -40,6 +40,9 @@ type KamCompany = {
   cargo_contacto?: string | null;
   correo?: string | null;
   telefono?: string | null;
+  telefono_central?: string | null;
+  linkedin_url?: string | null;
+  contactos_count?: number | null;
   estado?: string | null;
   observacion?: string | null;
   rubro?: string | null;
@@ -249,6 +252,8 @@ async function ensureKamTables() {
       cargo_contacto text,
       correo text,
       telefono text,
+      telefono_central text,
+      linkedin_url text,
       estado text not null default 'Sin asignar',
       observacion text,
       rubro text,
@@ -322,6 +327,23 @@ async function ensureKamTables() {
     )
   `);
 
+
+  await prisma.$executeRawUnsafe(`
+    create table if not exists operafix_kam_company_contacts (
+      id text primary key,
+      company_id text not null,
+      nombre text not null,
+      cargo text,
+      correo text,
+      telefono_contacto text,
+      linkedin_url text,
+      es_principal boolean not null default false,
+      observacion text,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `);
+
   const profileColumns: Array<[string, string]> = [
     ['user_id', 'text'], ['nivel_experiencia', `text not null default 'Junior'`], ['experiencia_licitaciones', 'integer not null default 0'],
     ['experiencia_ventas', 'integer not null default 0'], ['experiencia_recuperaciones', 'integer not null default 0'], ['experiencia_empresas_grandes', 'integer not null default 0'],
@@ -333,7 +355,7 @@ async function ensureKamTables() {
 
   const companyColumns: Array<[string, string]> = [
     ['rut', 'text'], ['razon_social', 'text'], ['nro_empleados', 'integer'], ['monto_devolucion', 'numeric(18,2)'], ['nombre_contacto', 'text'],
-    ['cargo_contacto', 'text'], ['correo', 'text'], ['telefono', 'text'], ['estado', `text not null default 'Sin asignar'`], ['observacion', 'text'], ['rubro', 'text'], ['region', 'text'],
+    ['cargo_contacto', 'text'], ['correo', 'text'], ['telefono', 'text'], ['telefono_central', 'text'], ['linkedin_url', 'text'], ['estado', `text not null default 'Sin asignar'`], ['observacion', 'text'], ['rubro', 'text'], ['region', 'text'],
     ['prioridad', 'text'], ['score_empresa', 'integer not null default 0'], ['segmento_empresa', 'text'], ['segmento_monto', 'text'], ['tipo_oportunidad', 'text'], ['origen', 'text'],
     ['kam_asignado_id', 'text'], ['kam_admin_id', 'text'], ['fecha_asignacion', 'timestamptz'], ['fecha_ultimo_contacto', 'timestamptz'], ['proxima_gestion', 'date'],
     ['resultado_gestion', 'text'], ['motivo_perdida', 'text'], ['probabilidad_cierre', 'integer'], ['canal_origen', 'text'], ['source_company_id', 'text'], ['source_mandante_id', 'text'],
@@ -361,8 +383,16 @@ async function ensureKamTables() {
   ];
   for (const [col, def] of activityColumns) await addColumnIfMissing('operafix_kam_activities', col, def);
 
+  const contactColumns: Array<[string, string]> = [
+    ['company_id', 'text'], ['nombre', 'text'], ['cargo', 'text'], ['correo', 'text'], ['telefono_contacto', 'text'],
+    ['linkedin_url', 'text'], ['es_principal', 'boolean not null default false'], ['observacion', 'text'],
+    ['created_at', 'timestamptz not null default now()'], ['updated_at', 'timestamptz not null default now()'],
+  ];
+  for (const [col, def] of contactColumns) await addColumnIfMissing('operafix_kam_company_contacts', col, def);
+
   await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_activities_company on operafix_kam_activities(company_id)`).catch(() => null);
   await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_activities_kam on operafix_kam_activities(kam_id)`).catch(() => null);
+  await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_contacts_company on operafix_kam_company_contacts(company_id)`).catch(() => null);
 
   await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_companies_rut on operafix_kam_companies(rut)`).catch(() => null);
   await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_companies_kam on operafix_kam_companies(kam_asignado_id)`).catch(() => null);
@@ -405,7 +435,7 @@ async function syncFinanfixPotentialCompanies() {
       join mandantes m on m.id = c.mandante_id
       where (${FINANFIX_MANDANTE_PATTERNS.map((_, index) => `m.name ilike $${index + 1}`).join(' or ')})
       order by c.razon_social asc
-    `, ...FINANFIX_MANDANTE_PATTERNS).catch((error) => {
+    `, ...FINANFIX_MANDANTE_PATTERNS).catch((error: any) => {
       console.error('[KAM] No se pudo sincronizar empresas Finanfix:', error);
       return [] as any[];
     });
@@ -413,6 +443,22 @@ async function syncFinanfixPotentialCompanies() {
     for (const row of rows) {
       const monto = numberOrNull(row.estimated_amount);
       const score = companyScore({ monto_devolucion: monto });
+      const duplicate = await findDuplicateCompany(String(row.rut || ''), String(row.razon_social || ''));
+      if (duplicate && String(duplicate.id || '') !== String(row.source_company_id || '')) {
+        await prisma.$executeRawUnsafe(`
+          update operafix_kam_companies set
+            source_company_id = coalesce(source_company_id, $2),
+            source_mandante_id = coalesce(source_mandante_id, $3),
+            source_mandante_name = coalesce(source_mandante_name, $4),
+            monto_devolucion = coalesce(monto_devolucion, $5),
+            nombre_contacto = coalesce(nombre_contacto, $6),
+            correo = coalesce(correo, $7),
+            origen = coalesce(origen, 'Registro empresas - Finanfix Solutions SPA'),
+            updated_at = now()
+          where id = $1
+        `, duplicate.id, String(row.source_company_id), String(row.source_mandante_id), String(row.source_mandante_name || 'Finanfix Solutions SPA'), monto, strOrNull(row.owner_name), strOrNull(row.email)).catch((error: any) => console.error('[KAM] No se pudo vincular empresa duplicada Finanfix:', error));
+        continue;
+      }
       await prisma.$executeRawUnsafe(`
         insert into operafix_kam_companies (
           id, source_company_id, source_mandante_id, source_mandante_name, rut, razon_social,
@@ -433,7 +479,7 @@ async function syncFinanfixPotentialCompanies() {
         id('kco'), String(row.source_company_id), String(row.source_mandante_id), String(row.source_mandante_name || 'Finanfix Solutions SPA'),
         String(row.rut || ''), String(row.razon_social || ''), monto, strOrNull(row.owner_name), strOrNull(row.email),
         priority(score), score, segmentEmployees(null), segmentAmount(monto)
-      ).catch((error) => console.error('[KAM] No se pudo insertar empresa potencial:', error));
+      ).catch((error: any) => console.error('[KAM] No se pudo insertar empresa potencial:', error));
     }
     return rows.length;
   } catch (error) {
@@ -518,6 +564,73 @@ async function fetchCompany(companyId: string) {
   return rows[0] || null;
 }
 
+async function findDuplicateCompany(rut?: string | null, razonSocial?: string | null, excludeId?: string | null) {
+  const rutValue = String(rut || '').trim();
+  const razonValue = String(razonSocial || '').trim();
+  if (!rutValue && !razonValue) return null;
+  const params: any[] = [];
+  const where: string[] = [];
+  if (rutValue) {
+    params.push(rutValue);
+    where.push(`regexp_replace(upper(coalesce(rut,'')), '[^0-9K]', '', 'g') = regexp_replace(upper($${params.length}), '[^0-9K]', '', 'g')`);
+  }
+  if (razonValue) {
+    params.push(razonValue);
+    where.push(`lower(trim(coalesce(razon_social,''))) = lower(trim($${params.length}))`);
+  }
+  if (excludeId) {
+    params.push(excludeId);
+    where.push(`id <> $${params.length}`);
+  }
+  const rows = await prisma.$queryRawUnsafe<any[]>(`
+    select id, rut, razon_social
+    from operafix_kam_companies
+    where (${where.filter((w) => !w.startsWith('id <>')).join(' or ')}) ${excludeId ? `and id <> $${params.length}` : ''}
+    limit 1
+  `, ...params).catch(() => [] as any[]);
+  return rows[0] || null;
+}
+
+async function canAccessCompany(session: SessionLike, companyId: string) {
+  const company = await fetchCompany(companyId);
+  if (!company) return { company: null, ok: false, status: 404, message: 'Empresa KAM no encontrada.' };
+  if (isKam(session) && company.kam_asignado_id !== sessionUserId(session)) {
+    return { company, ok: false, status: 403, message: 'Solo puedes gestionar empresas de tu cartera.' };
+  }
+  return { company, ok: true, status: 200, message: '' };
+}
+
+function contactPayload(body: any) {
+  return {
+    nombre: String(body.nombre || body.nombre_contacto || '').trim(),
+    cargo: strOrNull(body.cargo),
+    correo: strOrNull(body.correo),
+    telefono_contacto: strOrNull(body.telefono_contacto ?? body.telefono ?? body.nro_telefonico),
+    linkedin_url: strOrNull(body.linkedin_url ?? body.linkedin),
+    es_principal: Boolean(body.es_principal),
+    observacion: strOrNull(body.observacion),
+  };
+}
+
+async function applyPrincipalContact(companyId: string, contact: any) {
+  if (!contact?.es_principal) return;
+  await prisma.$executeRawUnsafe(`
+    update operafix_kam_company_contacts
+    set es_principal = false, updated_at = now()
+    where company_id = $1 and id <> $2
+  `, companyId, contact.id).catch(() => null);
+  await prisma.$executeRawUnsafe(`
+    update operafix_kam_companies set
+      nombre_contacto = coalesce($2, nombre_contacto),
+      cargo_contacto = coalesce($3, cargo_contacto),
+      correo = coalesce($4, correo),
+      telefono = coalesce($5, telefono),
+      linkedin_url = coalesce($6, linkedin_url),
+      updated_at = now()
+    where id = $1
+  `, companyId, strOrNull(contact.nombre), strOrNull(contact.cargo), strOrNull(contact.correo), strOrNull(contact.telefono_contacto), strOrNull(contact.linkedin_url)).catch(() => null);
+}
+
 function companyPayload(body: any) {
   const nroEmpleados = integerOrNull(body.nro_empleados ?? body.nroEmpleados);
   const montoDevolucion = numberOrNull(body.monto_devolucion ?? body.montoDevolucion);
@@ -536,7 +649,9 @@ function companyPayload(body: any) {
     nombre_contacto: strOrNull(body.nombre_contacto ?? body.nombre),
     cargo_contacto: strOrNull(body.cargo_contacto ?? body.cargo),
     correo: strOrNull(body.correo),
-    telefono: strOrNull(body.telefono ?? body.nro_telefonico),
+    telefono: strOrNull(body.telefono ?? body.nro_telefonico ?? body.telefono_contacto),
+    telefono_central: strOrNull(body.telefono_central ?? body.nro_telefonico_central ?? body.telefono_empresa),
+    linkedin_url: strOrNull(body.linkedin_url ?? body.linkedin),
     estado: strOrNull(body.estado) || "Sin asignar",
     observacion: strOrNull(body.observacion),
     rubro: strOrNull(body.rubro),
@@ -590,10 +705,11 @@ kamRouter.get("/companies", async (req, res) => {
     }
 
     const rows = await prisma.$queryRawUnsafe<any[]>(`
-      select c.*, ka.full_name as kam_asignado_nombre, kad.full_name as kam_admin_nombre
+      select c.*, ka.full_name as kam_asignado_nombre, kad.full_name as kam_admin_nombre, coalesce(cc.contactos_count,0)::integer as contactos_count
       from operafix_kam_companies c
       left join operafix_users ka on ka.id = c.kam_asignado_id
       left join operafix_users kad on kad.id = c.kam_admin_id
+      left join (select company_id, count(*)::integer as contactos_count from operafix_kam_company_contacts group by company_id) cc on cc.company_id = c.id
       ${where.length ? `where ${where.join(" and ")}` : ""}
       order by c.score_empresa desc, c.created_at desc
     `, ...params);
@@ -612,20 +728,22 @@ kamRouter.post("/companies", async (req, res) => {
 
   const data = companyPayload(req.body);
   if (!data.rut || !data.razon_social) return res.status(400).json({ message: "RUT y Razón Social son obligatorios." });
+  const duplicate = await findDuplicateCompany(data.rut, data.razon_social);
+  if (duplicate) return res.status(409).json({ message: `No se puede crear duplicado. Ya existe la empresa ${duplicate.razon_social} con RUT ${duplicate.rut}.` });
 
   const companyId = id("kco");
   const kamAdminId = isKamAdmin(session) ? sessionUserId(session) : strOrNull(req.body.kam_admin_id);
 
   const rows = await prisma.$queryRawUnsafe<any[]>(`
     insert into operafix_kam_companies (
-      id, rut, razon_social, nro_empleados, monto_devolucion, nombre_contacto, cargo_contacto, correo, telefono,
+      id, rut, razon_social, nro_empleados, monto_devolucion, nombre_contacto, cargo_contacto, correo, telefono, telefono_central, linkedin_url,
       estado, observacion, rubro, region, prioridad, score_empresa, segmento_empresa, segmento_monto,
       tipo_oportunidad, origen, kam_admin_id, proxima_gestion, resultado_gestion, motivo_perdida, probabilidad_cierre, canal_origen
-    ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
+    ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
     returning *
   `,
     companyId, data.rut, data.razon_social, data.nro_empleados, data.monto_devolucion, data.nombre_contacto,
-    data.cargo_contacto, data.correo, data.telefono, data.estado, data.observacion, data.rubro, data.region,
+    data.cargo_contacto, data.correo, data.telefono, data.telefono_central, data.linkedin_url, data.estado, data.observacion, data.rubro, data.region,
     data.prioridad, data.score_empresa, data.segmento_empresa, data.segmento_monto, data.tipo_oportunidad,
     data.origen, kamAdminId, data.proxima_gestion, data.resultado_gestion, data.motivo_perdida, data.probabilidad_cierre, data.canal_origen
   );
@@ -641,6 +759,8 @@ kamRouter.put("/companies/:id", async (req, res) => {
     if (isKam(session) && existing.kam_asignado_id !== sessionUserId(session)) return res.status(403).json({ message: "Solo puedes modificar empresas de tu cartera." });
 
     const data = companyPayload({ ...existing, ...req.body });
+    const duplicate = await findDuplicateCompany(data.rut, data.razon_social, req.params.id);
+    if (duplicate) return res.status(409).json({ message: `No se puede guardar duplicado. Ya existe la empresa ${duplicate.razon_social} con RUT ${duplicate.rut}.` });
     if (String(data.estado || '') === 'Perdida' && !data.motivo_perdida) {
       return res.status(400).json({ message: 'Debes ingresar motivo de pérdida antes de marcar la empresa como Perdida.' });
     }
@@ -656,15 +776,15 @@ kamRouter.put("/companies/:id", async (req, res) => {
     const rows = await prisma.$queryRawUnsafe<any[]>(`
       update operafix_kam_companies set
         rut=$2, razon_social=$3, nro_empleados=$4, monto_devolucion=$5, nombre_contacto=$6, cargo_contacto=$7,
-        correo=$8, telefono=$9, estado=$10, observacion=$11, rubro=$12, region=$13, prioridad=$14,
-        score_empresa=$15, segmento_empresa=$16, segmento_monto=$17, tipo_oportunidad=$18, origen=$19,
-        proxima_gestion=$20, resultado_gestion=$21, motivo_perdida=$22, probabilidad_cierre=$23, canal_origen=$24,
-        fecha_ultimo_contacto=case when $25::boolean then now() else fecha_ultimo_contacto end,
+        correo=$8, telefono=$9, telefono_central=$10, linkedin_url=$11, estado=$12, observacion=$13, rubro=$14, region=$15, prioridad=$16,
+        score_empresa=$17, segmento_empresa=$18, segmento_monto=$19, tipo_oportunidad=$20, origen=$21,
+        proxima_gestion=$22, resultado_gestion=$23, motivo_perdida=$24, probabilidad_cierre=$25, canal_origen=$26,
+        fecha_ultimo_contacto=case when $27::boolean then now() else fecha_ultimo_contacto end,
         updated_at=now()
       where id=$1 returning *
     `,
       req.params.id, data.rut, data.razon_social, data.nro_empleados, data.monto_devolucion, data.nombre_contacto,
-      data.cargo_contacto, data.correo, data.telefono, data.estado, data.observacion, data.rubro, data.region,
+      data.cargo_contacto, data.correo, data.telefono, data.telefono_central, data.linkedin_url, data.estado, data.observacion, data.rubro, data.region,
       data.prioridad, data.score_empresa, data.segmento_empresa, data.segmento_monto, data.tipo_oportunidad,
       data.origen, data.proxima_gestion, data.resultado_gestion, data.motivo_perdida, data.probabilidad_cierre, data.canal_origen,
       ["Contactada", "Interesada", "Propuesta enviada", "En negociación", "Ganada", "Perdida"].includes(String(data.estado || ""))
@@ -685,7 +805,7 @@ kamRouter.put("/companies/:id", async (req, res) => {
         strOrNull(req.body.actividad_tipo) || (estadoCambio ? 'Cambio de estado' : 'Actualización de seguimiento'),
         data.resultado_gestion, strOrNull(req.body.proxima_accion), data.proxima_gestion, data.estado, data.probabilidad_cierre,
         strOrNull(req.body.actividad_observacion) || data.observacion || `Estado: ${data.estado}`
-      ).catch((error) => console.error('[KAM] No se pudo registrar actividad:', error));
+      ).catch((error: any) => console.error('[KAM] No se pudo registrar actividad:', error));
     }
     res.json(updated);
   } catch (error: any) {
@@ -701,8 +821,84 @@ kamRouter.delete("/companies/:id", async (req, res) => {
   const session = requireKamAccess(req, res);
   if (!session) return;
   if (isKam(session)) return res.status(403).json({ message: "El KAM vendedor no puede eliminar empresas." });
+  await prisma.$executeRawUnsafe(`delete from operafix_kam_company_contacts where company_id = $1`, req.params.id).catch(() => null);
+  await prisma.$executeRawUnsafe(`delete from operafix_kam_activities where company_id = $1`, req.params.id).catch(() => null);
+  await prisma.$executeRawUnsafe(`delete from operafix_kam_assignment_history where empresa_id = $1`, req.params.id).catch(() => null);
   await prisma.$executeRawUnsafe(`delete from operafix_kam_companies where id = $1`, req.params.id);
-  res.json({ ok: true });
+  res.json({ ok: true, message: 'Empresa eliminada correctamente.' });
+});
+
+
+kamRouter.get("/companies/:id/contacts", async (req, res) => {
+  const session = requireKamAccess(req, res);
+  if (!session) return;
+  const access = await canAccessCompany(session, req.params.id);
+  if (!access.ok) return res.status(access.status).json({ message: access.message });
+  const rows = await prisma.$queryRawUnsafe<any[]>(`
+    select * from operafix_kam_company_contacts
+    where company_id = $1
+    order by es_principal desc, created_at desc
+  `, req.params.id).catch(() => [] as any[]);
+  res.json(rows);
+});
+
+kamRouter.post("/companies/:id/contacts", async (req, res) => {
+  const session = requireKamAccess(req, res);
+  if (!session) return;
+  const access = await canAccessCompany(session, req.params.id);
+  if (!access.ok) return res.status(access.status).json({ message: access.message });
+  const data = contactPayload(req.body);
+  if (!data.nombre) return res.status(400).json({ message: "Debes ingresar el nombre del contacto." });
+  if (!data.correo && !data.telefono_contacto && !data.linkedin_url) {
+    return res.status(400).json({ message: "Debes ingresar al menos correo, teléfono o LinkedIn del contacto." });
+  }
+  const duplicate = await prisma.$queryRawUnsafe<any[]>(`
+    select id from operafix_kam_company_contacts
+    where company_id = $1
+      and lower(trim(nombre)) = lower(trim($2))
+      and coalesce(lower(trim(correo)),'') = coalesce(lower(trim($3)),'')
+    limit 1
+  `, req.params.id, data.nombre, data.correo).catch(() => [] as any[]);
+  if (duplicate[0]) return res.status(409).json({ message: "Este contacto ya existe para la empresa." });
+
+  const rows = await prisma.$queryRawUnsafe<any[]>(`
+    insert into operafix_kam_company_contacts (id, company_id, nombre, cargo, correo, telefono_contacto, linkedin_url, es_principal, observacion)
+    values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+    returning *
+  `, id('kct'), req.params.id, data.nombre, data.cargo, data.correo, data.telefono_contacto, data.linkedin_url, data.es_principal, data.observacion);
+  await applyPrincipalContact(req.params.id, rows[0]);
+  res.status(201).json(rows[0]);
+});
+
+kamRouter.put("/contacts/:contactId", async (req, res) => {
+  const session = requireKamAccess(req, res);
+  if (!session) return;
+  const currentRows = await prisma.$queryRawUnsafe<any[]>(`select * from operafix_kam_company_contacts where id=$1 limit 1`, req.params.contactId).catch(() => [] as any[]);
+  const current = currentRows[0];
+  if (!current) return res.status(404).json({ message: "Contacto no encontrado." });
+  const access = await canAccessCompany(session, current.company_id);
+  if (!access.ok) return res.status(access.status).json({ message: access.message });
+  const data = contactPayload({ ...current, ...req.body });
+  if (!data.nombre) return res.status(400).json({ message: "Debes ingresar el nombre del contacto." });
+  const rows = await prisma.$queryRawUnsafe<any[]>(`
+    update operafix_kam_company_contacts set
+      nombre=$2, cargo=$3, correo=$4, telefono_contacto=$5, linkedin_url=$6, es_principal=$7, observacion=$8, updated_at=now()
+    where id=$1 returning *
+  `, req.params.contactId, data.nombre, data.cargo, data.correo, data.telefono_contacto, data.linkedin_url, data.es_principal, data.observacion);
+  await applyPrincipalContact(current.company_id, rows[0]);
+  res.json(rows[0]);
+});
+
+kamRouter.delete("/contacts/:contactId", async (req, res) => {
+  const session = requireKamAccess(req, res);
+  if (!session) return;
+  const currentRows = await prisma.$queryRawUnsafe<any[]>(`select * from operafix_kam_company_contacts where id=$1 limit 1`, req.params.contactId).catch(() => [] as any[]);
+  const current = currentRows[0];
+  if (!current) return res.status(404).json({ message: "Contacto no encontrado." });
+  const access = await canAccessCompany(session, current.company_id);
+  if (!access.ok) return res.status(access.status).json({ message: access.message });
+  await prisma.$executeRawUnsafe(`delete from operafix_kam_company_contacts where id=$1`, req.params.contactId);
+  res.json({ ok: true, message: "Contacto eliminado correctamente." });
 });
 
 
@@ -939,7 +1135,7 @@ kamRouter.post("/companies/:id/activities", async (req, res) => {
       fecha_ultimo_contacto=now(),
       updated_at=now()
     where id=$1
-  `, req.params.id, estadoVenta, resultado, proxima, prob, motivoPerdida, observacion).catch((error) => console.error('[KAM] No se pudo actualizar empresa desde actividad:', error));
+  `, req.params.id, estadoVenta, resultado, proxima, prob, motivoPerdida, observacion).catch((error: any) => console.error('[KAM] No se pudo actualizar empresa desde actividad:', error));
 
   res.status(201).json(rows[0]);
 });

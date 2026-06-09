@@ -648,3 +648,35 @@ button { cursor: pointer; }
   color: #2563eb !important;
   font-weight: 700;
 }
+
+/* V99 KAM contacts, delete actions and save messages */
+.kam-save-message {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border-left: 4px solid #1f7a4d;
+  background: #f2fff7;
+  color: #12442b;
+}
+
+.zoho-btn-danger,
+.zoho-small-btn.danger {
+  border-color: #c62828 !important;
+  color: #c62828 !important;
+  background: #fff5f5 !important;
+}
+
+.zoho-btn-danger:hover,
+.zoho-small-btn.danger:hover {
+  background: #ffe7e7 !important;
+}
+
+.kam-checkbox-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  font-size: 13px;
+  color: #344054;
+}
