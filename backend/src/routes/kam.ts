@@ -644,8 +644,14 @@ kamRouter.put("/companies/:id", async (req, res) => {
     if (String(data.estado || '') === 'Perdida' && !data.motivo_perdida) {
       return res.status(400).json({ message: 'Debes ingresar motivo de pérdida antes de marcar la empresa como Perdida.' });
     }
+
+    // En cambios rápidos desde Kanban, el frontend puede enviar solo el nuevo estado.
+    // Para no bloquear el arrastre, si la empresa queda activa y asignada sin próxima gestión,
+    // se agenda automáticamente para el día siguiente.
     if (existing.kam_asignado_id && !['Ganada','Perdida','Congelada'].includes(String(data.estado || '')) && !data.proxima_gestion) {
-      return res.status(400).json({ message: 'Debes ingresar próxima gestión para mantener la empresa activa y evitar que quede abandonada.' });
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      data.proxima_gestion = tomorrow.toISOString().slice(0, 10);
     }
     const rows = await prisma.$queryRawUnsafe<any[]>(`
       update operafix_kam_companies set
