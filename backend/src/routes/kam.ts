@@ -62,6 +62,31 @@ function id(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function pgQuote(value: string) {
+  return `"${String(value).replace(/"/g, '""')}"`;
+}
+
+async function tableExists(tableName: string) {
+  const rows = await prisma.$queryRawUnsafe<any[]>(
+    `select to_regclass($1)::text as name`,
+    `public.${tableName}`
+  ).catch(() => [] as any[]);
+  return Boolean(rows[0]?.name);
+}
+
+async function columnExists(tableName: string, columnName: string) {
+  const rows = await prisma.$queryRawUnsafe<any[]>(
+    `select 1 as ok from information_schema.columns where table_schema = 'public' and table_name = $1 and column_name = $2 limit 1`,
+    tableName,
+    columnName
+  ).catch(() => [] as any[]);
+  return Boolean(rows[0]);
+}
+
+async function addColumnIfMissing(tableName: string, columnName: string, definition: string) {
+  await prisma.$executeRawUnsafe(`alter table ${pgQuote(tableName)} add column if not exists ${pgQuote(columnName)} ${definition}`);
+}
+
 function sessionUserId(session: any) {
   return String(session?.id || session?.sub || "");
 }
@@ -183,10 +208,11 @@ function profileRanking(input: any) {
 
 async function ensureKamTables() {
   await ensureUsersTable();
+
   await prisma.$executeRawUnsafe(`
     create table if not exists operafix_kam_profiles (
       id text primary key,
-      user_id text not null unique references operafix_users(id) on delete cascade,
+      user_id text not null unique,
       nivel_experiencia text not null default 'Junior',
       experiencia_licitaciones integer not null default 0,
       experiencia_ventas integer not null default 0,
@@ -226,8 +252,8 @@ async function ensureKamTables() {
       segmento_monto text,
       tipo_oportunidad text,
       origen text,
-      kam_asignado_id text references operafix_users(id) on delete set null,
-      kam_admin_id text references operafix_users(id) on delete set null,
+      kam_asignado_id text,
+      kam_admin_id text,
       fecha_asignacion timestamptz,
       fecha_ultimo_contacto timestamptz,
       proxima_gestion date,
@@ -235,32 +261,19 @@ async function ensureKamTables() {
       motivo_perdida text,
       probabilidad_cierre integer,
       canal_origen text,
+      source_company_id text,
+      source_mandante_id text,
+      source_mandante_name text,
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
     )
   `);
 
-  await prisma.$executeRawUnsafe(`alter table operafix_kam_companies add column if not exists source_company_id text`);
-  await prisma.$executeRawUnsafe(`alter table operafix_kam_companies add column if not exists source_mandante_id text`);
-  await prisma.$executeRawUnsafe(`alter table operafix_kam_companies add column if not exists source_mandante_name text`);
-  await prisma.$executeRawUnsafe(`alter table operafix_kam_companies add column if not exists fecha_ultimo_contacto timestamptz`);
-  await prisma.$executeRawUnsafe(`alter table operafix_kam_companies add column if not exists proxima_gestion date`);
-  await prisma.$executeRawUnsafe(`alter table operafix_kam_companies add column if not exists resultado_gestion text`);
-  await prisma.$executeRawUnsafe(`alter table operafix_kam_companies add column if not exists motivo_perdida text`);
-  await prisma.$executeRawUnsafe(`alter table operafix_kam_companies add column if not exists probabilidad_cierre integer`);
-  await prisma.$executeRawUnsafe(`alter table operafix_kam_companies add column if not exists canal_origen text`);
-
-  await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_companies_rut on operafix_kam_companies(rut)`);
-  await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_companies_kam on operafix_kam_companies(kam_asignado_id)`);
-  await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_companies_source_company on operafix_kam_companies(source_company_id)`);
-  await prisma.$executeRawUnsafe(`create unique index if not exists ux_operafix_kam_companies_source_company on operafix_kam_companies(source_company_id) where source_company_id is not null`);
-  await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_companies_score on operafix_kam_companies(score_empresa)`);
-
   await prisma.$executeRawUnsafe(`
     create table if not exists operafix_kam_assignment_rules (
       id text primary key,
-      nombre_regla text not null,
-      criterio text not null,
+      nombre_regla text not null default 'Nueva regla',
+      criterio text not null default 'monto_devolucion',
       operador text not null default '=',
       valor text,
       peso integer not null default 10,
@@ -274,7 +287,7 @@ async function ensureKamTables() {
   await prisma.$executeRawUnsafe(`
     create table if not exists operafix_kam_assignment_history (
       id text primary key,
-      empresa_id text not null references operafix_kam_companies(id) on delete cascade,
+      empresa_id text not null,
       kam_anterior_id text,
       kam_nuevo_id text,
       kam_admin_id text,
@@ -284,45 +297,115 @@ async function ensureKamTables() {
       created_at timestamptz not null default now()
     )
   `);
+
+  const profileColumns: Array<[string, string]> = [
+    ['user_id', 'text'], ['nivel_experiencia', `text not null default 'Junior'`], ['experiencia_licitaciones', 'integer not null default 0'],
+    ['experiencia_ventas', 'integer not null default 0'], ['experiencia_recuperaciones', 'integer not null default 0'], ['experiencia_empresas_grandes', 'integer not null default 0'],
+    ['experiencia_empresas_pequenas', 'integer not null default 0'], ['rubros_experiencia', `text[] not null default '{}'`], ['regiones_experiencia', `text[] not null default '{}'`],
+    ['capacidad_maxima', 'integer not null default 30'], ['tasa_cierre', 'numeric(5,2) not null default 0'], ['monto_cerrado_historico', 'numeric(18,2) not null default 0'],
+    ['ranking_kam', 'integer not null default 0'], ['activo', 'boolean not null default true'], ['created_at', 'timestamptz not null default now()'], ['updated_at', 'timestamptz not null default now()'],
+  ];
+  for (const [col, def] of profileColumns) await addColumnIfMissing('operafix_kam_profiles', col, def);
+
+  const companyColumns: Array<[string, string]> = [
+    ['rut', 'text'], ['razon_social', 'text'], ['nro_empleados', 'integer'], ['monto_devolucion', 'numeric(18,2)'], ['nombre_contacto', 'text'],
+    ['cargo_contacto', 'text'], ['correo', 'text'], ['telefono', 'text'], ['estado', `text not null default 'Sin asignar'`], ['observacion', 'text'], ['rubro', 'text'], ['region', 'text'],
+    ['prioridad', 'text'], ['score_empresa', 'integer not null default 0'], ['segmento_empresa', 'text'], ['segmento_monto', 'text'], ['tipo_oportunidad', 'text'], ['origen', 'text'],
+    ['kam_asignado_id', 'text'], ['kam_admin_id', 'text'], ['fecha_asignacion', 'timestamptz'], ['fecha_ultimo_contacto', 'timestamptz'], ['proxima_gestion', 'date'],
+    ['resultado_gestion', 'text'], ['motivo_perdida', 'text'], ['probabilidad_cierre', 'integer'], ['canal_origen', 'text'], ['source_company_id', 'text'], ['source_mandante_id', 'text'],
+    ['source_mandante_name', 'text'], ['created_at', 'timestamptz not null default now()'], ['updated_at', 'timestamptz not null default now()'],
+  ];
+  for (const [col, def] of companyColumns) await addColumnIfMissing('operafix_kam_companies', col, def);
+
+  const ruleColumns: Array<[string, string]> = [
+    ['nombre_regla', `text not null default 'Nueva regla'`], ['criterio', `text not null default 'monto_devolucion'`], ['operador', `text not null default '='`],
+    ['valor', 'text'], ['peso', 'integer not null default 10'], ['accion', `text not null default 'priorizar'`], ['activa', 'boolean not null default true'],
+    ['created_at', 'timestamptz not null default now()'], ['updated_at', 'timestamptz not null default now()'],
+  ];
+  for (const [col, def] of ruleColumns) await addColumnIfMissing('operafix_kam_assignment_rules', col, def);
+
+  const historyColumns: Array<[string, string]> = [
+    ['empresa_id', 'text'], ['kam_anterior_id', 'text'], ['kam_nuevo_id', 'text'], ['kam_admin_id', 'text'], ['motivo_asignacion', 'text'],
+    ['score_match', 'integer'], ['observacion', 'text'], ['created_at', 'timestamptz not null default now()'],
+  ];
+  for (const [col, def] of historyColumns) await addColumnIfMissing('operafix_kam_assignment_history', col, def);
+
+  await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_companies_rut on operafix_kam_companies(rut)`).catch(() => null);
+  await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_companies_kam on operafix_kam_companies(kam_asignado_id)`).catch(() => null);
+  await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_companies_source_company on operafix_kam_companies(source_company_id)`).catch(() => null);
+  await prisma.$executeRawUnsafe(`create unique index if not exists ux_operafix_kam_companies_source_company on operafix_kam_companies(source_company_id) where source_company_id is not null`).catch(() => null);
+  await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_companies_score on operafix_kam_companies(score_empresa)`).catch(() => null);
 }
 
 
 async function syncFinanfixPotentialCompanies() {
-  const rows = await prisma.$queryRawUnsafe<any[]>(`
-    select c.id as source_company_id, c.mandante_id as source_mandante_id, m.name as source_mandante_name,
-           c.rut, c.razon_social, c.owner_name, c.email, c.estimated_amount
-    from companies c
-    join mandantes m on m.id = c.mandante_id
-    where (${FINANFIX_MANDANTE_PATTERNS.map((_, index) => `m.name ilike $${index + 1}`).join(" or ")})
-    order by c.razon_social asc
-  `, ...FINANFIX_MANDANTE_PATTERNS).catch(() => [] as any[]);
+  try {
+    const hasCompanies = await tableExists('companies');
+    const hasMandantes = await tableExists('mandantes');
+    if (!hasCompanies || !hasMandantes) return 0;
 
-  for (const row of rows) {
-    const monto = numberOrNull(row.estimated_amount);
-    const score = companyScore({ monto_devolucion: monto });
-    await prisma.$executeRawUnsafe(`
-      insert into operafix_kam_companies (
-        id, source_company_id, source_mandante_id, source_mandante_name, rut, razon_social,
-        monto_devolucion, nombre_contacto, correo, estado, prioridad, score_empresa, segmento_empresa,
-        segmento_monto, tipo_oportunidad, origen
-      ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'Sin asignar',$10,$11,$12,$13,'Recuperaciones','Registro empresas - Finanfix Solutions SPA')
-      on conflict (source_company_id) where source_company_id is not null do update set
-        rut=excluded.rut,
-        razon_social=excluded.razon_social,
-        monto_devolucion=coalesce(operafix_kam_companies.monto_devolucion, excluded.monto_devolucion),
-        nombre_contacto=coalesce(operafix_kam_companies.nombre_contacto, excluded.nombre_contacto),
-        correo=coalesce(operafix_kam_companies.correo, excluded.correo),
-        source_mandante_id=excluded.source_mandante_id,
-        source_mandante_name=excluded.source_mandante_name,
-        origen=excluded.origen,
-        updated_at=now()
-    `,
-      id("kco"), String(row.source_company_id), String(row.source_mandante_id), String(row.source_mandante_name || "Finanfix Solutions SPA"),
-      String(row.rut || ""), String(row.razon_social || ""), monto, strOrNull(row.owner_name), strOrNull(row.email),
-      priority(score), score, segmentEmployees(null), segmentAmount(monto)
-    );
+    const companyCols = {
+      id: await columnExists('companies', 'id'),
+      mandante_id: await columnExists('companies', 'mandante_id'),
+      rut: await columnExists('companies', 'rut'),
+      razon_social: await columnExists('companies', 'razon_social'),
+      owner_name: await columnExists('companies', 'owner_name'),
+      email: await columnExists('companies', 'email'),
+      estimated_amount: await columnExists('companies', 'estimated_amount'),
+    };
+    const mandanteCols = {
+      id: await columnExists('mandantes', 'id'),
+      name: await columnExists('mandantes', 'name'),
+    };
+
+    if (!companyCols.id || !companyCols.mandante_id || !companyCols.rut || !companyCols.razon_social || !mandanteCols.id || !mandanteCols.name) return 0;
+
+    const ownerExpr = companyCols.owner_name ? 'c.owner_name' : 'null::text';
+    const emailExpr = companyCols.email ? 'c.email' : 'null::text';
+    const amountExpr = companyCols.estimated_amount ? 'c.estimated_amount' : 'null::numeric';
+
+    const rows = await prisma.$queryRawUnsafe<any[]>(`
+      select c.id as source_company_id, c.mandante_id as source_mandante_id, m.name as source_mandante_name,
+             c.rut, c.razon_social, ${ownerExpr} as owner_name, ${emailExpr} as email, ${amountExpr} as estimated_amount
+      from companies c
+      join mandantes m on m.id = c.mandante_id
+      where (${FINANFIX_MANDANTE_PATTERNS.map((_, index) => `m.name ilike $${index + 1}`).join(' or ')})
+      order by c.razon_social asc
+    `, ...FINANFIX_MANDANTE_PATTERNS).catch((error) => {
+      console.error('[KAM] No se pudo sincronizar empresas Finanfix:', error);
+      return [] as any[];
+    });
+
+    for (const row of rows) {
+      const monto = numberOrNull(row.estimated_amount);
+      const score = companyScore({ monto_devolucion: monto });
+      await prisma.$executeRawUnsafe(`
+        insert into operafix_kam_companies (
+          id, source_company_id, source_mandante_id, source_mandante_name, rut, razon_social,
+          monto_devolucion, nombre_contacto, correo, estado, prioridad, score_empresa, segmento_empresa,
+          segmento_monto, tipo_oportunidad, origen
+        ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'Sin asignar',$10,$11,$12,$13,'Recuperaciones','Registro empresas - Finanfix Solutions SPA')
+        on conflict (source_company_id) where source_company_id is not null do update set
+          rut=excluded.rut,
+          razon_social=excluded.razon_social,
+          monto_devolucion=coalesce(operafix_kam_companies.monto_devolucion, excluded.monto_devolucion),
+          nombre_contacto=coalesce(operafix_kam_companies.nombre_contacto, excluded.nombre_contacto),
+          correo=coalesce(operafix_kam_companies.correo, excluded.correo),
+          source_mandante_id=excluded.source_mandante_id,
+          source_mandante_name=excluded.source_mandante_name,
+          origen=excluded.origen,
+          updated_at=now()
+      `,
+        id('kco'), String(row.source_company_id), String(row.source_mandante_id), String(row.source_mandante_name || 'Finanfix Solutions SPA'),
+        String(row.rut || ''), String(row.razon_social || ''), monto, strOrNull(row.owner_name), strOrNull(row.email),
+        priority(score), score, segmentEmployees(null), segmentAmount(monto)
+      ).catch((error) => console.error('[KAM] No se pudo insertar empresa potencial:', error));
+    }
+    return rows.length;
+  } catch (error) {
+    console.error('[KAM] Error general sincronizando Finanfix:', error);
+    return 0;
   }
-  return rows.length;
 }
 
 
@@ -438,46 +521,54 @@ function companyPayload(body: any) {
   };
 }
 
-kamRouter.use(async (_req, _res, next) => {
+kamRouter.use(async (_req, res, next) => {
   try {
     await ensureKamTables();
     next();
-  } catch (error) {
-    next(error);
+  } catch (error: any) {
+    console.error('[KAM] Error preparando tablas KAM:', error);
+    res.status(500).json({
+      message: 'No se pudo preparar el módulo KAM en la base de datos.',
+      detail: process.env.NODE_ENV === 'production' ? undefined : String(error?.message || error),
+    });
   }
 });
 
 kamRouter.get("/companies", async (req, res) => {
   const session = requireKamAccess(req, res);
   if (!session) return;
+  try {
+    await syncFinanfixPotentialCompanies();
 
-  await syncFinanfixPotentialCompanies();
+    const userId = sessionUserId(session);
+    const search = String(req.query.search || "").trim();
+    const where: string[] = [];
+    const params: any[] = [];
 
-  const userId = sessionUserId(session);
-  const search = String(req.query.search || "").trim();
-  const where: string[] = [];
-  const params: any[] = [];
+    if (isKam(session)) {
+      params.push(userId);
+      where.push(`c.kam_asignado_id = $${params.length}`);
+    }
 
-  if (isKam(session)) {
-    params.push(userId);
-    where.push(`c.kam_asignado_id = $${params.length}`);
+    if (search) {
+      params.push(`%${search}%`);
+      where.push(`(c.rut ilike $${params.length} or c.razon_social ilike $${params.length} or coalesce(c.rubro,'') ilike $${params.length} or coalesce(c.region,'') ilike $${params.length})`);
+    }
+
+    const rows = await prisma.$queryRawUnsafe<any[]>(`
+      select c.*, ka.full_name as kam_asignado_nombre, kad.full_name as kam_admin_nombre
+      from operafix_kam_companies c
+      left join operafix_users ka on ka.id = c.kam_asignado_id
+      left join operafix_users kad on kad.id = c.kam_admin_id
+      ${where.length ? `where ${where.join(" and ")}` : ""}
+      order by c.score_empresa desc, c.created_at desc
+    `, ...params);
+
+    res.json(rows);
+  } catch (error: any) {
+    console.error('[KAM] Error listando empresas:', error);
+    res.status(500).json({ message: 'No se pudieron cargar las empresas KAM.', detail: process.env.NODE_ENV === 'production' ? undefined : String(error?.message || error) });
   }
-
-  if (search) {
-    params.push(`%${search}%`);
-    where.push(`(c.rut ilike $${params.length} or c.razon_social ilike $${params.length} or coalesce(c.rubro,'') ilike $${params.length} or coalesce(c.region,'') ilike $${params.length})`);
-  }
-
-  const rows = await prisma.$queryRawUnsafe<any[]>(`
-    select c.*, ka.full_name as kam_asignado_nombre, kad.full_name as kam_admin_nombre
-    from operafix_kam_companies c
-    left join operafix_users ka on ka.id = c.kam_asignado_id
-    left join operafix_users kad on kad.id = c.kam_admin_id
-    ${where.length ? `where ${where.join(" and ")}` : ""}
-    order by c.score_empresa desc, c.created_at desc
-  `, ...params);
-
-  res.json(rows);
 });
 
 kamRouter.post("/companies", async (req, res) => {
@@ -561,42 +652,47 @@ kamRouter.get("/users", async (req, res) => {
 kamRouter.get("/metrics", async (req, res) => {
   const session = requireKamAccess(req, res);
   if (!session) return;
-  await syncFinanfixPotentialCompanies();
-  const userId = sessionUserId(session);
-  const where = isKam(session) ? `where c.kam_asignado_id = $1` : "";
-  const params = isKam(session) ? [userId] : [];
-  const summary = await prisma.$queryRawUnsafe<any[]>(`
-    select
-      count(*)::integer as total_empresas,
-      count(*) filter (where c.kam_asignado_id is null)::integer as sin_asignar,
-      count(*) filter (where c.estado = 'Ganada')::integer as ganadas,
-      count(*) filter (where c.estado = 'Perdida')::integer as perdidas,
-      count(*) filter (where c.estado in ('En prospección','Contactada','Interesada','Propuesta enviada','En negociación'))::integer as en_gestion,
-      coalesce(sum(c.monto_devolucion),0)::numeric as monto_potencial,
-      coalesce(sum(c.monto_devolucion) filter (where c.estado = 'Ganada'),0)::numeric as monto_ganado
-    from operafix_kam_companies c
-    ${where}
-  `, ...params).catch(() => [] as any[]);
+  try {
+    await syncFinanfixPotentialCompanies();
+    const userId = sessionUserId(session);
+    const where = isKam(session) ? `where c.kam_asignado_id = $1` : "";
+    const params = isKam(session) ? [userId] : [];
+    const summary = await prisma.$queryRawUnsafe<any[]>(`
+      select
+        count(*)::integer as total_empresas,
+        count(*) filter (where c.kam_asignado_id is null)::integer as sin_asignar,
+        count(*) filter (where c.estado = 'Ganada')::integer as ganadas,
+        count(*) filter (where c.estado = 'Perdida')::integer as perdidas,
+        count(*) filter (where c.estado in ('En prospección','Contactada','Interesada','Propuesta enviada','En negociación'))::integer as en_gestion,
+        coalesce(sum(c.monto_devolucion),0)::numeric as monto_potencial,
+        coalesce(sum(c.monto_devolucion) filter (where c.estado = 'Ganada'),0)::numeric as monto_ganado
+      from operafix_kam_companies c
+      ${where}
+    `, ...params).catch(() => [] as any[]);
 
-  const byKam = await prisma.$queryRawUnsafe<any[]>(`
-    select coalesce(u.full_name,u.email,'Sin asignar') as kam,
-      c.kam_asignado_id,
-      count(*)::integer as total,
-      count(*) filter (where c.estado = 'Ganada')::integer as ganadas,
-      count(*) filter (where c.estado = 'Perdida')::integer as perdidas,
-      count(*) filter (where c.estado in ('En prospección','Contactada','Interesada','Propuesta enviada','En negociación'))::integer as en_gestion,
-      coalesce(avg(nullif(c.probabilidad_cierre,0)),0)::numeric(10,2) as probabilidad_promedio,
-      coalesce(sum(c.monto_devolucion),0)::numeric as monto_potencial,
-      coalesce(sum(c.monto_devolucion) filter (where c.estado = 'Ganada'),0)::numeric as monto_ganado,
-      max(c.fecha_ultimo_contacto) as ultimo_contacto
-    from operafix_kam_companies c
-    left join operafix_users u on u.id = c.kam_asignado_id
-    ${where}
-    group by c.kam_asignado_id, coalesce(u.full_name,u.email,'Sin asignar')
-    order by ganadas desc, monto_ganado desc, total desc
-  `, ...params).catch(() => [] as any[]);
+    const byKam = await prisma.$queryRawUnsafe<any[]>(`
+      select coalesce(u.full_name,u.email,'Sin asignar') as kam,
+        c.kam_asignado_id,
+        count(*)::integer as total,
+        count(*) filter (where c.estado = 'Ganada')::integer as ganadas,
+        count(*) filter (where c.estado = 'Perdida')::integer as perdidas,
+        count(*) filter (where c.estado in ('En prospección','Contactada','Interesada','Propuesta enviada','En negociación'))::integer as en_gestion,
+        coalesce(avg(nullif(c.probabilidad_cierre,0)),0)::numeric(10,2) as probabilidad_promedio,
+        coalesce(sum(c.monto_devolucion),0)::numeric as monto_potencial,
+        coalesce(sum(c.monto_devolucion) filter (where c.estado = 'Ganada'),0)::numeric as monto_ganado,
+        max(c.fecha_ultimo_contacto) as ultimo_contacto
+      from operafix_kam_companies c
+      left join operafix_users u on u.id = c.kam_asignado_id
+      ${where}
+      group by c.kam_asignado_id, coalesce(u.full_name,u.email,'Sin asignar')
+      order by ganadas desc, monto_ganado desc, total desc
+    `, ...params).catch(() => [] as any[]);
 
-  res.json({ summary: summary[0] || {}, byKam });
+    res.json({ summary: summary[0] || {}, byKam });
+  } catch (error: any) {
+    console.error('[KAM] Error cargando métricas:', error);
+    res.status(500).json({ message: 'No se pudieron cargar las métricas KAM.', detail: process.env.NODE_ENV === 'production' ? undefined : String(error?.message || error) });
+  }
 });
 
 kamRouter.get("/profiles", async (req, res) => {
@@ -697,8 +793,13 @@ kamRouter.post("/companies/:id/assign", async (req, res) => {
 kamRouter.get("/rules", async (req, res) => {
   const session = requireKamAccess(req, res);
   if (!session) return;
-  const rows = await prisma.$queryRawUnsafe<any[]>(`select * from operafix_kam_assignment_rules order by activa desc, created_at desc`);
-  res.json(rows);
+  try {
+    const rows = await prisma.$queryRawUnsafe<any[]>(`select * from operafix_kam_assignment_rules order by activa desc, created_at desc`);
+    res.json(rows);
+  } catch (error: any) {
+    console.error('[KAM] Error listando reglas:', error);
+    res.status(500).json({ message: 'No se pudieron cargar las reglas KAM.', detail: process.env.NODE_ENV === 'production' ? undefined : String(error?.message || error) });
+  }
 });
 
 kamRouter.post("/rules", async (req, res) => {
