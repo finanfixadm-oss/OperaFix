@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { useLocation } from "react-router-dom";
 import { deleteJson, downloadBlob, fetchJson, postJson, putJson, uploadForm } from "../api";
 import { getCurrentUser } from "../auth";
 import "./kam-visual-pro.css";
@@ -260,6 +261,7 @@ function csv(value?: string[] | null) {
 }
 
 export default function KamAssignmentPage() {
+  const location = useLocation();
   const user = getCurrentUser();
   const canAdmin = ["admin", "kam_admin", "interno"].includes(String(user?.role || ""));
   const canConfigure = ["admin", "kam_admin"].includes(String(user?.role || ""));
@@ -351,6 +353,13 @@ export default function KamAssignmentPage() {
   useEffect(() => {
     loadAll();
   }, []);
+
+  useEffect(() => {
+    const requested = new URLSearchParams(location.search).get("tab") as typeof tab | null;
+    if (requested && ["companies", "profiles", "rules", "tracking", "kanban", "campaigns", "agenda"].includes(requested)) {
+      setTab(requested);
+    }
+  }, [location.search]);
 
   const filterOptions = useMemo(() => ({
     kams: uniqueSorted(companies.map((x) => x.kam_asignado_nombre || (!x.kam_asignado_id ? "Sin asignar" : ""))),
@@ -916,17 +925,9 @@ export default function KamAssignmentPage() {
           <h1>Asignación y Seguimiento KAM</h1>
           <p>Panel profesional para cartera propia, asignación manual, seguimiento comercial, Kanban, campañas y control por vendedor.</p>
         </div>
-        <div className="zoho-module-actions">
+        <div className="zoho-module-actions kam-hero-status">
+          <span className="kam-hero-pill">Navegación ordenada en menú lateral</span>
           {canAdmin && <button className="zoho-btn zoho-btn-primary" type="button" onClick={() => { setTab("companies"); newCompany(); }}>+ Nueva empresa</button>}
-          <button className="zoho-btn" type="button" onClick={() => openActivityModal()}>Registrar gestión</button>
-          <button className="zoho-btn" type="button" onClick={exportCompanies}>Exportar filtrado</button>
-          <button className={tab === "companies" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("companies")}>Empresas</button>
-          <button className={tab === "tracking" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("tracking")}>Dashboard KAM</button>
-          <button className={tab === "kanban" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("kanban")}>Kanban</button>
-          <button className={tab === "agenda" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("agenda")}>Agenda</button>
-          {canAdmin && <button className={tab === "campaigns" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("campaigns")}>Campañas / Excel</button>}
-          <button className={tab === "profiles" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("profiles")}>Ranking KAM</button>
-          <button className={tab === "rules" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("rules")}>Reglas</button>
         </div>
       </div>
 
@@ -938,6 +939,42 @@ export default function KamAssignmentPage() {
       </div>
 
       {saveMessage && <div className="zoho-card kam-save-message"><strong>{saveMessage}</strong><button className="zoho-small-btn" type="button" onClick={() => setSaveMessage("")}>Cerrar</button></div>}
+
+      <div className="kam-workspace-pro">
+        <aside className="kam-module-sidebar-pro" aria-label="Menú KAM">
+          <div className="kam-module-sidebar-head">
+            <img src="/operafix-icon-color.png" alt="OperaFix" />
+            <div><strong>Módulo KAM</strong><span>Menú comercial</span></div>
+          </div>
+
+          <details className="kam-menu-group" open>
+            <summary>Comercial KAM</summary>
+            <button type="button" className={tab === "tracking" ? "active" : ""} onClick={() => setTab("tracking")}>Dashboard KAM</button>
+            <button type="button" className={tab === "companies" ? "active" : ""} onClick={() => setTab("companies")}>Empresas</button>
+            <button type="button" className={tab === "kanban" ? "active" : ""} onClick={() => setTab("kanban")}>Kanban</button>
+            <button type="button" className={tab === "agenda" ? "active" : ""} onClick={() => setTab("agenda")}>Agenda</button>
+          </details>
+
+          <details className="kam-menu-group" open>
+            <summary>Acciones</summary>
+            {canAdmin && <button type="button" onClick={() => { setTab("companies"); newCompany(); }}>+ Nueva empresa</button>}
+            <button type="button" onClick={() => openActivityModal()}>Registrar gestión</button>
+            <button type="button" onClick={exportCompanies}>Exportar filtrado</button>
+          </details>
+
+          <details className="kam-menu-group" open>
+            <summary>Análisis</summary>
+            {canAdmin && <button type="button" className={tab === "campaigns" ? "active" : ""} onClick={() => setTab("campaigns")}>Campañas / Excel</button>}
+            <button type="button" className={tab === "profiles" ? "active" : ""} onClick={() => setTab("profiles")}>Ranking KAM</button>
+          </details>
+
+          <details className="kam-menu-group">
+            <summary>Configuración</summary>
+            <button type="button" className={tab === "rules" ? "active" : ""} onClick={() => setTab("rules")}>Reglas</button>
+          </details>
+        </aside>
+
+        <div className="kam-workspace-main">
 
       <section className="zoho-card kam-dashboard-card">
         <div className="zoho-table-toolbar">
@@ -1430,6 +1467,9 @@ export default function KamAssignmentPage() {
           </section>
         </div>
       )}
+
+        </div>
+      </div>
 
       {companyModalOpen && (
         <div className="kam-modal-backdrop" role="dialog" aria-modal="true">

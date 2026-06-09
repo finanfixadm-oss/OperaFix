@@ -19,7 +19,11 @@ export default function Layout({ children }: PropsWithChildren) {
   const location = useLocation();
   const user = getCurrentUser();
   const visibleItems = navItems.filter((item) => canAccess(item.module, user));
+  const generalItems = visibleItems.filter((item) => item.module !== "kamAsignacion");
+  const showKamMenu = visibleItems.some((item) => item.module === "kamAsignacion");
   const isLogin = location.pathname === "/login";
+  const currentKamTab = new URLSearchParams(location.search).get("tab") || "tracking";
+  const kamTabClass = (value: string) => location.pathname === "/kam-asignacion" && currentKamTab === value ? "active" : "";
 
   const logout = () => {
     localStorage.removeItem("token");
@@ -63,8 +67,30 @@ export default function Layout({ children }: PropsWithChildren) {
             <input className="zoho-input" placeholder="Buscar módulo" />
           </div>
 
-          <nav className="crm-side-nav">
-            {visibleItems.map((item) => <NavLink key={item.to} to={item.to}>{item.side}</NavLink>)}
+          <nav className="crm-side-nav crm-side-nav-pro">
+            {generalItems.map((item) => <NavLink key={item.to} to={item.to}>{item.side}</NavLink>)}
+            {showKamMenu && (
+              <details className="crm-sidebar-group" open>
+                <summary>Comercial KAM</summary>
+                <NavLink to="/kam-asignacion?tab=tracking" className={() => kamTabClass("tracking")}>Dashboard KAM</NavLink>
+                <NavLink to="/kam-asignacion?tab=companies" className={() => kamTabClass("companies")}>Empresas</NavLink>
+                <NavLink to="/kam-asignacion?tab=kanban" className={() => kamTabClass("kanban")}>Kanban</NavLink>
+                <NavLink to="/kam-asignacion?tab=agenda" className={() => kamTabClass("agenda")}>Agenda</NavLink>
+              </details>
+            )}
+            {showKamMenu && (
+              <details className="crm-sidebar-group" open>
+                <summary>Análisis KAM</summary>
+                <NavLink to="/kam-asignacion?tab=campaigns" className={() => kamTabClass("campaigns")}>Campañas / Excel</NavLink>
+                <NavLink to="/kam-asignacion?tab=profiles" className={() => kamTabClass("profiles")}>Ranking KAM</NavLink>
+              </details>
+            )}
+            {showKamMenu && (
+              <details className="crm-sidebar-group">
+                <summary>Configuración KAM</summary>
+                <NavLink to="/kam-asignacion?tab=rules" className={() => kamTabClass("rules")}>Reglas</NavLink>
+              </details>
+            )}
           </nav>
         </aside>
 

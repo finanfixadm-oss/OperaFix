@@ -4951,3 +4951,47 @@
   background: #eef6ff;
   color: #164e8b;
 }
+
+/* V105 - menú lateral global agrupado y desplegable */
+.crm-side-nav-pro {
+  gap: 8px;
+}
+.crm-sidebar-group {
+  border: 1px solid #e7edf5;
+  border-radius: 14px;
+  background: #fbfdff;
+  margin-top: 8px;
+  overflow: hidden;
+}
+.crm-sidebar-group summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 11px 12px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: #667085;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.crm-sidebar-group summary::-webkit-details-marker { display: none; }
+.crm-sidebar-group summary::after {
+  content: "▾";
+  color: #98a2b3;
+  transition: transform .16s ease;
+}
+.crm-sidebar-group:not([open]) summary::after {
+  transform: rotate(-90deg);
+}
+.crm-sidebar-group a {
+  margin: 0 8px 8px;
+  padding: 9px 11px !important;
+  border-radius: 11px !important;
+  font-size: 14px;
+}
+.crm-sidebar-group a.active {
+  background: #eaf4ff !important;
+  box-shadow: inset 3px 0 0 #0b74d1;
+}
