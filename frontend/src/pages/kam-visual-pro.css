@@ -292,3 +292,9 @@
   .kam-workspace-pro { grid-template-columns: 1fr; }
   .kam-module-sidebar-pro { position: relative; top: auto; }
 }
+
+/* V107: elimina el segundo menú interno del módulo KAM. La navegación queda solo en el sidebar principal. */
+.kam-workspace-main-full {
+  width: 100%;
+  margin-top: 18px;
+}
