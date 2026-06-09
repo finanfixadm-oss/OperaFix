@@ -33,7 +33,7 @@ export default function App() {
           <Route
             path="/ai-command-center"
             element={
-              <ProtectedRoute roles={["admin", "interno", "kam_admin", "kam"]}>
+              <ProtectedRoute roles={["admin", "interno"]}>
                 <AICommandCenterPage />
               </ProtectedRoute>
             }
@@ -42,7 +42,7 @@ export default function App() {
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute roles={["admin", "interno", "kam_admin", "kam"]}>
+              <ProtectedRoute roles={["admin", "interno"]}>
                 <DashboardExecutivePage />
               </ProtectedRoute>
             }
@@ -51,7 +51,7 @@ export default function App() {
           <Route
             path="/records"
             element={
-              <ProtectedRoute roles={["admin", "interno", "kam_admin", "kam"]}>
+              <ProtectedRoute roles={["admin", "interno"]}>
                 <RecordsPage />
               </ProtectedRoute>
             }
@@ -60,7 +60,7 @@ export default function App() {
           <Route
             path="/records/:id"
             element={
-              <ProtectedRoute roles={["admin", "interno", "kam_admin", "kam"]}>
+              <ProtectedRoute roles={["admin", "interno"]}>
                 <RecordDetailPage />
               </ProtectedRoute>
             }
@@ -69,7 +69,7 @@ export default function App() {
           <Route
             path="/portal-cliente"
             element={
-              <ProtectedRoute roles={["admin", "interno", "kam_admin", "kam", "cliente"]}>
+              <ProtectedRoute roles={["admin", "interno", "cliente"]}>
                 <ClientPortalPage />
               </ProtectedRoute>
             }
@@ -81,7 +81,7 @@ export default function App() {
           <Route
             path="/carga-masiva"
             element={
-              <ProtectedRoute roles={["admin", "interno", "kam_admin", "kam"]}>
+              <ProtectedRoute roles={["admin", "interno"]}>
                 <MassImportPage />
               </ProtectedRoute>
             }
@@ -90,7 +90,7 @@ export default function App() {
           <Route
             path="/informes"
             element={
-              <ProtectedRoute roles={["admin", "interno", "kam_admin", "kam", "cliente"]}>
+              <ProtectedRoute roles={["admin", "interno", "cliente"]}>
                 <ReportsBuilderPage />
               </ProtectedRoute>
             }
@@ -118,7 +118,7 @@ export default function App() {
           <Route
             path="/mandantes"
             element={
-              <ProtectedRoute roles={["admin", "interno", "kam_admin", "kam"]}>
+              <ProtectedRoute roles={["admin", "interno"]}>
                 <MandantesPage />
               </ProtectedRoute>
             }

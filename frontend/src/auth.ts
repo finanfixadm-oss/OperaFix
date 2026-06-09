@@ -21,15 +21,15 @@ export const ROLE_LABELS: Record<string, string> = {
 };
 
 export const MODULE_PERMISSIONS: Record<string, UserRole[]> = {
-  dashboard: ["admin", "interno", "kam_admin", "kam"],
-  records: ["admin", "interno", "kam_admin", "kam"],
-  portal: ["admin", "interno", "kam_admin", "kam", "cliente"],
-  ia: ["admin", "interno", "kam_admin", "kam"],
-  informes: ["admin", "interno", "kam_admin", "kam", "cliente"],
-  cargaMasiva: ["admin", "interno", "kam_admin", "kam"],
+  dashboard: ["admin", "interno"],
+  records: ["admin", "interno"],
+  portal: ["admin", "interno", "cliente"],
+  ia: ["admin", "interno"],
+  informes: ["admin", "interno", "cliente"],
+  cargaMasiva: ["admin", "interno"],
   usuarios: ["admin", "kam_admin"],
   kamAsignacion: ["admin", "interno", "kam_admin", "kam"],
-  mandantes: ["admin", "interno", "kam_admin", "kam"],
+  mandantes: ["admin", "interno"],
 };
 
 export function getCurrentUser(): CurrentUser | null {
@@ -51,6 +51,8 @@ export function canAccess(module: keyof typeof MODULE_PERMISSIONS, user = getCur
 
 export function defaultPathForUser(user: CurrentUser | null) {
   if (!user) return "/login";
-  if (String(user.role).toLowerCase() === "cliente") return "/portal-cliente";
+  const role = String(user.role || "").toLowerCase();
+  if (role === "cliente") return "/portal-cliente";
+  if (role === "kam" || role === "kam_admin") return "/kam-asignacion";
   return "/dashboard";
 }

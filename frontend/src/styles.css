@@ -524,3 +524,18 @@ button { cursor: pointer; }
 .zoho-filter-compact-card strong { color: #0f2a6b; }
 .zoho-filter-compact-card span { color: #64748b; font-size: 13px; line-height: 1.35; }
 @media (max-width: 980px) { .zoho-filter-compact-card { width: 100%; } }
+
+/* V94 - Dashboard KAM administrador y filtros comerciales */
+.kam-dashboard-card {
+  margin-bottom: 16px;
+}
+
+.kam-filter-grid {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  align-items: end;
+}
+
+.zoho-dashboard-stack {
+  display: grid;
+  gap: 16px;
+}

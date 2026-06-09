@@ -133,6 +133,35 @@ const emptyRule = {
   activa: true,
 };
 
+const ESTADOS_VENTA = [
+  "Sin asignar",
+  "Asignada",
+  "Pendiente de contacto",
+  "En prospección",
+  "Contactada",
+  "Interesada",
+  "Reunión agendada",
+  "Propuesta enviada",
+  "En negociación",
+  "Ganada",
+  "Perdida",
+  "Congelada",
+  "Reasignar",
+];
+
+const ESTADOS_GESTION = ["Asignada", "Pendiente de contacto", "En prospección", "Contactada", "Interesada", "Reunión agendada", "Propuesta enviada", "En negociación", "Reasignar"];
+
+function uniqueSorted(values: Array<string | null | undefined>) {
+  return Array.from(new Set(values.map((v) => String(v || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "es"));
+}
+
+function isOverdue(value?: string | null) {
+  if (!value) return false;
+  const d = new Date(String(value).slice(0, 10) + "T23:59:59");
+  if (Number.isNaN(d.getTime())) return false;
+  return d.getTime() < Date.now();
+}
+
 function money(value: unknown) {
   const n = Number(value || 0);
   if (!Number.isFinite(n) || n === 0) return "—";
@@ -147,12 +176,19 @@ export default function KamAssignmentPage() {
   const user = getCurrentUser();
   const canAdmin = ["admin", "kam_admin", "interno"].includes(String(user?.role || ""));
   const canConfigure = ["admin", "kam_admin"].includes(String(user?.role || ""));
-  const [tab, setTab] = useState<"companies" | "profiles" | "rules" | "tracking">("companies");
+  const [tab, setTab] = useState<"companies" | "profiles" | "rules" | "tracking">("tracking");
   const [companies, setCompanies] = useState<KamCompany[]>([]);
   const [profiles, setProfiles] = useState<KamProfile[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [rules, setRules] = useState<RuleRow[]>([]);
   const [search, setSearch] = useState("");
+  const [filterKam, setFilterKam] = useState("");
+  const [filterEstado, setFilterEstado] = useState("");
+  const [filterRubro, setFilterRubro] = useState("");
+  const [filterRegion, setFilterRegion] = useState("");
+  const [filterPriority, setFilterPriority] = useState("");
+  const [filterSegment, setFilterSegment] = useState("");
+  const [filterQuick, setFilterQuick] = useState("");
   const [selected, setSelected] = useState<KamCompany | null>(null);
   const [companyForm, setCompanyForm] = useState<any>(emptyCompany);
   const [profileForm, setProfileForm] = useState<any>(emptyProfile);
@@ -188,15 +224,90 @@ export default function KamAssignmentPage() {
     loadAll();
   }, []);
 
+  const filterOptions = useMemo(() => ({
+    kams: uniqueSorted(companies.map((x) => x.kam_asignado_nombre || (!x.kam_asignado_id ? "Sin asignar" : ""))),
+    rubros: uniqueSorted(companies.map((x) => x.rubro)),
+    regiones: uniqueSorted(companies.map((x) => x.region)),
+    segmentos: uniqueSorted(companies.map((x) => x.segmento_empresa)),
+  }), [companies]);
+
   const filteredCompanies = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return companies;
-    return companies.filter((row) =>
-      [row.rut, row.razon_social, row.rubro, row.region, row.estado, row.prioridad, row.kam_asignado_nombre]
+    return companies.filter((row) => {
+      const assignedName = row.kam_asignado_nombre || (!row.kam_asignado_id ? "Sin asignar" : "");
+      const quickOk = !filterQuick
+        || (filterQuick === "sin_asignar" && !row.kam_asignado_id)
+        || (filterQuick === "estrategicas" && row.prioridad === "Estratégica")
+        || (filterQuick === "vencidas" && isOverdue(row.proxima_gestion))
+        || (filterQuick === "sin_contacto" && !row.fecha_ultimo_contacto && Boolean(row.kam_asignado_id))
+        || (filterQuick === "ganadas" && row.estado === "Ganada")
+        || (filterQuick === "perdidas" && row.estado === "Perdida")
+        || (filterQuick === "reasignar" && row.estado === "Reasignar");
+      const qOk = !q || [row.rut, row.razon_social, row.rubro, row.region, row.estado, row.prioridad, row.kam_asignado_nombre, row.correo, row.telefono]
         .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(q))
-    );
-  }, [companies, search]);
+        .some((value) => String(value).toLowerCase().includes(q));
+      return qOk
+        && (!filterKam || assignedName === filterKam)
+        && (!filterEstado || row.estado === filterEstado)
+        && (!filterRubro || row.rubro === filterRubro)
+        && (!filterRegion || row.region === filterRegion)
+        && (!filterPriority || row.prioridad === filterPriority)
+        && (!filterSegment || row.segmento_empresa === filterSegment)
+        && quickOk;
+    });
+  }, [companies, search, filterKam, filterEstado, filterRubro, filterRegion, filterPriority, filterSegment, filterQuick]);
+
+  const dashboard = useMemo(() => {
+    const rows = filteredCompanies;
+    const amount = (items: KamCompany[]) => items.reduce((sum, item) => sum + Number(item.monto_devolucion || 0), 0);
+    const total = rows.length;
+    const sinAsignar = rows.filter((x) => !x.kam_asignado_id).length;
+    const enGestion = rows.filter((x) => ESTADOS_GESTION.includes(String(x.estado || ""))).length;
+    const ganadas = rows.filter((x) => x.estado === "Ganada").length;
+    const perdidas = rows.filter((x) => x.estado === "Perdida").length;
+    const vencidas = rows.filter((x) => isOverdue(x.proxima_gestion)).length;
+    const sinContacto = rows.filter((x) => x.kam_asignado_id && !x.fecha_ultimo_contacto).length;
+    const montoPotencial = amount(rows);
+    const montoGanado = amount(rows.filter((x) => x.estado === "Ganada"));
+    const probPromedio = rows.length ? rows.reduce((sum, x) => sum + Number(x.probabilidad_cierre || 0), 0) / rows.length : 0;
+    const byEstado = ESTADOS_VENTA.map((estado) => {
+      const items = rows.filter((x) => String(x.estado || "Sin asignar") === estado);
+      return { estado, total: items.length, monto: amount(items) };
+    }).filter((x) => x.total > 0);
+    const byKam = Array.from(new Set(rows.map((x) => x.kam_asignado_nombre || (!x.kam_asignado_id ? "Sin asignar" : "KAM sin nombre")))).sort((a, b) => a.localeCompare(b, "es")).map((kam) => {
+      const items = rows.filter((x) => (x.kam_asignado_nombre || (!x.kam_asignado_id ? "Sin asignar" : "KAM sin nombre")) === kam);
+      const won = items.filter((x) => x.estado === "Ganada");
+      const lost = items.filter((x) => x.estado === "Perdida");
+      const active = items.filter((x) => ESTADOS_GESTION.includes(String(x.estado || "")));
+      const prob = items.length ? items.reduce((sum, x) => sum + Number(x.probabilidad_cierre || 0), 0) / items.length : 0;
+      const conversionBase = won.length + lost.length;
+      return {
+        kam,
+        total: items.length,
+        activas: active.length,
+        ganadas: won.length,
+        perdidas: lost.length,
+        vencidas: items.filter((x) => isOverdue(x.proxima_gestion)).length,
+        sin_contacto: items.filter((x) => x.kam_asignado_id && !x.fecha_ultimo_contacto).length,
+        probabilidad: prob,
+        conversion: conversionBase ? (won.length / conversionBase) * 100 : 0,
+        monto_potencial: amount(items),
+        monto_ganado: amount(won),
+      };
+    });
+    return { total, sinAsignar, enGestion, ganadas, perdidas, vencidas, sinContacto, montoPotencial, montoGanado, probPromedio, byEstado, byKam };
+  }, [filteredCompanies]);
+
+  const clearFilters = () => {
+    setSearch("");
+    setFilterKam("");
+    setFilterEstado("");
+    setFilterRubro("");
+    setFilterRegion("");
+    setFilterPriority("");
+    setFilterSegment("");
+    setFilterQuick("");
+  };
 
   const kpis = useMemo(() => {
     const strategic = companies.filter((x) => x.prioridad === "Estratégica").length;
@@ -317,7 +428,7 @@ export default function KamAssignmentPage() {
         </div>
         <div className="zoho-module-actions">
           <button className={tab === "companies" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("companies")}>Empresas</button>
-          <button className={tab === "tracking" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("tracking")}>Seguimiento</button>
+          <button className={tab === "tracking" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("tracking")}>Dashboard KAM</button>
           <button className={tab === "profiles" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("profiles")}>Ranking KAM</button>
           <button className={tab === "rules" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("rules")}>Reglas</button>
         </div>
@@ -330,6 +441,23 @@ export default function KamAssignmentPage() {
         <div className="zoho-card"><strong>{money(metrics.summary?.monto_potencial ?? kpis.totalAmount)}</strong><span>Monto potencial</span></div>
       </div>
 
+      <section className="zoho-card kam-dashboard-card">
+        <div className="zoho-table-toolbar">
+          <strong>Filtros comerciales</strong>
+          <button className="zoho-small-btn" type="button" onClick={clearFilters}>Limpiar filtros</button>
+        </div>
+        <div className="zoho-form-grid kam-filter-grid">
+          <Field label="Buscar"><input className="zoho-input" placeholder="RUT, razón social, rubro, región, correo, teléfono" value={search} onChange={(e) => setSearch(e.target.value)} /></Field>
+          <Field label="KAM"><select className="zoho-input" value={filterKam} onChange={(e) => setFilterKam(e.target.value)}><option value="">Todos</option>{filterOptions.kams.map((x) => <option key={x} value={x}>{x}</option>)}</select></Field>
+          <Field label="Estado venta"><select className="zoho-input" value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)}><option value="">Todos</option>{ESTADOS_VENTA.map((x) => <option key={x} value={x}>{x}</option>)}</select></Field>
+          <Field label="Rubro"><select className="zoho-input" value={filterRubro} onChange={(e) => setFilterRubro(e.target.value)}><option value="">Todos</option>{filterOptions.rubros.map((x) => <option key={x} value={x}>{x}</option>)}</select></Field>
+          <Field label="Región"><select className="zoho-input" value={filterRegion} onChange={(e) => setFilterRegion(e.target.value)}><option value="">Todas</option>{filterOptions.regiones.map((x) => <option key={x} value={x}>{x}</option>)}</select></Field>
+          <Field label="Prioridad"><select className="zoho-input" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}><option value="">Todas</option><option>Estratégica</option><option>Alta</option><option>Media</option><option>Baja</option></select></Field>
+          <Field label="Tamaño empresa"><select className="zoho-input" value={filterSegment} onChange={(e) => setFilterSegment(e.target.value)}><option value="">Todos</option>{filterOptions.segmentos.map((x) => <option key={x} value={x}>{x}</option>)}</select></Field>
+          <Field label="Vista rápida"><select className="zoho-input" value={filterQuick} onChange={(e) => setFilterQuick(e.target.value)}><option value="">Todas</option><option value="sin_asignar">Sin asignar</option><option value="estrategicas">Estratégicas</option><option value="vencidas">Gestiones vencidas</option><option value="sin_contacto">Sin primer contacto</option><option value="ganadas">Ganadas</option><option value="perdidas">Perdidas</option><option value="reasignar">Reasignar</option></select></Field>
+        </div>
+      </section>
+
       {tab === "companies" && (
         <div className="mandantes-layout">
           <aside className="zoho-filter-panel">
@@ -341,7 +469,7 @@ export default function KamAssignmentPage() {
                   <Field label="Empresa"><input className="zoho-input" value={companyForm.razon_social} disabled /></Field>
                   <Field label="Estado">
                     <select className="zoho-input" value={companyForm.estado} onChange={(e) => setCompanyForm({ ...companyForm, estado: e.target.value })}>
-                      <option>Asignada</option><option>En prospección</option><option>Contactada</option><option>Interesada</option><option>Propuesta enviada</option><option>En negociación</option><option>Ganada</option><option>Perdida</option><option>Congelada</option><option>Reasignar</option>
+                      {ESTADOS_VENTA.filter((x) => x !== "Sin asignar").map((x) => <option key={x}>{x}</option>)}
                     </select>
                   </Field>
                   <Field label="Próxima gestión"><input className="zoho-input" type="date" value={companyForm.proxima_gestion} onChange={(e) => setCompanyForm({ ...companyForm, proxima_gestion: e.target.value })} /></Field>
@@ -372,7 +500,7 @@ export default function KamAssignmentPage() {
                 </Field>
                 <Field label="Estado">
                   <select className="zoho-input" value={companyForm.estado} onChange={(e) => setCompanyForm({ ...companyForm, estado: e.target.value })}>
-                    <option>Sin asignar</option><option>Asignada</option><option>En prospección</option><option>Contactada</option><option>Interesada</option><option>Propuesta enviada</option><option>En negociación</option><option>Ganada</option><option>Perdida</option><option>Congelada</option><option>Reasignar</option>
+                    <option>Sin asignar</option>{ESTADOS_VENTA.filter((x) => x !== "Sin asignar").map((x) => <option key={x}>{x}</option>)}
                   </select>
                 </Field>
                 <Field label="Próxima gestión"><input className="zoho-input" type="date" value={companyForm.proxima_gestion} onChange={(e) => setCompanyForm({ ...companyForm, proxima_gestion: e.target.value })} /></Field>
@@ -402,7 +530,7 @@ export default function KamAssignmentPage() {
           <section className="zoho-table-wrap">
             <div className="zoho-table-toolbar">
               <span>{loading ? "Cargando..." : `Empresas ${filteredCompanies.length}`}</span>
-              <input className="zoho-input compact-search" placeholder="Buscar por RUT, RS, rubro, región o KAM" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <span className="zoho-help-text">Filtrado por KAM, estado, rubro, región, prioridad y segmento</span>
             </div>
             <div className="zoho-table-scroll-x">
               <table className="zoho-table kam-wide-table">
@@ -471,27 +599,81 @@ export default function KamAssignmentPage() {
       )}
 
       {tab === "tracking" && (
-        <section className="zoho-table-wrap">
-          <div className="zoho-table-toolbar"><span>Seguimiento y medición KAM</span></div>
-          <table className="zoho-table">
-            <thead><tr><th>KAM</th><th>Asignadas</th><th>En gestión</th><th>Ganadas</th><th>Perdidas</th><th>Prob. promedio</th><th>Monto potencial</th><th>Monto ganado</th><th>Último contacto</th></tr></thead>
-            <tbody>
-              {(metrics.byKam || []).map((row) => (
-                <tr key={row.kam}>
-                  <td>{row.kam}</td>
-                  <td>{row.total}</td>
-                  <td>{row.en_gestion}</td>
-                  <td>{row.ganadas}</td>
-                  <td>{row.perdidas}</td>
-                  <td>{Number(row.probabilidad_promedio || 0).toFixed(0)}%</td>
-                  <td>{money(row.monto_potencial)}</td>
-                  <td>{money(row.monto_ganado)}</td>
-                  <td>{row.ultimo_contacto ? String(row.ultimo_contacto).slice(0, 10) : "—"}</td>
-                </tr>
-              ))}
-              {!(metrics.byKam || []).length && <tr><td colSpan={9}>Sin métricas disponibles.</td></tr>}
-            </tbody>
-          </table>
+        <section className="zoho-dashboard-stack">
+          <div className="zoho-kpi-grid">
+            <div className="zoho-card"><strong>{dashboard.total}</strong><span>Empresas filtradas</span></div>
+            <div className="zoho-card"><strong>{dashboard.enGestion}</strong><span>En gestión</span></div>
+            <div className="zoho-card"><strong>{dashboard.ganadas}</strong><span>Ganadas</span></div>
+            <div className="zoho-card"><strong>{dashboard.perdidas}</strong><span>Perdidas</span></div>
+            <div className="zoho-card"><strong>{dashboard.vencidas}</strong><span>Gestiones vencidas</span></div>
+            <div className="zoho-card"><strong>{dashboard.sinContacto}</strong><span>Sin primer contacto</span></div>
+            <div className="zoho-card"><strong>{Number(dashboard.probPromedio || 0).toFixed(0)}%</strong><span>Probabilidad promedio</span></div>
+            <div className="zoho-card"><strong>{money(dashboard.montoGanado)}</strong><span>Monto ganado</span></div>
+          </div>
+
+          <section className="zoho-table-wrap">
+            <div className="zoho-table-toolbar"><span>Embudo de ventas por estado</span><span className="zoho-help-text">Muestra cantidad de empresas y monto potencial según los filtros activos.</span></div>
+            <div className="zoho-table-scroll-x">
+              <table className="zoho-table">
+                <thead><tr><th>Estado</th><th>Empresas</th><th>Monto potencial</th></tr></thead>
+                <tbody>
+                  {dashboard.byEstado.map((row) => <tr key={row.estado}><td>{row.estado}</td><td>{row.total}</td><td>{money(row.monto)}</td></tr>)}
+                  {!dashboard.byEstado.length && <tr><td colSpan={3}>Sin empresas para los filtros seleccionados.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="zoho-table-wrap">
+            <div className="zoho-table-toolbar"><span>Seguimiento y medición por KAM</span><span className="zoho-help-text">Control comercial por vendedor: carga, avance, ganadas, perdidas, vencidas y conversión.</span></div>
+            <div className="zoho-table-scroll-x">
+              <table className="zoho-table kam-wide-table">
+                <thead><tr><th>KAM</th><th>Asignadas</th><th>En gestión</th><th>Ganadas</th><th>Perdidas</th><th>Gest. vencidas</th><th>Sin contacto</th><th>Prob. promedio</th><th>Conversión</th><th>Monto potencial</th><th>Monto ganado</th></tr></thead>
+                <tbody>
+                  {dashboard.byKam.map((row) => (
+                    <tr key={row.kam}>
+                      <td>{row.kam}</td>
+                      <td>{row.total}</td>
+                      <td>{row.activas}</td>
+                      <td>{row.ganadas}</td>
+                      <td>{row.perdidas}</td>
+                      <td>{row.vencidas}</td>
+                      <td>{row.sin_contacto}</td>
+                      <td>{Number(row.probabilidad || 0).toFixed(0)}%</td>
+                      <td>{Number(row.conversion || 0).toFixed(0)}%</td>
+                      <td>{money(row.monto_potencial)}</td>
+                      <td>{money(row.monto_ganado)}</td>
+                    </tr>
+                  ))}
+                  {!dashboard.byKam.length && <tr><td colSpan={11}>Sin métricas disponibles.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="zoho-table-wrap">
+            <div className="zoho-table-toolbar"><span>Empresas críticas para acción</span><span className="zoho-help-text">Empresas vencidas, sin contacto o marcadas para reasignar.</span></div>
+            <div className="zoho-table-scroll-x">
+              <table className="zoho-table kam-wide-table">
+                <thead><tr><th>Empresa</th><th>KAM</th><th>Estado</th><th>Prioridad</th><th>Monto</th><th>Próxima gestión</th><th>Alerta</th><th>Acción</th></tr></thead>
+                <tbody>
+                  {filteredCompanies.filter((row) => isOverdue(row.proxima_gestion) || (!row.fecha_ultimo_contacto && row.kam_asignado_id) || row.estado === "Reasignar").slice(0, 30).map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.razon_social}</td>
+                      <td>{row.kam_asignado_nombre || "Sin asignar"}</td>
+                      <td>{row.estado || "—"}</td>
+                      <td>{row.prioridad || "—"}</td>
+                      <td>{money(row.monto_devolucion)}</td>
+                      <td>{row.proxima_gestion ? String(row.proxima_gestion).slice(0, 10) : "—"}</td>
+                      <td>{row.estado === "Reasignar" ? "Requiere reasignación" : isOverdue(row.proxima_gestion) ? "Gestión vencida" : "Sin primer contacto"}</td>
+                      <td><button className="zoho-small-btn" onClick={() => { setTab("companies"); editCompany(row); }}>Ver</button></td>
+                    </tr>
+                  ))}
+                  {!filteredCompanies.some((row) => isOverdue(row.proxima_gestion) || (!row.fecha_ultimo_contacto && row.kam_asignado_id) || row.estado === "Reasignar") && <tr><td colSpan={8}>No hay alertas comerciales para los filtros actuales.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </section>
       )}
 
