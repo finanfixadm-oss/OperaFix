@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import type { CorsOptions } from "cors";
 import path from "node:path";
 
 import companiesRouter from "./routes/companies.js";
@@ -32,16 +33,44 @@ import { requireAuth, requireRoles } from "./middleware/security.js";
 
 const app = express();
 
-app.use(
-  cors({
-    origin: [
-      "http://localhost:5173",
-      "https://crm.finanfix.cl",
-      "https://operafix-production.up.railway.app",
-    ],
-    credentials: true,
-  })
-);
+const allowedCorsOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://crm.finanfix.cl",
+  "https://operafix-production.up.railway.app",
+];
+
+const corsOptions: CorsOptions = {
+  origin(origin, callback) {
+    if (!origin || allowedCorsOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(null, false);
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+};
+
+// CORS defensivo para producción: evita que errores 500/401 o preflight PUT del Kanban
+// lleguen al navegador sin cabeceras Access-Control-Allow-Origin.
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && allowedCorsOrigins.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+    res.header("Vary", "Origin");
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept");
+  }
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
+app.use(cors(corsOptions));
 
 app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ extended: true, limit: "25mb" }));

@@ -635,48 +635,60 @@ kamRouter.post("/companies", async (req, res) => {
 kamRouter.put("/companies/:id", async (req, res) => {
   const session = requireKamAccess(req, res);
   if (!session) return;
-  const existing = await fetchCompany(req.params.id);
-  if (!existing) return res.status(404).json({ message: "Empresa KAM no encontrada." });
-  if (isKam(session) && existing.kam_asignado_id !== sessionUserId(session)) return res.status(403).json({ message: "Solo puedes modificar empresas de tu cartera." });
+  try {
+    const existing = await fetchCompany(req.params.id);
+    if (!existing) return res.status(404).json({ message: "Empresa KAM no encontrada." });
+    if (isKam(session) && existing.kam_asignado_id !== sessionUserId(session)) return res.status(403).json({ message: "Solo puedes modificar empresas de tu cartera." });
 
-  const data = companyPayload({ ...existing, ...req.body });
-  if (String(data.estado || '') === 'Perdida' && !data.motivo_perdida) {
-    return res.status(400).json({ message: 'Debes ingresar motivo de pérdida antes de marcar la empresa como Perdida.' });
-  }
-  if (existing.kam_asignado_id && !['Ganada','Perdida','Congelada'].includes(String(data.estado || '')) && !data.proxima_gestion) {
-    return res.status(400).json({ message: 'Debes ingresar próxima gestión para mantener la empresa activa y evitar que quede abandonada.' });
-  }
-  const rows = await prisma.$queryRawUnsafe<any[]>(`
-    update operafix_kam_companies set
-      rut=$2, razon_social=$3, nro_empleados=$4, monto_devolucion=$5, nombre_contacto=$6, cargo_contacto=$7,
-      correo=$8, telefono=$9, estado=$10, observacion=$11, rubro=$12, region=$13, prioridad=$14,
-      score_empresa=$15, segmento_empresa=$16, segmento_monto=$17, tipo_oportunidad=$18, origen=$19,
-      proxima_gestion=$20, resultado_gestion=$21, motivo_perdida=$22, probabilidad_cierre=$23, canal_origen=$24,
-      fecha_ultimo_contacto=case when $25::boolean then now() else fecha_ultimo_contacto end,
-      updated_at=now()
-    where id=$1 returning *
-  `,
-    req.params.id, data.rut, data.razon_social, data.nro_empleados, data.monto_devolucion, data.nombre_contacto,
-    data.cargo_contacto, data.correo, data.telefono, data.estado, data.observacion, data.rubro, data.region,
-    data.prioridad, data.score_empresa, data.segmento_empresa, data.segmento_monto, data.tipo_oportunidad,
-    data.origen, data.proxima_gestion, data.resultado_gestion, data.motivo_perdida, data.probabilidad_cierre, data.canal_origen,
-    ["Contactada", "Interesada", "Propuesta enviada", "En negociación", "Ganada", "Perdida"].includes(String(data.estado || ""))
-  );
-  const estadoCambio = String(existing.estado || '') !== String(data.estado || '');
-  const obsCambio = String(existing.observacion || '') !== String(data.observacion || '');
-  const proximaCambio = String(existing.proxima_gestion || '').slice(0, 10) !== String(data.proxima_gestion || '').slice(0, 10);
-  if (estadoCambio || obsCambio || proximaCambio || strOrNull(req.body.actividad_tipo) || strOrNull(req.body.actividad_observacion)) {
-    await prisma.$executeRawUnsafe(`
-      insert into operafix_kam_activities (id, company_id, kam_id, tipo_gestion, resultado, proxima_accion, proxima_gestion, estado_venta, probabilidad_cierre, observacion)
-      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+    const data = companyPayload({ ...existing, ...req.body });
+    if (String(data.estado || '') === 'Perdida' && !data.motivo_perdida) {
+      return res.status(400).json({ message: 'Debes ingresar motivo de pérdida antes de marcar la empresa como Perdida.' });
+    }
+    if (existing.kam_asignado_id && !['Ganada','Perdida','Congelada'].includes(String(data.estado || '')) && !data.proxima_gestion) {
+      return res.status(400).json({ message: 'Debes ingresar próxima gestión para mantener la empresa activa y evitar que quede abandonada.' });
+    }
+    const rows = await prisma.$queryRawUnsafe<any[]>(`
+      update operafix_kam_companies set
+        rut=$2, razon_social=$3, nro_empleados=$4, monto_devolucion=$5, nombre_contacto=$6, cargo_contacto=$7,
+        correo=$8, telefono=$9, estado=$10, observacion=$11, rubro=$12, region=$13, prioridad=$14,
+        score_empresa=$15, segmento_empresa=$16, segmento_monto=$17, tipo_oportunidad=$18, origen=$19,
+        proxima_gestion=$20, resultado_gestion=$21, motivo_perdida=$22, probabilidad_cierre=$23, canal_origen=$24,
+        fecha_ultimo_contacto=case when $25::boolean then now() else fecha_ultimo_contacto end,
+        updated_at=now()
+      where id=$1 returning *
     `,
-      id('kac'), req.params.id, isKam(session) ? sessionUserId(session) : (rows[0]?.kam_asignado_id || sessionUserId(session)),
-      strOrNull(req.body.actividad_tipo) || (estadoCambio ? 'Cambio de estado' : 'Actualización de seguimiento'),
-      data.resultado_gestion, strOrNull(req.body.proxima_accion), data.proxima_gestion, data.estado, data.probabilidad_cierre,
-      strOrNull(req.body.actividad_observacion) || data.observacion || `Estado: ${data.estado}`
-    ).catch((error) => console.error('[KAM] No se pudo registrar actividad:', error));
+      req.params.id, data.rut, data.razon_social, data.nro_empleados, data.monto_devolucion, data.nombre_contacto,
+      data.cargo_contacto, data.correo, data.telefono, data.estado, data.observacion, data.rubro, data.region,
+      data.prioridad, data.score_empresa, data.segmento_empresa, data.segmento_monto, data.tipo_oportunidad,
+      data.origen, data.proxima_gestion, data.resultado_gestion, data.motivo_perdida, data.probabilidad_cierre, data.canal_origen,
+      ["Contactada", "Interesada", "Propuesta enviada", "En negociación", "Ganada", "Perdida"].includes(String(data.estado || ""))
+    );
+
+    const updated = rows[0];
+    if (!updated) return res.status(404).json({ message: "Empresa KAM no encontrada." });
+
+    const estadoCambio = String(existing.estado || '') !== String(data.estado || '');
+    const obsCambio = String(existing.observacion || '') !== String(data.observacion || '');
+    const proximaCambio = String(existing.proxima_gestion || '').slice(0, 10) !== String(data.proxima_gestion || '').slice(0, 10);
+    if (estadoCambio || obsCambio || proximaCambio || strOrNull(req.body.actividad_tipo) || strOrNull(req.body.actividad_observacion)) {
+      await prisma.$executeRawUnsafe(`
+        insert into operafix_kam_activities (id, company_id, kam_id, tipo_gestion, resultado, proxima_accion, proxima_gestion, estado_venta, probabilidad_cierre, observacion)
+        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      `,
+        id('kac'), req.params.id, isKam(session) ? sessionUserId(session) : (updated?.kam_asignado_id || sessionUserId(session)),
+        strOrNull(req.body.actividad_tipo) || (estadoCambio ? 'Cambio de estado' : 'Actualización de seguimiento'),
+        data.resultado_gestion, strOrNull(req.body.proxima_accion), data.proxima_gestion, data.estado, data.probabilidad_cierre,
+        strOrNull(req.body.actividad_observacion) || data.observacion || `Estado: ${data.estado}`
+      ).catch((error) => console.error('[KAM] No se pudo registrar actividad:', error));
+    }
+    res.json(updated);
+  } catch (error: any) {
+    console.error('[KAM] Error actualizando empresa:', error);
+    res.status(500).json({
+      message: 'No se pudo actualizar la empresa KAM.',
+      detail: process.env.NODE_ENV === 'production' ? undefined : String(error?.message || error),
+    });
   }
-  res.json(rows[0]);
 });
 
 kamRouter.delete("/companies/:id", async (req, res) => {
