@@ -1445,8 +1445,14 @@ kamRouter.post('/companies/export-excel', async (req, res) => {
   const where: string[] = [];
   const params: any[] = [];
   if (isKam(session)) { params.push(userId); where.push(`c.kam_asignado_id = $${params.length}`); }
-  for (const [field, column] of [['estado','c.estado'], ['rubro','c.rubro'], ['region','c.region'], ['prioridad','c.prioridad'], ['campaign_id','c.campaign_id']] as any[]) {
-    if (req.body?.[field]) { params.push(String(req.body[field])); where.push(`${column} = $${params.length}`); }
+  const requestedIds = Array.isArray(req.body?.ids) ? req.body.ids.map((x: any) => String(x || '').trim()).filter(Boolean) : [];
+  if (requestedIds.length) {
+    const placeholders = requestedIds.map((value: string) => { params.push(value); return `$${params.length}`; }).join(',');
+    where.push(`c.id in (${placeholders})`);
+  } else {
+    for (const [field, column] of [['estado','c.estado'], ['rubro','c.rubro'], ['region','c.region'], ['prioridad','c.prioridad'], ['campaign_id','c.campaign_id']] as any[]) {
+      if (req.body?.[field]) { params.push(String(req.body[field])); where.push(`${column} = $${params.length}`); }
+    }
   }
   const rows = await prisma.$queryRawUnsafe<any[]>(`
     select c.rut as "RUT", c.razon_social as "Razón Social", c.nro_empleados as "Nro Empleados", c.monto_devolucion as "Monto Devolución",

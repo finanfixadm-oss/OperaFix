@@ -297,6 +297,8 @@ export default function KamAssignmentPage() {
   const [loading, setLoading] = useState(false);
   const [draggingCompanyId, setDraggingCompanyId] = useState<string | null>(null);
   const [kanbanUpdatingId, setKanbanUpdatingId] = useState<string | null>(null);
+  const [companyModalOpen, setCompanyModalOpen] = useState(false);
+  const [activityModalOpen, setActivityModalOpen] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
   async function loadAll() {
@@ -476,6 +478,51 @@ export default function KamAssignmentPage() {
     setContactForm(emptyContact);
     setDraftContacts([]);
     setEditingContactId(null);
+    setCompanyModalOpen(true);
+  }
+
+  function newCompany() {
+    setSelected(null);
+    setCompanyForm(emptyCompany);
+    setContacts([]);
+    setDraftContacts([]);
+    setContactForm(emptyContact);
+    setEditingContactId(null);
+    setRecommendations([]);
+    setManualKamId("");
+    setCompanyModalOpen(true);
+  }
+
+  async function openActivityModal(row?: KamCompany) {
+    const target = row || selected;
+    if (!target) {
+      alert("Selecciona una empresa para registrar gestión.");
+      return;
+    }
+    if (!selected || selected.id !== target.id) {
+      setSelected(target);
+      setCompanyForm({
+        ...emptyCompany,
+        ...target,
+        nro_empleados: target.nro_empleados || "",
+        monto_devolucion: target.monto_devolucion || "",
+        telefono: target.telefono || "",
+        telefono_central: target.telefono_central || "",
+        linkedin_url: target.linkedin_url || "",
+        probabilidad_cierre: target.probabilidad_cierre || "",
+        campaign_id: target.campaign_id || "",
+        proxima_gestion: target.proxima_gestion ? String(target.proxima_gestion).slice(0, 10) : "",
+      });
+      const rows = await fetchJson<KamActivity[]>(`/kam/companies/${target.id}/activities`).catch(() => [] as KamActivity[]);
+      setActivities(rows);
+    }
+    setActivityForm({
+      ...emptyActivity,
+      estado_venta: target.estado || "Contactada",
+      proxima_gestion: target.proxima_gestion ? String(target.proxima_gestion).slice(0, 10) : "",
+      probabilidad_cierre: target.probabilidad_cierre || "",
+    });
+    setActivityModalOpen(true);
   }
 
   async function saveCompany() {
@@ -519,6 +566,7 @@ export default function KamAssignmentPage() {
       setDraftContacts([]);
       setContactForm(emptyContact);
       setEditingContactId(null);
+      setCompanyModalOpen(false);
       setSaveMessage(wasEditing ? "Empresa actualizada correctamente." : `Empresa creada correctamente${cleanDraftContacts.length ? ` con ${cleanDraftContacts.length} contacto(s).` : "."}`);
       await loadAll();
     } catch (error: any) {
@@ -546,8 +594,9 @@ export default function KamAssignmentPage() {
     const rows = await fetchJson<KamActivity[]>(`/kam/companies/${selected.id}/activities`).catch(() => [] as KamActivity[]);
     setActivities(rows);
     setActivityForm(emptyActivity);
+    setActivityModalOpen(false);
     await loadAll();
-    setSaveMessage("Gestión registrada correctamente.");
+    setSaveMessage("Gestión registrada correctamente en la bitácora comercial.");
   }
 
   async function refreshContacts(companyId?: string) {
@@ -778,12 +827,15 @@ export default function KamAssignmentPage() {
 
   async function exportCompanies() {
     await downloadBlob("/kam/companies/export-excel", {
+      ids: filteredCompanies.map((row) => row.id),
       estado: filterEstado || undefined,
       rubro: filterRubro || undefined,
       region: filterRegion || undefined,
       prioridad: filterPriority || undefined,
       campaign_id: filterCampaign && campaigns.find((c) => c.nombre === filterCampaign)?.id ? campaigns.find((c) => c.nombre === filterCampaign)?.id : undefined,
-    }, "empresas_kam.xlsx");
+      export_mode: "filtered",
+    }, "empresas_kam_filtradas.xlsx");
+    setSaveMessage(`Exportación generada con ${filteredCompanies.length} empresa(s) filtrada(s).`);
   }
 
   function tomorrowDate() {
@@ -865,6 +917,9 @@ export default function KamAssignmentPage() {
           <p>Panel profesional para cartera propia, asignación manual, seguimiento comercial, Kanban, campañas y control por vendedor.</p>
         </div>
         <div className="zoho-module-actions">
+          {canAdmin && <button className="zoho-btn zoho-btn-primary" type="button" onClick={() => { setTab("companies"); newCompany(); }}>+ Nueva empresa</button>}
+          <button className="zoho-btn" type="button" onClick={() => openActivityModal()}>Registrar gestión</button>
+          <button className="zoho-btn" type="button" onClick={exportCompanies}>Exportar filtrado</button>
           <button className={tab === "companies" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("companies")}>Empresas</button>
           <button className={tab === "tracking" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("tracking")}>Dashboard KAM</button>
           <button className={tab === "kanban" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("kanban")}>Kanban</button>
@@ -888,7 +943,8 @@ export default function KamAssignmentPage() {
         <div className="zoho-table-toolbar">
           <strong>Filtros comerciales</strong>
           <button className="zoho-small-btn" type="button" onClick={clearFilters}>Limpiar filtros</button>
-          <button className="zoho-small-btn primary" type="button" onClick={exportCompanies}>Exportar Excel</button>
+          {canAdmin && <button className="zoho-small-btn primary" type="button" onClick={() => { setTab("companies"); newCompany(); }}>Nueva empresa</button>}
+          <button className="zoho-small-btn primary" type="button" onClick={exportCompanies}>Exportar solo filtrado</button>
         </div>
         <div className="zoho-form-grid kam-filter-grid">
           <Field label="Buscar"><input className="zoho-input" placeholder="RUT, razón social, rubro, región, correo, teléfono" value={search} onChange={(e) => setSearch(e.target.value)} /></Field>
@@ -1051,6 +1107,7 @@ export default function KamAssignmentPage() {
                       <td>
                         <div className="zoho-actions-row compact-actions">
                           <button className="zoho-small-btn" onClick={() => editCompany(row)}>Editar</button>
+                          <button className="zoho-small-btn primary" onClick={() => openActivityModal(row)}>Registrar gestión</button>
                           {canAdmin && <button className="zoho-small-btn" onClick={() => recommend(row)}>Recomendar</button>}
                           {canAdmin && <button className="zoho-small-btn danger" onClick={() => deleteCompany(row)}>Eliminar</button>}
                         </div>
@@ -1373,6 +1430,113 @@ export default function KamAssignmentPage() {
           </section>
         </div>
       )}
+
+      {companyModalOpen && (
+        <div className="kam-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="kam-modal-panel kam-modal-large">
+            <div className="kam-modal-header">
+              <div>
+                <span className="kam-pro-eyebrow">Empresa potencial</span>
+                <h2>{selected ? "Editar empresa" : "Nueva empresa"}</h2>
+                <p>Completa los datos comerciales, asignación y contactos sin salir del dashboard.</p>
+              </div>
+              <button className="kam-modal-close" type="button" onClick={() => setCompanyModalOpen(false)}>×</button>
+            </div>
+            <div className="kam-modal-body">
+              <div className="kam-modal-section"><strong>Datos empresa</strong><span>Identificación, segmentación y potencial.</span></div>
+              <div className="zoho-form-grid kam-filter-grid">
+                <Field label="RUT"><input className="zoho-input" value={companyForm.rut} onChange={(e) => setCompanyForm({ ...companyForm, rut: e.target.value })} disabled={Boolean(selected && !canAdmin)} /></Field>
+                <Field label="Razón Social"><input className="zoho-input" value={companyForm.razon_social} onChange={(e) => setCompanyForm({ ...companyForm, razon_social: e.target.value })} disabled={Boolean(selected && !canAdmin)} /></Field>
+                <Field label="Nro Empleados"><input className="zoho-input" type="number" value={companyForm.nro_empleados} onChange={(e) => setCompanyForm({ ...companyForm, nro_empleados: e.target.value })} /></Field>
+                <Field label="Monto Devolución"><input className="zoho-input" type="number" value={companyForm.monto_devolucion} onChange={(e) => setCompanyForm({ ...companyForm, monto_devolucion: e.target.value })} /></Field>
+                <Field label="Rubro"><input className="zoho-input" value={companyForm.rubro} onChange={(e) => setCompanyForm({ ...companyForm, rubro: e.target.value })} /></Field>
+                <Field label="Región"><input className="zoho-input" value={companyForm.region} onChange={(e) => setCompanyForm({ ...companyForm, region: e.target.value })} /></Field>
+                <Field label="Teléfono central / empresa"><input className="zoho-input" value={companyForm.telefono_central} onChange={(e) => setCompanyForm({ ...companyForm, telefono_central: e.target.value })} /></Field>
+                <Field label="LinkedIn empresa"><input className="zoho-input" placeholder="https://www.linkedin.com/company/..." value={companyForm.linkedin_url} onChange={(e) => setCompanyForm({ ...companyForm, linkedin_url: e.target.value })} /></Field>
+              </div>
+
+              <div className="kam-modal-section"><strong>Asignación y seguimiento</strong><span>Estado comercial, campaña y próxima gestión.</span></div>
+              <div className="zoho-form-grid kam-filter-grid">
+                <Field label="Estado"><select className="zoho-input" value={companyForm.estado} onChange={(e) => setCompanyForm({ ...companyForm, estado: e.target.value })}>{ESTADOS_VENTA.map((x) => <option key={x}>{x}</option>)}</select></Field>
+                <Field label="Campaña"><select className="zoho-input" value={companyForm.campaign_id || ""} onChange={(e) => setCompanyForm({ ...companyForm, campaign_id: e.target.value })}><option value="">Sin campaña</option>{campaigns.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select></Field>
+                <Field label="Tipo oportunidad"><input className="zoho-input" value={companyForm.tipo_oportunidad} onChange={(e) => setCompanyForm({ ...companyForm, tipo_oportunidad: e.target.value })} /></Field>
+                <Field label="Canal origen"><input className="zoho-input" value={companyForm.canal_origen} onChange={(e) => setCompanyForm({ ...companyForm, canal_origen: e.target.value })} /></Field>
+                <Field label="Próxima gestión"><input className="zoho-input" type="date" value={companyForm.proxima_gestion} onChange={(e) => setCompanyForm({ ...companyForm, proxima_gestion: e.target.value })} /></Field>
+                <Field label="Probabilidad cierre %"><input className="zoho-input" type="number" min={0} max={100} value={companyForm.probabilidad_cierre} onChange={(e) => setCompanyForm({ ...companyForm, probabilidad_cierre: e.target.value })} /></Field>
+                <Field label="Motivo pérdida"><input className="zoho-input" value={companyForm.motivo_perdida || ""} onChange={(e) => setCompanyForm({ ...companyForm, motivo_perdida: e.target.value })} /></Field>
+                <Field label="Observación"><textarea className="zoho-input" rows={2} value={companyForm.observacion} onChange={(e) => setCompanyForm({ ...companyForm, observacion: e.target.value })} /></Field>
+              </div>
+
+              <div className="kam-modal-section"><strong>Contacto principal</strong><span>Estos datos quedan visibles en la tabla principal.</span></div>
+              <div className="zoho-form-grid kam-filter-grid">
+                <Field label="Nombre contacto"><input className="zoho-input" value={companyForm.nombre_contacto} onChange={(e) => setCompanyForm({ ...companyForm, nombre_contacto: e.target.value })} /></Field>
+                <Field label="Cargo"><input className="zoho-input" value={companyForm.cargo_contacto} onChange={(e) => setCompanyForm({ ...companyForm, cargo_contacto: e.target.value })} /></Field>
+                <Field label="Correo"><input className="zoho-input" value={companyForm.correo} onChange={(e) => setCompanyForm({ ...companyForm, correo: e.target.value })} /></Field>
+                <Field label="Nro telefónico contacto"><input className="zoho-input" value={companyForm.telefono} onChange={(e) => setCompanyForm({ ...companyForm, telefono: e.target.value })} /></Field>
+              </div>
+
+              {!selected && canAdmin && (
+                <div className="kam-contact-builder">
+                  <div className="kam-section-title"><strong>Contactos adicionales</strong><span>Puedes agregar 1, 2, 3, 4 o más contactos antes de guardar.</span></div>
+                  <div className="kam-contact-builder-grid">
+                    <input className="zoho-input" placeholder="Nombre contacto" value={contactForm.nombre} onChange={(e) => setContactForm({ ...contactForm, nombre: e.target.value })} />
+                    <input className="zoho-input" placeholder="Cargo" value={contactForm.cargo} onChange={(e) => setContactForm({ ...contactForm, cargo: e.target.value })} />
+                    <input className="zoho-input" placeholder="Correo" value={contactForm.correo} onChange={(e) => setContactForm({ ...contactForm, correo: e.target.value })} />
+                    <input className="zoho-input" placeholder="Teléfono directo" value={contactForm.telefono_contacto} onChange={(e) => setContactForm({ ...contactForm, telefono_contacto: e.target.value })} />
+                    <input className="zoho-input" placeholder="LinkedIn contacto" value={contactForm.linkedin_url} onChange={(e) => setContactForm({ ...contactForm, linkedin_url: e.target.value })} />
+                    <label className="kam-checkbox-line"><input type="checkbox" checked={Boolean(contactForm.es_principal)} onChange={(e) => setContactForm({ ...contactForm, es_principal: e.target.checked })} /> Marcar como principal</label>
+                    <button className="zoho-small-btn primary" type="button" onClick={addDraftContact}>Agregar contacto</button>
+                  </div>
+                  <div className="kam-draft-contact-list">
+                    {draftContacts.map((c, idx) => <div className="kam-draft-contact" key={`${c.nombre}-${idx}`}><div><strong>{c.nombre} {c.es_principal ? "· Principal" : ""}</strong><span>{c.cargo || "Sin cargo"} · {c.correo || c.telefono_contacto || c.linkedin_url}</span></div><div className="zoho-actions-row compact-actions"><button className="zoho-small-btn" type="button" onClick={() => promoteDraftContact(idx)}>Principal</button><button className="zoho-small-btn danger" type="button" onClick={() => removeDraftContact(idx)}>Quitar</button></div></div>)}
+                    {!draftContacts.length && <p className="zoho-help-text">Aún no agregas contactos adicionales.</p>}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="kam-modal-footer">
+              <button className="zoho-btn" type="button" onClick={() => setCompanyModalOpen(false)}>Cancelar</button>
+              <button className="zoho-btn zoho-btn-primary" type="button" onClick={saveCompany}>{selected ? "Guardar cambios" : "Crear empresa"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activityModalOpen && selected && (
+        <div className="kam-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="kam-modal-panel">
+            <div className="kam-modal-header">
+              <div>
+                <span className="kam-pro-eyebrow">Bitácora comercial</span>
+                <h2>Registrar gestión</h2>
+                <p>{selected.razon_social}</p>
+              </div>
+              <button className="kam-modal-close" type="button" onClick={() => setActivityModalOpen(false)}>×</button>
+            </div>
+            <div className="kam-modal-body">
+              <div className="zoho-form-grid kam-filter-grid">
+                <Field label="Tipo gestión"><select className="zoho-input" value={activityForm.tipo_gestion} onChange={(e) => setActivityForm({ ...activityForm, tipo_gestion: e.target.value })}><option>Llamada</option><option>Correo</option><option>WhatsApp</option><option>Reunión</option><option>Propuesta</option><option>Seguimiento</option><option>Contacto LinkedIn</option><option>Reasignación</option></select></Field>
+                <Field label="Estado venta"><select className="zoho-input" value={activityForm.estado_venta} onChange={(e) => setActivityForm({ ...activityForm, estado_venta: e.target.value })}>{ESTADOS_VENTA.filter((x) => x !== "Sin asignar").map((x) => <option key={x}>{x}</option>)}</select></Field>
+                <Field label="Resultado"><input className="zoho-input" value={activityForm.resultado} onChange={(e) => setActivityForm({ ...activityForm, resultado: e.target.value })} placeholder="Contactado, sin respuesta, interesado..." /></Field>
+                <Field label="Próxima acción"><input className="zoho-input" value={activityForm.proxima_accion} onChange={(e) => setActivityForm({ ...activityForm, proxima_accion: e.target.value })} /></Field>
+                <Field label="Próxima gestión"><input className="zoho-input" type="date" value={activityForm.proxima_gestion} onChange={(e) => setActivityForm({ ...activityForm, proxima_gestion: e.target.value })} /></Field>
+                <Field label="Probabilidad %"><input className="zoho-input" type="number" min={0} max={100} value={activityForm.probabilidad_cierre} onChange={(e) => setActivityForm({ ...activityForm, probabilidad_cierre: e.target.value })} /></Field>
+                <Field label="Observación"><textarea className="zoho-input" rows={4} value={activityForm.observacion} onChange={(e) => setActivityForm({ ...activityForm, observacion: e.target.value })} /></Field>
+              </div>
+              <div className="kam-modal-history">
+                <strong>Últimas gestiones</strong>
+                {activities.slice(0, 5).map((a) => <div className="kam-history-item" key={a.id}><span>{a.created_at ? String(a.created_at).slice(0, 10) : "—"}</span><b>{a.tipo_gestion}</b><small>{a.resultado || a.observacion || "Sin detalle"}</small></div>)}
+                {!activities.length && <p className="zoho-help-text">Sin gestiones registradas para esta empresa.</p>}
+              </div>
+            </div>
+            <div className="kam-modal-footer">
+              <button className="zoho-btn" type="button" onClick={() => setActivityModalOpen(false)}>Cancelar</button>
+              <button className="zoho-btn zoho-btn-primary" type="button" onClick={saveActivity}>Guardar en bitácora</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -72,3 +72,97 @@
 .kam-visual-pro .kam-kanban-card:hover { transform: translateY(-2px); box-shadow: 0 14px 28px rgba(15,23,42,.12); }
 @media (max-width: 1100px) { .kam-pro-kpis { grid-template-columns: repeat(2, minmax(0,1fr)); } .kam-contact-builder-grid { grid-template-columns: 1fr; } }
 @media (max-width: 720px) { .kam-pro-kpis { grid-template-columns: 1fr; } .kam-visual-pro .kam-pro-hero { padding: 20px; } }
+
+/* V104 - CRM Pro modals, export filtrado y gestión comercial */
+.kam-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  background: rgba(15, 23, 42, .58);
+  backdrop-filter: blur(8px);
+}
+.kam-modal-panel {
+  width: min(920px, 96vw);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, .95);
+  border-radius: 24px;
+  box-shadow: 0 30px 90px rgba(2, 8, 23, .32);
+  overflow: hidden;
+}
+.kam-modal-large { width: min(1120px, 97vw); }
+.kam-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 24px 26px;
+  color: #fff;
+  background: linear-gradient(135deg, #0f2742, #164e8b 62%, #0b74d1);
+}
+.kam-modal-header h2 { margin: 4px 0 4px; font-size: 25px; letter-spacing: -.03em; color: #fff; }
+.kam-modal-header p { margin: 0; color: rgba(255,255,255,.78); }
+.kam-modal-close {
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255,255,255,.24);
+  border-radius: 12px;
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+.kam-modal-body {
+  padding: 22px 26px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+.kam-modal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e7edf5;
+}
+.kam-modal-section strong { color: #122033; font-size: 15px; }
+.kam-modal-section span { color: #667085; font-size: 12px; }
+.kam-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 26px;
+  border-top: 1px solid #e7edf5;
+  background: #fff;
+}
+.kam-modal-history {
+  border: 1px solid #e7edf5;
+  border-radius: 16px;
+  padding: 14px;
+  background: #fff;
+}
+.kam-history-item {
+  display: grid;
+  grid-template-columns: 90px 150px 1fr;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid #edf1f7;
+  color: #475467;
+}
+.kam-history-item:first-of-type { border-top: 0; }
+.kam-history-item b { color: #122033; }
+.kam-history-item small { color: #667085; }
+@media (max-width: 760px) {
+  .kam-modal-backdrop { padding: 10px; align-items: flex-start; }
+  .kam-modal-panel { max-height: 96vh; }
+  .kam-history-item { grid-template-columns: 1fr; }
+}

@@ -4879,3 +4879,75 @@
   color: white;
   border-color: #2563eb;
 }
+
+/* V104 - OperaFix CRM Pro branding */
+.crm-topbar {
+  height: 60px;
+  background: linear-gradient(135deg, #0f2742 0%, #164e8b 58%, #0b74d1 100%);
+  box-shadow: 0 10px 30px rgba(15, 39, 66, .18);
+}
+.crm-brand-pro {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+  font-size: 23px;
+  font-weight: 850;
+  letter-spacing: -.03em;
+}
+.crm-brand-pro img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+.crm-main-nav a {
+  padding: 8px 10px;
+  border-radius: 10px;
+  color: rgba(255,255,255,.82);
+  font-weight: 700;
+}
+.crm-main-nav a.active,
+.crm-main-nav a:hover {
+  background: rgba(255,255,255,.14);
+  color: #fff;
+}
+.crm-body { min-height: calc(100vh - 60px); }
+.crm-sidebar {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border-right: 1px solid #dfe7f1;
+  box-shadow: 8px 0 28px rgba(15,23,42,.04);
+}
+.crm-sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 8px 16px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #e7edf5;
+}
+.crm-sidebar-logo img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+.crm-sidebar-logo strong {
+  display: block;
+  color: #0f2742;
+  font-size: 15px;
+}
+.crm-sidebar-logo span {
+  display: block;
+  color: #667085;
+  font-size: 12px;
+}
+.crm-side-nav a {
+  padding: 10px 12px;
+  border-radius: 12px;
+  color: #344054;
+  font-weight: 700;
+}
+.crm-side-nav a.active,
+.crm-side-nav a:hover {
+  background: #eef6ff;
+  color: #164e8b;
+}
