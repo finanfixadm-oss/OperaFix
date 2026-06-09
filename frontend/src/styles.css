@@ -539,3 +539,50 @@ button { cursor: pointer; }
   display: grid;
   gap: 16px;
 }
+
+/* KAM V95 - Kanban y bitácora comercial */
+.kam-kanban-board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(260px, 1fr);
+  gap: 16px;
+  overflow-x: auto;
+  padding: 8px 2px 18px;
+}
+.kam-kanban-column {
+  background: rgba(15, 23, 42, 0.035);
+  border: 1px solid rgba(15, 23, 42, 0.09);
+  border-radius: 16px;
+  padding: 12px;
+  min-height: 320px;
+}
+.kam-kanban-column h3 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+.kam-kanban-column h3 span {
+  background: rgba(15, 23, 42, 0.08);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.kam-kanban-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #fff;
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+}
+.kam-kanban-card strong { font-size: 13px; color: #0f172a; }
+.kam-kanban-card span { font-size: 12px; color: #475569; }
+.kam-alert-text { color: #b91c1c !important; font-weight: 700; }

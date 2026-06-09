@@ -72,6 +72,30 @@ type RuleRow = {
   activa: boolean;
 };
 
+type KamActivity = {
+  id: string;
+  company_id: string;
+  kam_nombre?: string | null;
+  tipo_gestion: string;
+  resultado?: string | null;
+  proxima_accion?: string | null;
+  proxima_gestion?: string | null;
+  estado_venta?: string | null;
+  probabilidad_cierre?: number | null;
+  observacion?: string | null;
+  created_at?: string | null;
+};
+
+const emptyActivity = {
+  tipo_gestion: "Llamada",
+  resultado: "",
+  proxima_accion: "Hacer seguimiento",
+  proxima_gestion: "",
+  estado_venta: "Contactada",
+  probabilidad_cierre: "",
+  observacion: "",
+};
+
 type KamMetrics = {
   summary?: any;
   byKam?: Array<{
@@ -176,7 +200,7 @@ export default function KamAssignmentPage() {
   const user = getCurrentUser();
   const canAdmin = ["admin", "kam_admin", "interno"].includes(String(user?.role || ""));
   const canConfigure = ["admin", "kam_admin"].includes(String(user?.role || ""));
-  const [tab, setTab] = useState<"companies" | "profiles" | "rules" | "tracking">("tracking");
+  const [tab, setTab] = useState<"companies" | "profiles" | "rules" | "tracking" | "kanban">("tracking");
   const [companies, setCompanies] = useState<KamCompany[]>([]);
   const [profiles, setProfiles] = useState<KamProfile[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -190,6 +214,8 @@ export default function KamAssignmentPage() {
   const [filterSegment, setFilterSegment] = useState("");
   const [filterQuick, setFilterQuick] = useState("");
   const [selected, setSelected] = useState<KamCompany | null>(null);
+  const [activities, setActivities] = useState<KamActivity[]>([]);
+  const [activityForm, setActivityForm] = useState<any>(emptyActivity);
   const [companyForm, setCompanyForm] = useState<any>(emptyCompany);
   const [profileForm, setProfileForm] = useState<any>(emptyProfile);
   const [ruleForm, setRuleForm] = useState<any>(emptyRule);
@@ -316,7 +342,7 @@ export default function KamAssignmentPage() {
     return { total: companies.length, strategic, unassigned, totalAmount };
   }, [companies]);
 
-  function editCompany(row: KamCompany) {
+  async function editCompany(row: KamCompany) {
     setSelected(row);
     setCompanyForm({
       ...emptyCompany,
@@ -331,6 +357,14 @@ export default function KamAssignmentPage() {
     });
     setManualKamId(row.kam_asignado_id || "");
     setRecommendations([]);
+    setActivityForm({
+      ...emptyActivity,
+      estado_venta: row.estado || "Contactada",
+      proxima_gestion: row.proxima_gestion ? String(row.proxima_gestion).slice(0, 10) : "",
+      probabilidad_cierre: row.probabilidad_cierre || "",
+    });
+    const rows = await fetchJson<KamActivity[]>(`/kam/companies/${row.id}/activities`).catch(() => [] as KamActivity[]);
+    setActivities(rows);
   }
 
   async function saveCompany() {
@@ -338,10 +372,41 @@ export default function KamAssignmentPage() {
       alert("Debes ingresar RUT y Razón Social.");
       return;
     }
-    if (selected) await putJson(`/kam/companies/${selected.id}`, companyForm);
+    if (companyForm.estado === "Perdida" && !companyForm.motivo_perdida) {
+      alert("Debes ingresar motivo de pérdida antes de marcar la empresa como Perdida.");
+      return;
+    }
+    if (selected && selected.kam_asignado_id && !["Ganada", "Perdida", "Congelada"].includes(companyForm.estado) && !companyForm.proxima_gestion) {
+      alert("Debes ingresar una próxima gestión para que la empresa no quede abandonada.");
+      return;
+    }
+    if (selected) await putJson(`/kam/companies/${selected.id}`, { ...companyForm, actividad_tipo: "Actualización", actividad_observacion: companyForm.observacion });
     else await postJson("/kam/companies", companyForm);
     setCompanyForm(emptyCompany);
     setSelected(null);
+    await loadAll();
+  }
+
+  async function saveActivity() {
+    if (!selected) {
+      alert("Selecciona una empresa para registrar gestión.");
+      return;
+    }
+    if (!activityForm.observacion && !activityForm.resultado) {
+      alert("Ingresa resultado u observación de la gestión.");
+      return;
+    }
+    if (activityForm.estado_venta === "Perdida" && !companyForm.motivo_perdida && !activityForm.observacion) {
+      alert("Para registrar pérdida debes indicar motivo u observación.");
+      return;
+    }
+    await postJson(`/kam/companies/${selected.id}/activities`, {
+      ...activityForm,
+      motivo_perdida: companyForm.motivo_perdida,
+    });
+    const rows = await fetchJson<KamActivity[]>(`/kam/companies/${selected.id}/activities`).catch(() => [] as KamActivity[]);
+    setActivities(rows);
+    setActivityForm(emptyActivity);
     await loadAll();
   }
 
@@ -429,6 +494,7 @@ export default function KamAssignmentPage() {
         <div className="zoho-module-actions">
           <button className={tab === "companies" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("companies")}>Empresas</button>
           <button className={tab === "tracking" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("tracking")}>Dashboard KAM</button>
+          <button className={tab === "kanban" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("kanban")}>Kanban</button>
           <button className={tab === "profiles" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("profiles")}>Ranking KAM</button>
           <button className={tab === "rules" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("rules")}>Reglas</button>
         </div>
@@ -521,7 +587,7 @@ export default function KamAssignmentPage() {
                 <Field label="Observación"><textarea className="zoho-input" rows={3} value={companyForm.observacion} onChange={(e) => setCompanyForm({ ...companyForm, observacion: e.target.value })} /></Field>
                 <div className="zoho-form-actions">
                   <button className="zoho-btn zoho-btn-primary" onClick={saveCompany}>{selected ? "Guardar cambios" : "Crear empresa"}</button>
-                  {selected && <button className="zoho-btn" onClick={() => { setSelected(null); setCompanyForm(emptyCompany); setRecommendations([]); }}>Limpiar</button>}
+                  {selected && <button className="zoho-btn" onClick={() => { setSelected(null); setCompanyForm(emptyCompany); setRecommendations([]); setActivities([]); }}>Limpiar</button>}
                 </div>
               </div>
             )}
@@ -572,6 +638,36 @@ export default function KamAssignmentPage() {
               </table>
             </div>
 
+            {selected && (
+              <div className="zoho-card kam-recommend-box">
+                <h3>Bitácora comercial de {selected.razon_social}</h3>
+                <p className="zoho-help-text">Registra llamadas, correos, reuniones, próximas acciones y cambios de estado para no perder trazabilidad.</p>
+                <div className="zoho-form-grid kam-filter-grid">
+                  <Field label="Tipo gestión">
+                    <select className="zoho-input" value={activityForm.tipo_gestion} onChange={(e) => setActivityForm({ ...activityForm, tipo_gestion: e.target.value })}>
+                      <option>Llamada</option><option>Correo</option><option>WhatsApp</option><option>Reunión</option><option>Propuesta</option><option>Seguimiento</option><option>Reasignación</option>
+                    </select>
+                  </Field>
+                  <Field label="Estado venta"><select className="zoho-input" value={activityForm.estado_venta} onChange={(e) => setActivityForm({ ...activityForm, estado_venta: e.target.value })}>{ESTADOS_VENTA.filter((x) => x !== "Sin asignar").map((x) => <option key={x}>{x}</option>)}</select></Field>
+                  <Field label="Resultado"><input className="zoho-input" value={activityForm.resultado} onChange={(e) => setActivityForm({ ...activityForm, resultado: e.target.value })} placeholder="Contactado, sin respuesta, interesado..." /></Field>
+                  <Field label="Próxima acción"><input className="zoho-input" value={activityForm.proxima_accion} onChange={(e) => setActivityForm({ ...activityForm, proxima_accion: e.target.value })} /></Field>
+                  <Field label="Próxima gestión"><input className="zoho-input" type="date" value={activityForm.proxima_gestion} onChange={(e) => setActivityForm({ ...activityForm, proxima_gestion: e.target.value })} /></Field>
+                  <Field label="Probabilidad %"><input className="zoho-input" type="number" min={0} max={100} value={activityForm.probabilidad_cierre} onChange={(e) => setActivityForm({ ...activityForm, probabilidad_cierre: e.target.value })} /></Field>
+                  <Field label="Observación"><textarea className="zoho-input" rows={2} value={activityForm.observacion} onChange={(e) => setActivityForm({ ...activityForm, observacion: e.target.value })} /></Field>
+                  <div className="zoho-form-field"><span>&nbsp;</span><button className="zoho-btn zoho-btn-primary" type="button" onClick={saveActivity}>Registrar gestión</button></div>
+                </div>
+                <div className="zoho-table-scroll-x">
+                  <table className="zoho-table">
+                    <thead><tr><th>Fecha</th><th>KAM</th><th>Tipo</th><th>Estado</th><th>Resultado</th><th>Próxima acción</th><th>Próxima gestión</th><th>Prob.</th><th>Observación</th></tr></thead>
+                    <tbody>
+                      {activities.map((a) => <tr key={a.id}><td>{a.created_at ? String(a.created_at).slice(0, 10) : "—"}</td><td>{a.kam_nombre || "—"}</td><td>{a.tipo_gestion}</td><td>{a.estado_venta || "—"}</td><td>{a.resultado || "—"}</td><td>{a.proxima_accion || "—"}</td><td>{a.proxima_gestion ? String(a.proxima_gestion).slice(0, 10) : "—"}</td><td>{a.probabilidad_cierre ?? "—"}</td><td>{a.observacion || "—"}</td></tr>)}
+                      {!activities.length && <tr><td colSpan={9}>Sin gestiones registradas para esta empresa.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {recommendations.length > 0 && selected && (
               <div className="zoho-card kam-recommend-box">
                 <h3>Recomendación para {selected.razon_social}</h3>
@@ -596,6 +692,32 @@ export default function KamAssignmentPage() {
             )}
           </section>
         </div>
+      )}
+
+      {tab === "kanban" && (
+        <section className="zoho-dashboard-stack">
+          <div className="zoho-table-toolbar"><span>Tablero Kanban comercial</span><span className="zoho-help-text">Arrastra visualmente la gestión desde pendiente hasta ganada/perdida. Para cambiar el estado, abre la tarjeta y guarda el seguimiento.</span></div>
+          <div className="kam-kanban-board">
+            {ESTADOS_VENTA.filter((estado) => estado !== "Sin asignar").map((estado) => {
+              const items = filteredCompanies.filter((row) => String(row.estado || "") === estado).slice(0, 50);
+              return (
+                <div className="kam-kanban-column" key={estado}>
+                  <h3>{estado} <span>{items.length}</span></h3>
+                  {items.map((row) => (
+                    <button type="button" className="kam-kanban-card" key={row.id} onClick={() => { setTab("companies"); editCompany(row); }}>
+                      <strong>{row.razon_social}</strong>
+                      <span>{row.kam_asignado_nombre || "Sin asignar"}</span>
+                      <span>{money(row.monto_devolucion)} · {row.nro_empleados || "—"} trab.</span>
+                      <span>{row.rubro || "Sin rubro"} · {row.region || "Sin región"}</span>
+                      <span className={isOverdue(row.proxima_gestion) ? "kam-alert-text" : ""}>Próxima: {row.proxima_gestion ? String(row.proxima_gestion).slice(0, 10) : "sin fecha"}</span>
+                    </button>
+                  ))}
+                  {!items.length && <p className="zoho-help-text">Sin empresas</p>}
+                </div>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       {tab === "tracking" && (
