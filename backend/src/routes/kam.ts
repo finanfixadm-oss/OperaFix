@@ -155,6 +155,14 @@ function strOrNull(value: unknown) {
   return s ? s : null;
 }
 
+function normalizeRutForDelete(value: unknown) {
+  return String(value || '').toLowerCase().replace(/[^0-9k]/g, '');
+}
+
+function normalizeNameForDelete(value: unknown) {
+  return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 function segmentEmployees(n?: number | null) {
   if (!n || n <= 0) return "Sin información";
   if (n <= 9) return "Microempresa";
@@ -365,6 +373,25 @@ async function ensureKamTables() {
     )
   `);
 
+  await prisma.$executeRawUnsafe(`
+    create table if not exists operafix_kam_deleted_companies (
+      id text primary key,
+      kam_company_id text,
+      source_company_id text,
+      source_mandante_id text,
+      source_mandante_name text,
+      rut text,
+      rut_normalized text,
+      razon_social text,
+      razon_social_normalized text,
+      deleted_by text,
+      delete_source_attempted boolean not null default false,
+      source_deleted boolean not null default false,
+      reason text,
+      created_at timestamptz not null default now()
+    )
+  `);
+
   const profileColumns: Array<[string, string]> = [
     ['user_id', 'text'], ['nivel_experiencia', `text not null default 'Junior'`], ['experiencia_licitaciones', 'integer not null default 0'],
     ['experiencia_ventas', 'integer not null default 0'], ['experiencia_recuperaciones', 'integer not null default 0'], ['experiencia_empresas_grandes', 'integer not null default 0'],
@@ -418,6 +445,17 @@ async function ensureKamTables() {
   ];
   for (const [col, def] of campaignColumns) await addColumnIfMissing('operafix_kam_campaigns', col, def);
 
+  const deletedCompanyColumns: Array<[string, string]> = [
+    ['kam_company_id', 'text'], ['source_company_id', 'text'], ['source_mandante_id', 'text'], ['source_mandante_name', 'text'],
+    ['rut', 'text'], ['rut_normalized', 'text'], ['razon_social', 'text'], ['razon_social_normalized', 'text'],
+    ['deleted_by', 'text'], ['delete_source_attempted', 'boolean not null default false'], ['source_deleted', 'boolean not null default false'],
+    ['reason', 'text'], ['created_at', 'timestamptz not null default now()'],
+  ];
+  for (const [col, def] of deletedCompanyColumns) await addColumnIfMissing('operafix_kam_deleted_companies', col, def);
+
+  await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_deleted_source on operafix_kam_deleted_companies(source_company_id)`).catch(() => null);
+  await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_deleted_rut on operafix_kam_deleted_companies(rut_normalized)`).catch(() => null);
+  await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_deleted_name on operafix_kam_deleted_companies(razon_social_normalized)`).catch(() => null);
 
   await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_activities_company on operafix_kam_activities(company_id)`).catch(() => null);
   await prisma.$executeRawUnsafe(`create index if not exists idx_operafix_kam_activities_kam on operafix_kam_activities(kam_id)`).catch(() => null);
@@ -465,6 +503,13 @@ async function syncFinanfixPotentialCompanies() {
       from companies c
       join mandantes m on m.id = c.mandante_id
       where (${FINANFIX_MANDANTE_PATTERNS.map((_, index) => `m.name ilike $${index + 1}`).join(' or ')})
+        and not exists (
+          select 1
+          from operafix_kam_deleted_companies d
+          where d.source_company_id = c.id
+             or (d.rut_normalized is not null and d.rut_normalized <> '' and d.rut_normalized = regexp_replace(lower(coalesce(c.rut,'')), '[^0-9k]', '', 'g'))
+             or (d.razon_social_normalized is not null and d.razon_social_normalized <> '' and d.razon_social_normalized = trim(regexp_replace(lower(translate(coalesce(c.razon_social,''),'áéíóúÁÉÍÓÚñÑ','aeiouaeiounn')), '[^a-z0-9]+', ' ', 'g')))
+        )
       order by c.razon_social asc
     `, ...FINANFIX_MANDANTE_PATTERNS).catch((error: any) => {
       console.error('[KAM] No se pudo sincronizar empresas Finanfix:', error);
@@ -472,6 +517,16 @@ async function syncFinanfixPotentialCompanies() {
     });
 
     for (const row of rows) {
+      const wasDeleted = await prisma.$queryRawUnsafe<any[]>(`
+        select 1 as ok
+        from operafix_kam_deleted_companies
+        where (source_company_id is not null and source_company_id = $1)
+           or (rut_normalized is not null and rut_normalized <> '' and rut_normalized = $2)
+           or (razon_social_normalized is not null and razon_social_normalized <> '' and razon_social_normalized = $3)
+        limit 1
+      `, String(row.source_company_id || ''), normalizeRutForDelete(row.rut), normalizeNameForDelete(row.razon_social)).catch(() => [] as any[]);
+      if (wasDeleted[0]) continue;
+
       const monto = numberOrNull(row.estimated_amount);
       const score = companyScore({ monto_devolucion: monto });
       const duplicate = await findDuplicateCompany(String(row.rut || ''), String(row.razon_social || ''));
@@ -662,6 +717,26 @@ async function applyPrincipalContact(companyId: string, contact: any) {
   `, companyId, strOrNull(contact.nombre), strOrNull(contact.cargo), strOrNull(contact.correo), strOrNull(contact.telefono_contacto), strOrNull(contact.linkedin_url)).catch(() => null);
 }
 
+async function createCompanyContact(companyId: string, body: any, forcePrincipal = false) {
+  const data = contactPayload({ ...body, es_principal: forcePrincipal || Boolean(body?.es_principal) });
+  if (!data.nombre || (!data.correo && !data.telefono_contacto && !data.linkedin_url)) return null;
+  const duplicate = await prisma.$queryRawUnsafe<any[]>(`
+    select id from operafix_kam_company_contacts
+    where company_id = $1
+      and lower(trim(nombre)) = lower(trim($2))
+      and coalesce(lower(trim(correo)),'') = coalesce(lower(trim($3)),'')
+    limit 1
+  `, companyId, data.nombre, data.correo).catch(() => [] as any[]);
+  if (duplicate[0]) return null;
+  const rows = await prisma.$queryRawUnsafe<any[]>(`
+    insert into operafix_kam_company_contacts (id, company_id, nombre, cargo, correo, telefono_contacto, linkedin_url, es_principal, observacion)
+    values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+    returning *
+  `, id('kct'), companyId, data.nombre, data.cargo, data.correo, data.telefono_contacto, data.linkedin_url, data.es_principal, data.observacion);
+  await applyPrincipalContact(companyId, rows[0]);
+  return rows[0];
+}
+
 function companyPayload(body: any) {
   const nroEmpleados = integerOrNull(body.nro_empleados ?? body.nroEmpleados);
   const montoDevolucion = numberOrNull(body.monto_devolucion ?? body.montoDevolucion);
@@ -780,6 +855,15 @@ kamRouter.post("/companies", async (req, res) => {
     data.prioridad, data.score_empresa, data.segmento_empresa, data.segmento_monto, data.tipo_oportunidad,
     data.origen, kamAdminId, data.proxima_gestion, data.resultado_gestion, data.motivo_perdida, data.probabilidad_cierre, data.canal_origen, data.campaign_id
   );
+
+  const contactList = Array.isArray(req.body?.contactos) ? req.body.contactos : Array.isArray(req.body?.contacts) ? req.body.contacts : [];
+  for (let index = 0; index < contactList.length; index += 1) {
+    await createCompanyContact(companyId, contactList[index], index === 0 && !contactList.some((c: any) => Boolean(c?.es_principal))).catch((error: any) => {
+      console.error('[KAM] No se pudo crear contacto adicional al crear empresa:', error);
+      return null;
+    });
+  }
+
   res.status(201).json(rows[0]);
 });
 
@@ -854,11 +938,74 @@ kamRouter.delete("/companies/:id", async (req, res) => {
   const session = requireKamAccess(req, res);
   if (!session) return;
   if (isKam(session)) return res.status(403).json({ message: "El KAM vendedor no puede eliminar empresas." });
-  await prisma.$executeRawUnsafe(`delete from operafix_kam_company_contacts where company_id = $1`, req.params.id).catch(() => null);
-  await prisma.$executeRawUnsafe(`delete from operafix_kam_activities where company_id = $1`, req.params.id).catch(() => null);
-  await prisma.$executeRawUnsafe(`delete from operafix_kam_assignment_history where empresa_id = $1`, req.params.id).catch(() => null);
-  await prisma.$executeRawUnsafe(`delete from operafix_kam_companies where id = $1`, req.params.id);
-  res.json({ ok: true, message: 'Empresa eliminada correctamente.' });
+
+  try {
+    const rows = await prisma.$queryRawUnsafe<any[]>(`
+      select id, source_company_id, source_mandante_id, source_mandante_name, rut, razon_social
+      from operafix_kam_companies
+      where id = $1
+      limit 1
+    `, req.params.id);
+    const company = rows[0];
+    if (!company) return res.status(404).json({ message: "Empresa KAM no encontrada." });
+
+    let sourceDeleted = false;
+    let deleteSourceAttempted = false;
+
+    if (company.source_company_id && await tableExists('companies')) {
+      deleteSourceAttempted = true;
+      const hasCompanyMandante = await columnExists('companies', 'mandante_id');
+      const hasCompanyId = await columnExists('companies', 'id');
+      const hasMandantes = await tableExists('mandantes');
+      const hasMandanteId = await columnExists('mandantes', 'id');
+      const hasMandanteName = await columnExists('mandantes', 'name');
+
+      if (hasCompanyId && hasCompanyMandante && hasMandantes && hasMandanteId && hasMandanteName) {
+        const deleted = await prisma.$executeRawUnsafe(`
+          delete from companies c
+          using mandantes m
+          where c.id = $1
+            and m.id = c.mandante_id
+            and (${FINANFIX_MANDANTE_PATTERNS.map((_, index) => `m.name ilike $${index + 2}`).join(' or ')})
+        `, String(company.source_company_id), ...FINANFIX_MANDANTE_PATTERNS).catch((error: any) => {
+          console.error('[KAM] No se pudo eliminar empresa origen Finanfix:', error);
+          return 0;
+        });
+        sourceDeleted = Number(deleted || 0) > 0;
+      }
+    }
+
+    await prisma.$executeRawUnsafe(`
+      insert into operafix_kam_deleted_companies (
+        id, kam_company_id, source_company_id, source_mandante_id, source_mandante_name,
+        rut, rut_normalized, razon_social, razon_social_normalized, deleted_by,
+        delete_source_attempted, source_deleted, reason
+      ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+    `,
+      id('kdel'), company.id, company.source_company_id || null, company.source_mandante_id || null, company.source_mandante_name || null,
+      company.rut || null, normalizeRutForDelete(company.rut), company.razon_social || null, normalizeNameForDelete(company.razon_social), sessionUserId(session),
+      deleteSourceAttempted, sourceDeleted, strOrNull(req.body?.reason) || 'Eliminada desde módulo KAM'
+    ).catch((error: any) => console.error('[KAM] No se pudo registrar eliminación lógica:', error));
+
+    await prisma.$executeRawUnsafe(`delete from operafix_kam_company_contacts where company_id = $1`, req.params.id).catch(() => null);
+    await prisma.$executeRawUnsafe(`delete from operafix_kam_activities where company_id = $1`, req.params.id).catch(() => null);
+    await prisma.$executeRawUnsafe(`delete from operafix_kam_assignment_history where empresa_id = $1`, req.params.id).catch(() => null);
+    await prisma.$executeRawUnsafe(`delete from operafix_kam_companies where id = $1`, req.params.id);
+
+    res.json({
+      ok: true,
+      source_deleted: sourceDeleted,
+      message: sourceDeleted
+        ? 'Empresa eliminada correctamente del módulo KAM y del Registro Empresas Finanfix.'
+        : 'Empresa eliminada correctamente del módulo KAM. También quedó bloqueada para que no vuelva a sincronizarse desde Finanfix.',
+    });
+  } catch (error: any) {
+    console.error('[KAM] Error eliminando empresa:', error);
+    res.status(500).json({
+      message: 'No se pudo eliminar la empresa KAM.',
+      detail: process.env.NODE_ENV === 'production' ? undefined : String(error?.message || error),
+    });
+  }
 });
 
 

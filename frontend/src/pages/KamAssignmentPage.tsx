@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { deleteJson, downloadBlob, fetchJson, postJson, putJson, uploadForm } from "../api";
 import { getCurrentUser } from "../auth";
+import "./kam-visual-pro.css";
 
 type KamCompany = {
   id: string;
@@ -282,6 +283,7 @@ export default function KamAssignmentPage() {
   const [activities, setActivities] = useState<KamActivity[]>([]);
   const [contacts, setContacts] = useState<KamContact[]>([]);
   const [contactForm, setContactForm] = useState<any>(emptyContact);
+  const [draftContacts, setDraftContacts] = useState<any[]>([]);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [activityForm, setActivityForm] = useState<any>(emptyActivity);
   const [companyForm, setCompanyForm] = useState<any>(emptyCompany);
@@ -472,6 +474,7 @@ export default function KamAssignmentPage() {
     const contactRows = await fetchJson<KamContact[]>(`/kam/companies/${row.id}/contacts`).catch(() => [] as KamContact[]);
     setContacts(contactRows);
     setContactForm(emptyContact);
+    setDraftContacts([]);
     setEditingContactId(null);
   }
 
@@ -503,14 +506,20 @@ export default function KamAssignmentPage() {
       return;
     }
     try {
-      if (selected) await putJson(`/kam/companies/${selected.id}`, { ...companyForm, actividad_tipo: "Actualización", actividad_observacion: companyForm.observacion });
-      else await postJson("/kam/companies", companyForm);
+      const wasEditing = Boolean(selected);
+      const cleanDraftContacts = draftContacts.filter((c) => String(c?.nombre || "").trim());
+      if (selected) {
+        await putJson(`/kam/companies/${selected.id}`, { ...companyForm, actividad_tipo: "Actualización", actividad_observacion: companyForm.observacion });
+      } else {
+        await postJson<KamCompany>("/kam/companies", { ...companyForm, contactos: cleanDraftContacts });
+      }
       setCompanyForm(emptyCompany);
       setSelected(null);
       setContacts([]);
+      setDraftContacts([]);
       setContactForm(emptyContact);
       setEditingContactId(null);
-      setSaveMessage(selected ? "Empresa actualizada correctamente." : "Empresa creada correctamente.");
+      setSaveMessage(wasEditing ? "Empresa actualizada correctamente." : `Empresa creada correctamente${cleanDraftContacts.length ? ` con ${cleanDraftContacts.length} contacto(s).` : "."}`);
       await loadAll();
     } catch (error: any) {
       alert(error?.message || "No se pudo guardar la empresa.");
@@ -546,6 +555,50 @@ export default function KamAssignmentPage() {
     if (!id) return;
     const rows = await fetchJson<KamContact[]>(`/kam/companies/${id}/contacts`).catch(() => [] as KamContact[]);
     setContacts(rows);
+  }
+
+  function addDraftContact() {
+    const next = { ...contactForm, es_principal: draftContacts.length === 0 ? true : Boolean(contactForm.es_principal) };
+    if (!String(next.nombre || "").trim()) {
+      alert("Debes ingresar el nombre del contacto.");
+      return;
+    }
+    if (!next.correo && !next.telefono_contacto && !next.linkedin_url) {
+      alert("Debes ingresar al menos correo, teléfono o LinkedIn del contacto.");
+      return;
+    }
+    setDraftContacts((prev) => {
+      const cleaned = next.es_principal ? prev.map((c) => ({ ...c, es_principal: false })) : prev;
+      return [...cleaned, next];
+    });
+    if (next.es_principal) {
+      setCompanyForm((prev: any) => ({
+        ...prev,
+        nombre_contacto: next.nombre || prev.nombre_contacto,
+        cargo_contacto: next.cargo || prev.cargo_contacto,
+        correo: next.correo || prev.correo,
+        telefono: next.telefono_contacto || prev.telefono,
+      }));
+    }
+    setContactForm(emptyContact);
+  }
+
+  function removeDraftContact(index: number) {
+    setDraftContacts((prev) => prev.filter((_, idx) => idx !== index));
+  }
+
+  function promoteDraftContact(index: number) {
+    setDraftContacts((prev) => prev.map((c, idx) => ({ ...c, es_principal: idx === index })));
+    const contact = draftContacts[index];
+    if (contact) {
+      setCompanyForm((prev: any) => ({
+        ...prev,
+        nombre_contacto: contact.nombre || prev.nombre_contacto,
+        cargo_contacto: contact.cargo || prev.cargo_contacto,
+        correo: contact.correo || prev.correo,
+        telefono: contact.telefono_contacto || prev.telefono,
+      }));
+    }
   }
 
   async function saveContact() {
@@ -776,6 +829,16 @@ export default function KamAssignmentPage() {
     }
   }
 
+  function estadoClass(value?: string | null) {
+    const key = String(value || "sin-asignar").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-");
+    return `kam-badge estado-${key}`;
+  }
+
+  function prioridadClass(value?: string | null) {
+    const key = String(value || "baja").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-");
+    return `kam-badge prioridad-${key}`;
+  }
+
   function onKanbanDragStart(event: DragEvent<HTMLElement>, row: KamCompany) {
     event.dataTransfer.setData("text/plain", row.id);
     event.dataTransfer.effectAllowed = "move";
@@ -794,11 +857,12 @@ export default function KamAssignmentPage() {
   }
 
   return (
-    <div className="zoho-module-page kam-module-page">
-      <div className="zoho-module-header">
+    <div className="zoho-module-page kam-module-page kam-visual-pro">
+      <div className="zoho-module-header kam-pro-hero">
         <div>
+          <div className="kam-pro-eyebrow">CRM Comercial FinanFix</div>
           <h1>Asignación y Seguimiento KAM</h1>
-          <p>Empresas potenciales desde Registro Empresas de Finanfix Solutions SPA, asignación manual a KAM vendedor, ranking y seguimiento comercial.</p>
+          <p>Panel profesional para cartera propia, asignación manual, seguimiento comercial, Kanban, campañas y control por vendedor.</p>
         </div>
         <div className="zoho-module-actions">
           <button className={tab === "companies" ? "zoho-btn zoho-btn-primary" : "zoho-btn"} onClick={() => setTab("companies")}>Empresas</button>
@@ -811,11 +875,11 @@ export default function KamAssignmentPage() {
         </div>
       </div>
 
-      <div className="zoho-kpi-grid">
-        <div className="zoho-card"><strong>{metrics.summary?.total_empresas ?? kpis.total}</strong><span>Empresas potenciales</span></div>
-        <div className="zoho-card"><strong>{metrics.summary?.ganadas ?? 0}</strong><span>Ganadas</span></div>
-        <div className="zoho-card"><strong>{metrics.summary?.sin_asignar ?? kpis.unassigned}</strong><span>Sin asignar</span></div>
-        <div className="zoho-card"><strong>{money(metrics.summary?.monto_potencial ?? kpis.totalAmount)}</strong><span>Monto potencial</span></div>
+      <div className="zoho-kpi-grid kam-pro-kpis">
+        <div className="zoho-card kam-kpi-card"><span className="kam-kpi-icon">🏢</span><strong>{metrics.summary?.total_empresas ?? kpis.total}</strong><span>Empresas potenciales</span></div>
+        <div className="zoho-card kam-kpi-card success"><span className="kam-kpi-icon">✅</span><strong>{metrics.summary?.ganadas ?? 0}</strong><span>Ganadas</span></div>
+        <div className="zoho-card kam-kpi-card warning"><span className="kam-kpi-icon">📌</span><strong>{metrics.summary?.sin_asignar ?? kpis.unassigned}</strong><span>Sin asignar</span></div>
+        <div className="zoho-card kam-kpi-card money"><span className="kam-kpi-icon">💰</span><strong>{money(metrics.summary?.monto_potencial ?? kpis.totalAmount)}</strong><span>Monto potencial</span></div>
       </div>
 
       {saveMessage && <div className="zoho-card kam-save-message"><strong>{saveMessage}</strong><button className="zoho-small-btn" type="button" onClick={() => setSaveMessage("")}>Cerrar</button></div>}
@@ -896,6 +960,37 @@ export default function KamAssignmentPage() {
                 <Field label="Probabilidad cierre %"><input className="zoho-input" type="number" min={0} max={100} value={companyForm.probabilidad_cierre} onChange={(e) => setCompanyForm({ ...companyForm, probabilidad_cierre: e.target.value })} /></Field>
                 <Field label="Resultado gestión"><input className="zoho-input" value={companyForm.resultado_gestion || ""} onChange={(e) => setCompanyForm({ ...companyForm, resultado_gestion: e.target.value })} /></Field>
                 <Field label="Motivo pérdida"><input className="zoho-input" value={companyForm.motivo_perdida || ""} onChange={(e) => setCompanyForm({ ...companyForm, motivo_perdida: e.target.value })} /></Field>
+                {!selected && (
+                  <div className="kam-contact-builder">
+                    <div className="kam-section-title">
+                      <strong>Contactos adicionales</strong>
+                      <span>Puedes crear 1, 2, 3 o más contactos antes de guardar la empresa.</span>
+                    </div>
+                    <div className="kam-contact-builder-grid">
+                      <input className="zoho-input" placeholder="Nombre contacto" value={contactForm.nombre} onChange={(e) => setContactForm({ ...contactForm, nombre: e.target.value })} />
+                      <input className="zoho-input" placeholder="Cargo" value={contactForm.cargo} onChange={(e) => setContactForm({ ...contactForm, cargo: e.target.value })} />
+                      <input className="zoho-input" placeholder="Correo" value={contactForm.correo} onChange={(e) => setContactForm({ ...contactForm, correo: e.target.value })} />
+                      <input className="zoho-input" placeholder="Teléfono contacto" value={contactForm.telefono_contacto} onChange={(e) => setContactForm({ ...contactForm, telefono_contacto: e.target.value })} />
+                      <input className="zoho-input" placeholder="LinkedIn contacto" value={contactForm.linkedin_url} onChange={(e) => setContactForm({ ...contactForm, linkedin_url: e.target.value })} />
+                      <label className="kam-checkbox-line"><input type="checkbox" checked={Boolean(contactForm.es_principal)} onChange={(e) => setContactForm({ ...contactForm, es_principal: e.target.checked })} /> Principal</label>
+                      <button className="zoho-small-btn primary" type="button" onClick={addDraftContact}>Agregar contacto</button>
+                    </div>
+                    {draftContacts.length > 0 && (
+                      <div className="kam-draft-contact-list">
+                        {draftContacts.map((c, idx) => (
+                          <div className="kam-draft-contact" key={`${c.nombre}-${idx}`}>
+                            <div><strong>{c.nombre}</strong><span>{c.cargo || "Sin cargo"} · {c.correo || c.telefono_contacto || c.linkedin_url}</span></div>
+                            <div className="zoho-actions-row compact-actions">
+                              {!c.es_principal && <button className="zoho-small-btn" type="button" onClick={() => promoteDraftContact(idx)}>Principal</button>}
+                              {c.es_principal && <span className="kam-badge success">Principal</span>}
+                              <button className="zoho-small-btn danger" type="button" onClick={() => removeDraftContact(idx)}>Quitar</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {selected && canConfigure && (
                   <Field label="Asignar manualmente a KAM vendedor">
                     <div className="zoho-actions-row">
@@ -910,7 +1005,7 @@ export default function KamAssignmentPage() {
                 <Field label="Observación"><textarea className="zoho-input" rows={3} value={companyForm.observacion} onChange={(e) => setCompanyForm({ ...companyForm, observacion: e.target.value })} /></Field>
                 <div className="zoho-form-actions">
                   <button className="zoho-btn zoho-btn-primary" onClick={saveCompany}>{selected ? "Guardar cambios" : "Crear empresa"}</button>
-                  {selected && <button className="zoho-btn" onClick={() => { setSelected(null); setCompanyForm(emptyCompany); setRecommendations([]); setActivities([]); setContacts([]); setContactForm(emptyContact); }}>Limpiar</button>}
+                  {selected && <button className="zoho-btn" onClick={() => { setSelected(null); setCompanyForm(emptyCompany); setRecommendations([]); setActivities([]); setContacts([]); setDraftContacts([]); setContactForm(emptyContact); }}>Limpiar</button>}
                   {selected && canAdmin && <button className="zoho-btn zoho-btn-danger" type="button" onClick={() => deleteCompany(selected)}>Eliminar empresa</button>}
                 </div>
               </div>
@@ -947,7 +1042,7 @@ export default function KamAssignmentPage() {
                       <td>{row.telefono || "—"}</td>
                       <td>{row.telefono_central || "—"}</td>
                       <td>{row.linkedin_url ? <a href={row.linkedin_url} target="_blank" rel="noreferrer">LinkedIn</a> : "—"}</td>
-                      <td>{row.estado || "—"}</td>
+                      <td><span className={estadoClass(row.estado)}>{row.estado || "—"}</span></td>
                       <td>{row.proxima_gestion ? String(row.proxima_gestion).slice(0, 10) : "—"}</td>
                       <td>{row.probabilidad_cierre ?? "—"}</td>
                       <td><span className={`priority-chip priority-${String(row.prioridad || "").toLowerCase()}`}>{row.prioridad || "—"}</span></td>
@@ -1158,7 +1253,7 @@ export default function KamAssignmentPage() {
                       <td>{row.razon_social}</td>
                       <td>{row.kam_asignado_nombre || "Sin asignar"}</td>
                       <td>{row.estado || "—"}</td>
-                      <td>{row.prioridad || "—"}</td>
+                      <td><span className={prioridadClass(row.prioridad)}>{row.prioridad || "—"}</span></td>
                       <td>{money(row.monto_devolucion)}</td>
                       <td>{row.proxima_gestion ? String(row.proxima_gestion).slice(0, 10) : "—"}</td>
                       <td>{row.estado === "Reasignar" ? "Requiere reasignación" : isOverdue(row.proxima_gestion) ? "Gestión vencida" : "Sin primer contacto"}</td>
