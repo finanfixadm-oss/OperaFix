@@ -890,3 +890,19 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* V114 - Popups globales de éxito/error y corrección de asignación KAM */
+.kam-success-modal.error {
+  border-color: #fecdd3;
+}
+.kam-success-modal.error .kam-success-icon {
+  background: #fee2e2;
+  color: #b42318;
+}
+.kam-success-modal.error h3 {
+  color: #7f1d1d;
+}
+.kam-success-modal.error p {
+  color: #991b1b;
+}

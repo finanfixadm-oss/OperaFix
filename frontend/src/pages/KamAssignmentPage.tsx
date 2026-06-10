@@ -484,6 +484,7 @@ export default function KamAssignmentPage() {
   const [activityModalOpen, setActivityModalOpen] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [successPopup, setSuccessPopup] = useState("");
+  const [popupKind, setPopupKind] = useState<"success" | "error">("success");
   const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidget[]>(DEFAULT_DASHBOARD_WIDGETS);
   const [dashboardBuilderOpen, setDashboardBuilderOpen] = useState(false);
   const [dashboardBuilderMode, setDashboardBuilderMode] = useState<"create" | "edit">("create");
@@ -663,7 +664,14 @@ export default function KamAssignmentPage() {
   }
 
   function notifySuccess(message: string) {
+    setPopupKind("success");
     setSaveMessage(message);
+    setSuccessPopup(message);
+  }
+
+  function notifyError(message: string) {
+    setPopupKind("error");
+    setSaveMessage("");
     setSuccessPopup(message);
   }
 
@@ -727,13 +735,13 @@ export default function KamAssignmentPage() {
         message.toLowerCase().includes("debes iniciar sesión") ||
         message.includes("401")
       ) {
-        alert(
+        notifyError(
           "Tu sesión venció o el token anterior quedó inválido después de la actualización. Inicia sesión nuevamente.",
         );
         window.location.href = "/login";
         return;
       }
-      alert(message || "No se pudo cargar el módulo KAM.");
+      notifyError(message || "No se pudo cargar el módulo KAM.");
     } finally {
       setLoading(false);
     }
@@ -1007,7 +1015,7 @@ export default function KamAssignmentPage() {
   async function openActivityModal(row?: KamCompany) {
     const target = row || selected;
     if (!target) {
-      alert("Selecciona una empresa para registrar gestión.");
+      notifyError("Selecciona una empresa para registrar gestión.");
       return;
     }
     if (!selected || selected.id !== target.id) {
@@ -1045,7 +1053,7 @@ export default function KamAssignmentPage() {
   async function saveCompany() {
     setSaveMessage("");
     if (!companyForm.rut || !companyForm.razon_social) {
-      alert("Debes ingresar RUT y Razón Social.");
+      notifyError("Debes ingresar RUT y Razón Social.");
       return;
     }
     if (!selected) {
@@ -1068,14 +1076,14 @@ export default function KamAssignmentPage() {
         );
       });
       if (exists) {
-        alert(
+        notifyError(
           "No se puede crear la empresa porque ya existe un registro con el mismo RUT o razón social.",
         );
         return;
       }
     }
     if (companyForm.estado === "Perdida" && !companyForm.motivo_perdida) {
-      alert(
+      notifyError(
         "Debes ingresar motivo de pérdida antes de marcar la empresa como Perdida.",
       );
       return;
@@ -1086,7 +1094,7 @@ export default function KamAssignmentPage() {
       !["Ganada", "Perdida", "Congelada"].includes(companyForm.estado) &&
       !companyForm.proxima_gestion
     ) {
-      alert(
+      notifyError(
         "Debes ingresar una próxima gestión para que la empresa no quede abandonada.",
       );
       return;
@@ -1107,15 +1115,28 @@ export default function KamAssignmentPage() {
             contactos: cleanDraftContacts,
           });
 
+      let assignedFromPopup = false;
       if (manualKamId && (!wasEditing || manualKamId !== selected?.kam_asignado_id)) {
-        const assigned = await postJson<KamCompany>(`/kam/companies/${saved.id}/assign`, {
-          kam_asignado_id: manualKamId,
-          motivo_asignacion: wasEditing
-            ? "Asignación manual desde popup de edición"
-            : "Asignación manual al crear empresa",
-          observacion: companyForm.observacion || "Asignación manual desde popup",
-        });
-        setCompanies((prev) => prev.map((item) => item.id === assigned.id ? { ...item, ...assigned } : item));
+        try {
+          const assigned = await postJson<KamCompany>(`/kam/companies/${saved.id}/assign`, {
+            kam_asignado_id: manualKamId,
+            motivo_asignacion: wasEditing
+              ? "Asignación manual desde popup de edición"
+              : "Asignación manual al crear empresa",
+            observacion: companyForm.observacion || "Asignación manual desde popup",
+          });
+          assignedFromPopup = true;
+          setCompanies((prev) => prev.map((item) => item.id === assigned.id ? { ...item, ...assigned } : item));
+        } catch (assignError) {
+          const rows = await fetchJson<KamCompany[]>("/kam/companies").catch(() => [] as KamCompany[]);
+          const refreshed = rows.find((item) => item.id === saved.id);
+          if (refreshed && refreshed.kam_asignado_id === manualKamId) {
+            assignedFromPopup = true;
+            setCompanies(rows);
+          } else {
+            throw assignError;
+          }
+        }
       }
 
       setCompanyForm(emptyCompany);
@@ -1129,21 +1150,21 @@ export default function KamAssignmentPage() {
       await loadAll();
       notifySuccess(
         wasEditing
-          ? "Empresa actualizada correctamente."
-          : `Empresa creada correctamente${cleanDraftContacts.length ? ` con ${cleanDraftContacts.length} contacto(s).` : "."}`,
+          ? `Empresa actualizada correctamente${assignedFromPopup ? " y KAM asignado." : "."}`
+          : `Empresa creada correctamente${cleanDraftContacts.length ? ` con ${cleanDraftContacts.length} contacto(s)` : ""}${assignedFromPopup ? " y KAM asignado." : "."}`,
       );
     } catch (error: any) {
-      alert(error?.message || "No se pudo guardar la empresa.");
+      notifyError(error?.message || "No se pudo guardar la empresa.");
     }
   }
 
   async function saveActivity() {
     if (!selected) {
-      alert("Selecciona una empresa para registrar gestión.");
+      notifyError("Selecciona una empresa para registrar gestión.");
       return;
     }
     if (!activityForm.observacion && !activityForm.resultado) {
-      alert("Ingresa resultado u observación de la gestión.");
+      notifyError("Ingresa resultado u observación de la gestión.");
       return;
     }
     if (
@@ -1151,7 +1172,7 @@ export default function KamAssignmentPage() {
       !companyForm.motivo_perdida &&
       !activityForm.observacion
     ) {
-      alert("Para registrar pérdida debes indicar motivo u observación.");
+      notifyError("Para registrar pérdida debes indicar motivo u observación.");
       return;
     }
     try {
@@ -1186,7 +1207,7 @@ export default function KamAssignmentPage() {
       await loadAll();
       notifySuccess("Gestión registrada correctamente en la bitácora comercial.");
     } catch (error: any) {
-      alert(error?.message || "No se pudo registrar la gestión.");
+      notifyError(error?.message || "No se pudo registrar la gestión.");
     }
   }
 
@@ -1206,11 +1227,11 @@ export default function KamAssignmentPage() {
         draftContacts.length === 0 ? true : Boolean(contactForm.es_principal),
     };
     if (!String(next.nombre || "").trim()) {
-      alert("Debes ingresar el nombre del contacto.");
+      notifyError("Debes ingresar el nombre del contacto.");
       return;
     }
     if (!next.correo && !next.telefono_contacto && !next.linkedin_url) {
-      alert(
+      notifyError(
         "Debes ingresar al menos correo, teléfono o LinkedIn del contacto.",
       );
       return;
@@ -1255,11 +1276,11 @@ export default function KamAssignmentPage() {
 
   async function saveContact() {
     if (!selected) {
-      alert("Selecciona una empresa antes de agregar contactos.");
+      notifyError("Selecciona una empresa antes de agregar contactos.");
       return;
     }
     if (!contactForm.nombre) {
-      alert("Debes ingresar el nombre del contacto.");
+      notifyError("Debes ingresar el nombre del contacto.");
       return;
     }
     if (
@@ -1267,7 +1288,7 @@ export default function KamAssignmentPage() {
       !contactForm.telefono_contacto &&
       !contactForm.linkedin_url
     ) {
-      alert(
+      notifyError(
         "Debes ingresar al menos correo, teléfono o LinkedIn del contacto.",
       );
       return;
@@ -1287,7 +1308,7 @@ export default function KamAssignmentPage() {
       );
       await loadAll();
     } catch (error: any) {
-      alert(error?.message || "No se pudo guardar el contacto.");
+      notifyError(error?.message || "No se pudo guardar el contacto.");
     }
   }
 
@@ -1312,7 +1333,7 @@ export default function KamAssignmentPage() {
       notifySuccess("Contacto eliminado correctamente.");
       await loadAll();
     } catch (error: any) {
-      alert(error?.message || "No se pudo eliminar el contacto.");
+      notifyError(error?.message || "No se pudo eliminar el contacto.");
     }
   }
 
@@ -1333,7 +1354,7 @@ export default function KamAssignmentPage() {
       notifySuccess("Empresa eliminada correctamente.");
       await loadAll();
     } catch (error: any) {
-      alert(error?.message || "No se pudo eliminar la empresa.");
+      notifyError(error?.message || "No se pudo eliminar la empresa.");
     }
   }
 
@@ -1360,11 +1381,11 @@ export default function KamAssignmentPage() {
 
   async function assignManual() {
     if (!selected) {
-      alert("Primero selecciona una empresa.");
+      notifyError("Primero selecciona una empresa.");
       return;
     }
     if (!manualKamId) {
-      alert("Debes seleccionar un KAM vendedor.");
+      notifyError("Debes seleccionar un KAM vendedor.");
       return;
     }
     try {
@@ -1382,7 +1403,22 @@ export default function KamAssignmentPage() {
       await loadAll();
       notifySuccess("Asignación manual guardada correctamente.");
     } catch (error: any) {
-      alert(error?.message || "No se pudo asignar el vendedor KAM.");
+      try {
+        const rows = await fetchJson<KamCompany[]>("/kam/companies");
+        const refreshed = rows.find((item) => item.id === selected.id);
+        const kamName = users.find((u) => u.id === manualKamId)?.full_name || users.find((u) => u.id === manualKamId)?.email || "KAM asignado";
+        if (refreshed && (refreshed.kam_asignado_id === manualKamId || refreshed.kam_asignado_nombre === kamName)) {
+          const updated = { ...selected, ...refreshed, kam_asignado_id: manualKamId, kam_asignado_nombre: refreshed.kam_asignado_nombre || kamName };
+          setCompanies(rows);
+          setSelected(updated);
+          setCompanyForm((prev: any) => ({ ...prev, estado: updated.estado || prev.estado }));
+          notifySuccess("Empresa asignada correctamente. La tabla fue actualizada.");
+          return;
+        }
+      } catch {
+        // Si tampoco se puede refrescar, se informa el error original.
+      }
+      notifyError(error?.message || "No se pudo actualizar la empresa KAM.");
     }
   }
 
@@ -1406,7 +1442,7 @@ export default function KamAssignmentPage() {
 
   async function saveProfile() {
     if (!profileForm.user_id) {
-      alert("Debes seleccionar un KAM vendedor.");
+      notifyError("Debes seleccionar un KAM vendedor.");
       return;
     }
     await postJson("/kam/profiles", profileForm);
@@ -1417,7 +1453,7 @@ export default function KamAssignmentPage() {
 
   async function saveRule() {
     if (!ruleForm.nombre_regla) {
-      alert("Debes ingresar el nombre de la regla.");
+      notifyError("Debes ingresar el nombre de la regla.");
       return;
     }
     await postJson("/kam/rules", ruleForm);
@@ -1428,7 +1464,7 @@ export default function KamAssignmentPage() {
 
   async function saveCampaign() {
     if (!campaignForm.nombre) {
-      alert("Debes ingresar el nombre de la campaña.");
+      notifyError("Debes ingresar el nombre de la campaña.");
       return;
     }
     await postJson("/kam/campaigns", campaignForm);
@@ -1457,7 +1493,7 @@ export default function KamAssignmentPage() {
       );
       await loadAll();
     } catch (error: any) {
-      alert(error?.message || "No se pudo importar el Excel.");
+      notifyError(error?.message || "No se pudo importar el Excel.");
     } finally {
       event.target.value = "";
     }
@@ -1536,7 +1572,7 @@ export default function KamAssignmentPage() {
       await loadAll();
       notifySuccess("Estado actualizado correctamente desde Kanban.");
     } catch (error: any) {
-      alert(error?.message || "No se pudo cambiar el estado desde el Kanban.");
+      notifyError(error?.message || "No se pudo cambiar el estado desde el Kanban.");
     } finally {
       setKanbanUpdatingId(null);
       setDraggingCompanyId(null);
@@ -4746,12 +4782,12 @@ export default function KamAssignmentPage() {
 
       {successPopup && (
         <div className="kam-success-backdrop" role="dialog" aria-modal="true">
-          <div className="kam-success-modal">
-            <div className="kam-success-icon">✓</div>
-            <h3>Guardado exitosamente</h3>
+          <div className={`kam-success-modal ${popupKind === "error" ? "error" : ""}`}>
+            <div className="kam-success-icon">{popupKind === "error" ? "!" : "✓"}</div>
+            <h3>{popupKind === "error" ? "No se pudo completar la acción" : "Acción realizada correctamente"}</h3>
             <p>{successPopup}</p>
             <button
-              className="zoho-btn zoho-btn-primary"
+              className={popupKind === "error" ? "zoho-btn zoho-btn-danger" : "zoho-btn zoho-btn-primary"}
               type="button"
               onClick={() => setSuccessPopup("")}
             >
