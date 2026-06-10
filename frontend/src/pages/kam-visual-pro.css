@@ -452,3 +452,110 @@
 .kam-companies-layout .zoho-actions-row.compact-actions {
   flex-wrap: nowrap !important;
 }
+
+/* V111 - Filtros profesionales desplegables y acciones ordenadas en tabla */
+.kam-filter-card .zoho-table-toolbar,
+.kam-company-list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.kam-filter-toolbar-help {
+  display: block;
+  margin-top: 4px;
+}
+.kam-filter-toolbar-actions,
+.kam-company-list-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.kam-filter-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+}
+.kam-search-row .zoho-form-field {
+  margin-bottom: 0;
+}
+.kam-filter-builder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid #e7edf5;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+}
+.kam-filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 1 1 420px;
+}
+.kam-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #eaf4ff;
+  color: #164e8b;
+  font-weight: 800;
+  font-size: 12px;
+}
+.kam-filter-pill button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+}
+.kam-filter-empty {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 700;
+}
+.kam-filter-builder-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.kam-filter-builder-actions .zoho-input {
+  min-width: 210px;
+}
+.kam-filter-grid.collapsible {
+  padding: 0 16px 16px;
+}
+.kam-company-list-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.kam-company-list-title > span:first-child {
+  font-weight: 800;
+  color: #122033;
+}
+@media (max-width: 900px) {
+  .kam-filter-builder,
+  .kam-filter-toolbar-actions,
+  .kam-company-list-actions {
+    width: 100%;
+  }
+  .kam-filter-builder-actions {
+    width: 100%;
+  }
+  .kam-filter-builder-actions .zoho-input {
+    flex: 1 1 220px;
+    min-width: 180px;
+  }
+}
