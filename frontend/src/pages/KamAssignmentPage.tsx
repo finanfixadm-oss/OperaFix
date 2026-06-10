@@ -123,6 +123,28 @@ type RuleRow = {
   activa: boolean;
 };
 
+type DashboardMetric = "count" | "sum" | "avg" | "max" | "min";
+type DashboardChartType = "kpi" | "table" | "bar" | "donut" | "list";
+type DashboardSource = "companies" | "activities";
+
+type DashboardColumn = {
+  key: string;
+  label: string;
+  type: "text" | "number" | "date";
+  source: DashboardSource;
+};
+
+type DashboardWidget = {
+  id: string;
+  title: string;
+  source: DashboardSource;
+  chartType: DashboardChartType;
+  metric: DashboardMetric;
+  measureKey: string;
+  groupBy: string[];
+  filters: Array<{ column: string; operator: "equals" | "contains" | "not_empty"; value: string }>;
+};
+
 type KamActivity = {
   id: string;
   company_id: string;
@@ -236,6 +258,84 @@ const emptyRule = {
   activa: true,
 };
 
+const DASHBOARD_COLUMNS: DashboardColumn[] = [
+  { key: "rut", label: "RUT", type: "text", source: "companies" },
+  { key: "razon_social", label: "Razón Social", type: "text", source: "companies" },
+  { key: "source_mandante_name", label: "Mandante origen", type: "text", source: "companies" },
+  { key: "campaign_nombre", label: "Campaña", type: "text", source: "companies" },
+  { key: "nro_empleados", label: "Nro Empleados", type: "number", source: "companies" },
+  { key: "monto_devolucion", label: "Monto Dev.", type: "number", source: "companies" },
+  { key: "rubro", label: "Rubro", type: "text", source: "companies" },
+  { key: "region", label: "Región", type: "text", source: "companies" },
+  { key: "contactos_count", label: "Contactos", type: "number", source: "companies" },
+  { key: "nombre_contacto", label: "Nombre", type: "text", source: "companies" },
+  { key: "cargo_contacto", label: "Cargo", type: "text", source: "companies" },
+  { key: "correo", label: "Correo", type: "text", source: "companies" },
+  { key: "telefono", label: "Tel. contacto", type: "text", source: "companies" },
+  { key: "telefono_central", label: "Tel. central", type: "text", source: "companies" },
+  { key: "linkedin_url", label: "LinkedIn", type: "text", source: "companies" },
+  { key: "estado", label: "Estado", type: "text", source: "companies" },
+  { key: "proxima_gestion", label: "Próxima gestión", type: "date", source: "companies" },
+  { key: "probabilidad_cierre", label: "Prob.", type: "number", source: "companies" },
+  { key: "prioridad", label: "Prioridad", type: "text", source: "companies" },
+  { key: "score_empresa", label: "Score", type: "number", source: "companies" },
+  { key: "kam_asignado_nombre", label: "KAM", type: "text", source: "companies" },
+];
+
+const ACTIVITY_DASHBOARD_COLUMNS: DashboardColumn[] = [
+  { key: "tipo_gestion", label: "Tipo gestión", type: "text", source: "activities" },
+  { key: "resultado", label: "Resultado gestión", type: "text", source: "activities" },
+  { key: "estado_venta", label: "Estado venta", type: "text", source: "activities" },
+  { key: "proxima_accion", label: "Próxima acción", type: "text", source: "activities" },
+  { key: "proxima_gestion", label: "Próxima gestión", type: "date", source: "activities" },
+  { key: "probabilidad_cierre", label: "Probabilidad cierre", type: "number", source: "activities" },
+  { key: "kam_nombre", label: "KAM", type: "text", source: "activities" },
+  { key: "created_at", label: "Fecha registro", type: "date", source: "activities" },
+];
+
+const DEFAULT_DASHBOARD_WIDGETS: DashboardWidget[] = [
+  {
+    id: "w_estado_monto",
+    title: "Monto potencial por estado",
+    source: "companies",
+    chartType: "bar",
+    metric: "sum",
+    measureKey: "monto_devolucion",
+    groupBy: ["estado"],
+    filters: [],
+  },
+  {
+    id: "w_rubro_empresas",
+    title: "Empresas por rubro",
+    source: "companies",
+    chartType: "donut",
+    metric: "count",
+    measureKey: "id",
+    groupBy: ["rubro"],
+    filters: [],
+  },
+  {
+    id: "w_kam_pipeline",
+    title: "Cartera por KAM y estado",
+    source: "companies",
+    chartType: "table",
+    metric: "count",
+    measureKey: "id",
+    groupBy: ["kam_asignado_nombre", "estado"],
+    filters: [],
+  },
+  {
+    id: "w_region_monto",
+    title: "Monto potencial por región",
+    source: "companies",
+    chartType: "list",
+    metric: "sum",
+    measureKey: "monto_devolucion",
+    groupBy: ["region"],
+    filters: [],
+  },
+];
+
 const ESTADOS_VENTA = [
   "Sin asignar",
   "Asignada",
@@ -289,6 +389,27 @@ function money(value: unknown) {
 
 function csv(value?: string[] | null) {
   return Array.isArray(value) && value.length ? value.join(", ") : "—";
+}
+
+function valueOf(row: any, key: string) {
+  const value = row?.[key];
+  if (value === null || value === undefined || value === "") return "Sin asignar";
+  return value;
+}
+
+function numberOf(row: any, key: string) {
+  const value = Number(row?.[key] || 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function formatDashboardValue(value: number, metric: DashboardMetric, measureKey: string) {
+  if (measureKey === "monto_devolucion") return money(value);
+  if (metric === "avg") return `${Math.round(value * 10) / 10}`;
+  return value.toLocaleString("es-CL");
+}
+
+function dashboardColumnsFor(source: DashboardSource) {
+  return source === "activities" ? ACTIVITY_DASHBOARD_COLUMNS : DASHBOARD_COLUMNS;
 }
 
 export default function KamAssignmentPage() {
@@ -363,6 +484,20 @@ export default function KamAssignmentPage() {
   const [activityModalOpen, setActivityModalOpen] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [successPopup, setSuccessPopup] = useState("");
+  const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidget[]>(DEFAULT_DASHBOARD_WIDGETS);
+  const [dashboardBuilderOpen, setDashboardBuilderOpen] = useState(false);
+  const [dashboardBuilderMode, setDashboardBuilderMode] = useState<"create" | "edit">("create");
+  const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
+  const [dashboardForm, setDashboardForm] = useState<DashboardWidget>({
+    id: "",
+    title: "Nuevo panel",
+    source: "companies",
+    chartType: "table",
+    metric: "count",
+    measureKey: "id",
+    groupBy: ["estado"],
+    filters: [],
+  });
 
   const availableFilterEntries = [
     { key: "kam", label: "KAM" },
@@ -396,6 +531,136 @@ export default function KamAssignmentPage() {
   const remainingFilters = availableFilterEntries.filter(
     (item) => !activeFilters.includes(item.key),
   );
+
+
+  function dashboardRowsFor(widget: DashboardWidget) {
+    const baseRows = filteredCompanies;
+    return baseRows.filter((row: any) =>
+      widget.filters.every((filter) => {
+        const raw = String(row?.[filter.column] ?? "");
+        if (filter.operator === "not_empty") return raw.trim().length > 0;
+        if (filter.operator === "contains") return raw.toLowerCase().includes(String(filter.value || "").toLowerCase());
+        return raw.toLowerCase() === String(filter.value || "").toLowerCase();
+      }),
+    );
+  }
+
+  function buildDashboardData(widget: DashboardWidget) {
+    const rows = dashboardRowsFor(widget);
+    if (widget.chartType === "kpi") {
+      const values = rows.map((row: any) => numberOf(row, widget.measureKey));
+      let value = rows.length;
+      if (widget.metric === "sum") value = values.reduce((acc, item) => acc + item, 0);
+      if (widget.metric === "avg") value = values.length ? values.reduce((acc, item) => acc + item, 0) / values.length : 0;
+      if (widget.metric === "max") value = values.length ? Math.max(...values) : 0;
+      if (widget.metric === "min") value = values.length ? Math.min(...values) : 0;
+      return [{ label: "Total", value, rows }];
+    }
+
+    const groups = new Map<string, { label: string; value: number; rows: any[] }>();
+    rows.forEach((row: any) => {
+      const label = widget.groupBy.length
+        ? widget.groupBy.map((key) => String(valueOf(row, key))).join(" / ")
+        : "Total";
+      if (!groups.has(label)) groups.set(label, { label, value: 0, rows: [] });
+      const group = groups.get(label)!;
+      group.rows.push(row);
+      if (widget.metric === "count") group.value += 1;
+      else group.value += numberOf(row, widget.measureKey);
+    });
+
+    const data = Array.from(groups.values()).map((group) => {
+      if (widget.metric === "avg") {
+        const total = group.rows.reduce((acc, row: any) => acc + numberOf(row, widget.measureKey), 0);
+        group.value = group.rows.length ? total / group.rows.length : 0;
+      }
+      if (widget.metric === "max") {
+        group.value = group.rows.length ? Math.max(...group.rows.map((row: any) => numberOf(row, widget.measureKey))) : 0;
+      }
+      if (widget.metric === "min") {
+        group.value = group.rows.length ? Math.min(...group.rows.map((row: any) => numberOf(row, widget.measureKey))) : 0;
+      }
+      return group;
+    });
+
+    return data.sort((a, b) => b.value - a.value).slice(0, 12);
+  }
+
+  function openDashboardBuilder(widget?: DashboardWidget) {
+    if (widget) {
+      setDashboardBuilderMode("edit");
+      setEditingWidgetId(widget.id);
+      setDashboardForm({ ...widget, filters: widget.filters || [] });
+    } else {
+      setDashboardBuilderMode("create");
+      setEditingWidgetId(null);
+      setDashboardForm({
+        id: "",
+        title: "Nuevo panel",
+        source: "companies",
+        chartType: "table",
+        metric: "count",
+        measureKey: "id",
+        groupBy: ["estado"],
+        filters: [],
+      });
+    }
+    setDashboardBuilderOpen(true);
+  }
+
+  function saveDashboardWidget() {
+    const cleanWidget: DashboardWidget = {
+      ...dashboardForm,
+      id: editingWidgetId || `widget_${Date.now()}`,
+      title: dashboardForm.title || "Nuevo panel",
+      source: "companies",
+      groupBy: dashboardForm.groupBy.filter(Boolean),
+      filters: dashboardForm.filters.filter((item) => item.column && item.operator),
+    };
+    setDashboardWidgets((prev) =>
+      dashboardBuilderMode === "edit"
+        ? prev.map((item) => (item.id === cleanWidget.id ? cleanWidget : item))
+        : [cleanWidget, ...prev],
+    );
+    setDashboardBuilderOpen(false);
+    notifySuccess(dashboardBuilderMode === "edit" ? "Panel actualizado correctamente." : "Panel creado correctamente.");
+  }
+
+  function cloneDashboardWidget(widget: DashboardWidget) {
+    setDashboardWidgets((prev) => [
+      { ...widget, id: `widget_${Date.now()}`, title: `${widget.title} copia` },
+      ...prev,
+    ]);
+    notifySuccess("Panel clonado correctamente.");
+  }
+
+  function deleteDashboardWidget(id: string) {
+    setDashboardWidgets((prev) => prev.filter((item) => item.id !== id));
+    notifySuccess("Panel eliminado correctamente.");
+  }
+
+  function updateDashboardGroup(index: number, value: string) {
+    setDashboardForm((prev) => {
+      const groupBy = [...prev.groupBy];
+      groupBy[index] = value;
+      return { ...prev, groupBy };
+    });
+  }
+
+  function addDashboardFilter() {
+    const firstColumn = dashboardColumnsFor(dashboardForm.source)[0]?.key || "";
+    setDashboardForm((prev) => ({
+      ...prev,
+      filters: [...prev.filters, { column: firstColumn, operator: "contains", value: "" }],
+    }));
+  }
+
+  function updateDashboardFilter(index: number, patch: Partial<DashboardWidget["filters"][number]>) {
+    setDashboardForm((prev) => ({
+      ...prev,
+      filters: prev.filters.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)),
+    }));
+  }
 
   function notifySuccess(message: string) {
     setSaveMessage(message);
@@ -1316,6 +1581,119 @@ export default function KamAssignmentPage() {
     await moveKanbanCard(row, nuevoEstado);
   }
 
+
+  function renderDashboardWidget(widget: DashboardWidget) {
+    const data = buildDashboardData(widget);
+    const max = Math.max(1, ...data.map((item) => item.value));
+    return (
+      <div key={widget.id} className="zoho-card kam-dashboard-builder-card">
+        <div className="kam-dashboard-builder-head">
+          <div>
+            <h3>{widget.title}</h3>
+            <p>
+              {widget.metric === "count" ? "Cantidad" : widget.metric} por{" "}
+              {widget.groupBy.map((key) => dashboardColumnsFor(widget.source).find((col) => col.key === key)?.label || key).join(" / ") || "total"}
+            </p>
+          </div>
+          <div className="kam-dashboard-builder-actions">
+            <button className="zoho-small-btn" type="button" onClick={() => openDashboardBuilder(widget)}>
+              Editar
+            </button>
+            <button className="zoho-small-btn" type="button" onClick={() => cloneDashboardWidget(widget)}>
+              Clonar
+            </button>
+            <button className="zoho-small-btn danger" type="button" onClick={() => deleteDashboardWidget(widget.id)}>
+              Eliminar
+            </button>
+          </div>
+        </div>
+
+        {widget.chartType === "kpi" && (
+          <div className="kam-widget-kpi">
+            <strong>{formatDashboardValue(data[0]?.value || 0, widget.metric, widget.measureKey)}</strong>
+            <span>{data[0]?.rows.length || 0} registros utilizados</span>
+          </div>
+        )}
+
+        {widget.chartType === "bar" && (
+          <div className="kam-widget-bars">
+            {data.map((item) => (
+              <div key={item.label} className="kam-widget-bar-row">
+                <div className="kam-widget-bar-label">
+                  <strong>{item.label}</strong>
+                  <span>{formatDashboardValue(item.value, widget.metric, widget.measureKey)}</span>
+                </div>
+                <div className="kam-widget-bar-track">
+                  <span style={{ width: `${Math.max(5, (item.value / max) * 100)}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {widget.chartType === "donut" && (
+          <div className="kam-widget-donut-wrap">
+            <div className="kam-widget-donut">
+              <strong>{formatDashboardValue(data.reduce((acc, item) => acc + item.value, 0), widget.metric, widget.measureKey)}</strong>
+            </div>
+            <div className="kam-widget-legend">
+              {data.map((item) => (
+                <div key={item.label}>
+                  <span className="kam-legend-dot" />
+                  <b>{item.label}</b>
+                  <em>{formatDashboardValue(item.value, widget.metric, widget.measureKey)}</em>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {widget.chartType === "table" && (
+          <div className="zoho-table-scroll-x">
+            <table className="zoho-table kam-widget-table">
+              <thead>
+                <tr>
+                  <th>Agrupación</th>
+                  <th>Valor</th>
+                  <th>Registros</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((item) => (
+                  <tr key={item.label}>
+                    <td>{item.label}</td>
+                    <td>{formatDashboardValue(item.value, widget.metric, widget.measureKey)}</td>
+                    <td>{item.rows.length}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {widget.chartType === "list" && (
+          <div className="kam-widget-list">
+            {data.map((item) => (
+              <div key={item.label}>
+                <strong>{item.label}</strong>
+                <span>{formatDashboardValue(item.value, widget.metric, widget.measureKey)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <details className="kam-widget-records">
+          <summary>Ver registros utilizados ({dashboardRowsFor(widget).length})</summary>
+          <div className="kam-widget-record-list">
+            {dashboardRowsFor(widget).slice(0, 20).map((row: any) => (
+              <span key={row.id || row.rut}>{row.razon_social || row.rut || row.tipo_gestion}</span>
+            ))}
+          </div>
+        </details>
+      </div>
+    );
+  }
+
   return (
     <div className="zoho-module-page kam-module-page kam-visual-pro">
       <div className="zoho-module-header kam-pro-hero">
@@ -1365,6 +1743,23 @@ export default function KamAssignmentPage() {
           </button>
         </div>
       )}
+
+      <section className="zoho-card kam-dashboard-builder-shell">
+        <div className="zoho-table-toolbar kam-dashboard-builder-toolbar">
+          <div>
+            <strong>Paneles personalizados</strong>
+            <span className="zoho-help-text">
+              Crea tablas, gráficos, listas y KPI usando las columnas comerciales del módulo KAM.
+            </span>
+          </div>
+          <button className="zoho-small-btn primary" type="button" onClick={() => openDashboardBuilder()}>
+            Agregar componente
+          </button>
+        </div>
+        <div className="kam-dashboard-builder-grid">
+          {dashboardWidgets.map((widget) => renderDashboardWidget(widget))}
+        </div>
+      </section>
 
       <div className="kam-workspace-main kam-workspace-main-full">
         <section className="zoho-card kam-dashboard-card kam-filter-card">
@@ -4161,6 +4556,193 @@ export default function KamAssignmentPage() {
         </div>
       )}
 
+
+      {dashboardBuilderOpen && (
+        <div className="kam-modal-backdrop">
+          <div className="kam-modal-panel kam-modal-large">
+            <div className="kam-modal-header">
+              <div>
+                <div className="kam-pro-eyebrow">Crear panel de información</div>
+                <h2>{dashboardBuilderMode === "edit" ? "Editar panel" : "Nuevo panel"}</h2>
+                <p>Selecciona columnas, medida, agrupaciones y tipo de visualización.</p>
+              </div>
+              <button className="kam-modal-close" type="button" onClick={() => setDashboardBuilderOpen(false)}>
+                ×
+              </button>
+            </div>
+            <div className="kam-modal-body kam-dashboard-builder-modal">
+              <div className="kam-dashboard-builder-form">
+                <Field label="Nombre del componente">
+                  <input
+                    className="zoho-input"
+                    value={dashboardForm.title}
+                    onChange={(e) => setDashboardForm((prev) => ({ ...prev, title: e.target.value }))}
+                  />
+                </Field>
+                <Field label="Datos relacionados">
+                  <select
+                    className="zoho-input"
+                    value={dashboardForm.source}
+                    onChange={(e) =>
+                      setDashboardForm((prev) => ({
+                        ...prev,
+                        source: e.target.value as DashboardSource,
+                        measureKey: "id",
+                        groupBy: ["estado"],
+                        filters: [],
+                      }))
+                    }
+                  >
+                    <option value="companies">Empresas KAM</option>
+                  </select>
+                </Field>
+                <Field label="Tipo de gráfico">
+                  <select
+                    className="zoho-input"
+                    value={dashboardForm.chartType}
+                    onChange={(e) => setDashboardForm((prev) => ({ ...prev, chartType: e.target.value as DashboardChartType }))}
+                  >
+                    <option value="table">Tabla agrupada</option>
+                    <option value="bar">Barras</option>
+                    <option value="donut">Circular / dona</option>
+                    <option value="kpi">KPI</option>
+                    <option value="list">Lista resumen</option>
+                  </select>
+                </Field>
+                <Field label="Medida">
+                  <select
+                    className="zoho-input"
+                    value={dashboardForm.metric}
+                    onChange={(e) => setDashboardForm((prev) => ({ ...prev, metric: e.target.value as DashboardMetric }))}
+                  >
+                    <option value="count">Cantidad de registros</option>
+                    <option value="sum">Suma de</option>
+                    <option value="avg">Promedio de</option>
+                    <option value="max">Máximo de</option>
+                    <option value="min">Mínimo de</option>
+                  </select>
+                </Field>
+                {dashboardForm.metric !== "count" && (
+                  <Field label="Columna numérica">
+                    <select
+                      className="zoho-input"
+                      value={dashboardForm.measureKey}
+                      onChange={(e) => setDashboardForm((prev) => ({ ...prev, measureKey: e.target.value }))}
+                    >
+                      {dashboardColumnsFor(dashboardForm.source)
+                        .filter((col) => col.type === "number")
+                        .map((col) => (
+                          <option key={col.key} value={col.key}>
+                            {col.label}
+                          </option>
+                        ))}
+                    </select>
+                  </Field>
+                )}
+                <div className="kam-dashboard-builder-box">
+                  <strong>Agrupamiento</strong>
+                  {dashboardForm.groupBy.map((group, index) => (
+                    <div key={index} className="kam-dashboard-builder-row">
+                      <span>{index + 1}</span>
+                      <select
+                        className="zoho-input"
+                        value={group}
+                        onChange={(e) => updateDashboardGroup(index, e.target.value)}
+                      >
+                        {dashboardColumnsFor(dashboardForm.source).map((col) => (
+                          <option key={col.key} value={col.key}>
+                            {col.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="zoho-small-btn danger"
+                        type="button"
+                        onClick={() =>
+                          setDashboardForm((prev) => ({
+                            ...prev,
+                            groupBy: prev.groupBy.filter((_, itemIndex) => itemIndex !== index),
+                          }))
+                        }
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    className="zoho-small-btn"
+                    type="button"
+                    onClick={() => setDashboardForm((prev) => ({ ...prev, groupBy: [...prev.groupBy, "estado"] }))}
+                  >
+                    Agregar agrupamiento
+                  </button>
+                </div>
+
+                <div className="kam-dashboard-builder-box">
+                  <strong>Criterios de filtro propios</strong>
+                  {dashboardForm.filters.map((filter, index) => (
+                    <div key={index} className="kam-dashboard-builder-row">
+                      <select
+                        className="zoho-input"
+                        value={filter.column}
+                        onChange={(e) => updateDashboardFilter(index, { column: e.target.value })}
+                      >
+                        {dashboardColumnsFor(dashboardForm.source).map((col) => (
+                          <option key={col.key} value={col.key}>
+                            {col.label}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        className="zoho-input"
+                        value={filter.operator}
+                        onChange={(e) => updateDashboardFilter(index, { operator: e.target.value as any })}
+                      >
+                        <option value="contains">Contiene</option>
+                        <option value="equals">Igual a</option>
+                        <option value="not_empty">No vacío</option>
+                      </select>
+                      <input
+                        className="zoho-input"
+                        value={filter.value}
+                        disabled={filter.operator === "not_empty"}
+                        onChange={(e) => updateDashboardFilter(index, { value: e.target.value })}
+                      />
+                      <button
+                        className="zoho-small-btn danger"
+                        type="button"
+                        onClick={() =>
+                          setDashboardForm((prev) => ({
+                            ...prev,
+                            filters: prev.filters.filter((_, itemIndex) => itemIndex !== index),
+                          }))
+                        }
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  ))}
+                  <button className="zoho-small-btn" type="button" onClick={addDashboardFilter}>
+                    Agregar filtro
+                  </button>
+                </div>
+              </div>
+              <div className="kam-dashboard-builder-preview">
+                <strong>Vista previa</strong>
+                {renderDashboardWidget({ ...dashboardForm, id: "preview" })}
+              </div>
+            </div>
+            <div className="kam-modal-footer">
+              <button className="zoho-btn" type="button" onClick={() => setDashboardBuilderOpen(false)}>
+                Cancelar
+              </button>
+              <button className="zoho-btn zoho-btn-primary" type="button" onClick={saveDashboardWidget}>
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {successPopup && (
         <div className="kam-success-backdrop" role="dialog" aria-modal="true">
