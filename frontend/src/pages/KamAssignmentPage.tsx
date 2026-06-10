@@ -1326,13 +1326,7 @@ export default function KamAssignmentPage() {
             Panel profesional para cartera propia, asignación manual,
             seguimiento comercial, Kanban, campañas y control por vendedor.
           </p>
-        </div>
-        <div className="zoho-module-actions kam-hero-status">
-          <span className="kam-hero-pill">
-            Navegación ordenada en menú lateral
-          </span>
-        </div>
-      </div>
+        </div>      </div>
 
       <div className="zoho-kpi-grid kam-pro-kpis">
         <div className="zoho-card kam-kpi-card">

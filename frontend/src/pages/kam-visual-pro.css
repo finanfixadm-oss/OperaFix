@@ -559,3 +559,62 @@
     min-width: 180px;
   }
 }
+
+
+/* V112 - Ajuste de encabezado KAM: sin pill duplicado y contenido más uniforme */
+.kam-visual-pro {
+  padding: 0 18px 28px !important;
+  box-sizing: border-box;
+}
+
+.kam-visual-pro .kam-pro-hero {
+  margin: 0 auto 20px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 142px;
+  display: flex;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding: 30px 34px !important;
+  box-sizing: border-box;
+}
+
+.kam-visual-pro .kam-pro-hero > div:first-child {
+  max-width: 980px;
+  padding-left: 0 !important;
+}
+
+.kam-visual-pro .kam-pro-hero h1 {
+  margin-top: 6px !important;
+  margin-bottom: 10px !important;
+  line-height: 1.08;
+}
+
+.kam-visual-pro .kam-pro-hero p {
+  margin: 0 !important;
+  line-height: 1.4;
+}
+
+.kam-visual-pro .kam-hero-status,
+.kam-visual-pro .kam-hero-pill {
+  display: none !important;
+}
+
+.kam-pro-kpis,
+.kam-workspace-main-full,
+.kam-save-message {
+  margin-left: auto !important;
+  margin-right: auto !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 760px) {
+  .kam-visual-pro {
+    padding: 0 10px 20px !important;
+  }
+  .kam-visual-pro .kam-pro-hero {
+    padding: 22px !important;
+    min-height: auto;
+  }
+}
