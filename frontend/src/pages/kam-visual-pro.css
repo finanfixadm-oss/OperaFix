@@ -906,3 +906,125 @@
 .kam-success-modal.error p {
   color: #991b1b;
 }
+
+
+/* V117 - Filtros estilo Zoho CRM */
+.kam-filter-card {
+  overflow: hidden;
+}
+.kam-filter-card .kam-filter-toolbar {
+  padding: 18px 22px !important;
+  background: #fff !important;
+}
+.kam-filter-shell {
+  padding: 18px 22px 22px !important;
+  background: #fff;
+}
+.kam-search-row {
+  padding-bottom: 14px;
+  border-bottom: 1px solid #edf1f7;
+}
+.kam-search-row .zoho-input {
+  height: 42px;
+}
+.kam-filter-builder {
+  margin-top: 14px;
+  align-items: stretch !important;
+  background: #f8fafc !important;
+  border: 1px solid #dbe5f2 !important;
+  border-radius: 14px !important;
+  padding: 14px !important;
+}
+.kam-filter-pills {
+  align-items: center;
+}
+.kam-filter-pill {
+  background: #edf5ff !important;
+  color: #0f4c81 !important;
+  border: 1px solid #d4e8ff;
+  border-radius: 8px !important;
+  padding: 8px 10px !important;
+}
+.kam-filter-builder-actions {
+  align-items: stretch !important;
+}
+.kam-filter-builder-actions .zoho-input {
+  min-height: 40px !important;
+  border-radius: 10px !important;
+}
+.kam-zoho-filter-panel {
+  margin-top: 16px;
+  border: 1px solid #dbe5f2;
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+}
+.kam-zoho-filter-head {
+  display: grid;
+  grid-template-columns: 230px minmax(260px, 1fr) 120px;
+  gap: 14px;
+  padding: 12px 16px;
+  background: #f6f8fb;
+  border-bottom: 1px solid #dbe5f2;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.kam-zoho-filter-row {
+  display: grid;
+  grid-template-columns: 230px minmax(260px, 1fr) 120px;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #edf1f7;
+}
+.kam-zoho-filter-row:last-child {
+  border-bottom: 0;
+}
+.kam-zoho-filter-row:hover {
+  background: #fbfdff;
+}
+.kam-zoho-filter-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #122033;
+}
+.kam-filter-number {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #eaf4ff;
+  color: #0b74d1;
+  font-weight: 900;
+}
+.kam-zoho-filter-control .zoho-input {
+  width: 100%;
+  height: 40px;
+  border-radius: 10px !important;
+}
+.kam-zoho-filter-empty {
+  padding: 18px;
+  color: #667085;
+  font-weight: 700;
+}
+@media (max-width: 820px) {
+  .kam-zoho-filter-head {
+    display: none;
+  }
+  .kam-zoho-filter-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .kam-filter-builder-actions {
+    width: 100%;
+  }
+  .kam-filter-builder-actions .zoho-input,
+  .kam-filter-builder-actions .zoho-small-btn {
+    width: 100%;
+  }
+}

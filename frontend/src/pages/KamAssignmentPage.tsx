@@ -1904,135 +1904,146 @@ export default function KamAssignmentPage() {
             </div>
 
             {filtersExpanded && (
-              <div className="zoho-form-grid kam-filter-grid collapsible">
-                {activeFilters.includes("kam") && (
-                  <Field label="KAM">
-                    <select
-                      className="zoho-input"
-                      value={filterKam}
-                      onChange={(e) => setFilterKam(e.target.value)}
+              <div className="kam-zoho-filter-panel">
+                <div className="kam-zoho-filter-head">
+                  <span>Campo</span>
+                  <span>Criterio / valor</span>
+                  <span>Acción</span>
+                </div>
+                {activeFilterPills.map((item) => (
+                  <div key={item.key} className="kam-zoho-filter-row">
+                    <div className="kam-zoho-filter-name">
+                      <span className="kam-filter-number">•</span>
+                      <strong>{item.label}</strong>
+                    </div>
+                    <div className="kam-zoho-filter-control">
+                      {item.key === "kam" && (
+                        <select
+                          className="zoho-input"
+                          value={filterKam}
+                          onChange={(e) => setFilterKam(e.target.value)}
+                        >
+                          <option value="">Todos</option>
+                          {filterOptions.kams.map((x) => (
+                            <option key={x} value={x}>
+                              {x}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {item.key === "estado" && (
+                        <select
+                          className="zoho-input"
+                          value={filterEstado}
+                          onChange={(e) => setFilterEstado(e.target.value)}
+                        >
+                          <option value="">Todos</option>
+                          {ESTADOS_VENTA.map((x) => (
+                            <option key={x} value={x}>
+                              {x}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {item.key === "rubro" && (
+                        <select
+                          className="zoho-input"
+                          value={filterRubro}
+                          onChange={(e) => setFilterRubro(e.target.value)}
+                        >
+                          <option value="">Todos</option>
+                          {filterOptions.rubros.map((x) => (
+                            <option key={x} value={x}>
+                              {x}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {item.key === "region" && (
+                        <select
+                          className="zoho-input"
+                          value={filterRegion}
+                          onChange={(e) => setFilterRegion(e.target.value)}
+                        >
+                          <option value="">Todas</option>
+                          {filterOptions.regiones.map((x) => (
+                            <option key={x} value={x}>
+                              {x}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {item.key === "campaign" && (
+                        <select
+                          className="zoho-input"
+                          value={filterCampaign}
+                          onChange={(e) => setFilterCampaign(e.target.value)}
+                        >
+                          <option value="">Todas</option>
+                          {filterOptions.campaigns.map((x) => (
+                            <option key={x} value={x}>
+                              {x}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {item.key === "priority" && (
+                        <select
+                          className="zoho-input"
+                          value={filterPriority}
+                          onChange={(e) => setFilterPriority(e.target.value)}
+                        >
+                          <option value="">Todas</option>
+                          <option>Estratégica</option>
+                          <option>Alta</option>
+                          <option>Media</option>
+                          <option>Baja</option>
+                        </select>
+                      )}
+                      {item.key === "segment" && (
+                        <select
+                          className="zoho-input"
+                          value={filterSegment}
+                          onChange={(e) => setFilterSegment(e.target.value)}
+                        >
+                          <option value="">Todos</option>
+                          {filterOptions.segmentos.map((x) => (
+                            <option key={x} value={x}>
+                              {x}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {item.key === "quick" && (
+                        <select
+                          className="zoho-input"
+                          value={filterQuick}
+                          onChange={(e) => setFilterQuick(e.target.value)}
+                        >
+                          <option value="">Todas</option>
+                          <option value="sin_asignar">Sin asignar</option>
+                          <option value="estrategicas">Estratégicas</option>
+                          <option value="vencidas">Gestiones vencidas</option>
+                          <option value="sin_contacto">Sin primer contacto</option>
+                          <option value="ganadas">Ganadas</option>
+                          <option value="perdidas">Perdidas</option>
+                          <option value="reasignar">Reasignar</option>
+                        </select>
+                      )}
+                    </div>
+                    <button
+                      className="zoho-small-btn danger"
+                      type="button"
+                      onClick={() => removeFilterField(item.key)}
                     >
-                      <option value="">Todos</option>
-                      {filterOptions.kams.map((x) => (
-                        <option key={x} value={x}>
-                          {x}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                )}
-                {activeFilters.includes("estado") && (
-                  <Field label="Estado venta">
-                    <select
-                      className="zoho-input"
-                      value={filterEstado}
-                      onChange={(e) => setFilterEstado(e.target.value)}
-                    >
-                      <option value="">Todos</option>
-                      {ESTADOS_VENTA.map((x) => (
-                        <option key={x} value={x}>
-                          {x}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                )}
-                {activeFilters.includes("rubro") && (
-                  <Field label="Rubro">
-                    <select
-                      className="zoho-input"
-                      value={filterRubro}
-                      onChange={(e) => setFilterRubro(e.target.value)}
-                    >
-                      <option value="">Todos</option>
-                      {filterOptions.rubros.map((x) => (
-                        <option key={x} value={x}>
-                          {x}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                )}
-                {activeFilters.includes("region") && (
-                  <Field label="Región">
-                    <select
-                      className="zoho-input"
-                      value={filterRegion}
-                      onChange={(e) => setFilterRegion(e.target.value)}
-                    >
-                      <option value="">Todas</option>
-                      {filterOptions.regiones.map((x) => (
-                        <option key={x} value={x}>
-                          {x}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                )}
-                {activeFilters.includes("campaign") && (
-                  <Field label="Campaña">
-                    <select
-                      className="zoho-input"
-                      value={filterCampaign}
-                      onChange={(e) => setFilterCampaign(e.target.value)}
-                    >
-                      <option value="">Todas</option>
-                      {filterOptions.campaigns.map((x) => (
-                        <option key={x} value={x}>
-                          {x}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                )}
-                {activeFilters.includes("priority") && (
-                  <Field label="Prioridad">
-                    <select
-                      className="zoho-input"
-                      value={filterPriority}
-                      onChange={(e) => setFilterPriority(e.target.value)}
-                    >
-                      <option value="">Todas</option>
-                      <option>Estratégica</option>
-                      <option>Alta</option>
-                      <option>Media</option>
-                      <option>Baja</option>
-                    </select>
-                  </Field>
-                )}
-                {activeFilters.includes("segment") && (
-                  <Field label="Tamaño empresa">
-                    <select
-                      className="zoho-input"
-                      value={filterSegment}
-                      onChange={(e) => setFilterSegment(e.target.value)}
-                    >
-                      <option value="">Todos</option>
-                      {filterOptions.segmentos.map((x) => (
-                        <option key={x} value={x}>
-                          {x}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                )}
-                {activeFilters.includes("quick") && (
-                  <Field label="Vista rápida">
-                    <select
-                      className="zoho-input"
-                      value={filterQuick}
-                      onChange={(e) => setFilterQuick(e.target.value)}
-                    >
-                      <option value="">Todas</option>
-                      <option value="sin_asignar">Sin asignar</option>
-                      <option value="estrategicas">Estratégicas</option>
-                      <option value="vencidas">Gestiones vencidas</option>
-                      <option value="sin_contacto">Sin primer contacto</option>
-                      <option value="ganadas">Ganadas</option>
-                      <option value="perdidas">Perdidas</option>
-                      <option value="reasignar">Reasignar</option>
-                    </select>
-                  </Field>
+                      Quitar
+                    </button>
+                  </div>
+                ))}
+                {!activeFilterPills.length && (
+                  <div className="kam-zoho-filter-empty">
+                    No tienes filtros avanzados activos. Agrega uno desde el selector superior.
+                  </div>
                 )}
               </div>
             )}
