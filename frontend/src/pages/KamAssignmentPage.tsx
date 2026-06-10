@@ -354,6 +354,12 @@ export default function KamAssignmentPage() {
   const [companyModalOpen, setCompanyModalOpen] = useState(false);
   const [activityModalOpen, setActivityModalOpen] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const [successPopup, setSuccessPopup] = useState("");
+
+  function notifySuccess(message: string) {
+    setSaveMessage(message);
+    setSuccessPopup(message);
+  }
 
   async function loadAll() {
     setLoading(true);
@@ -784,31 +790,42 @@ export default function KamAssignmentPage() {
       const cleanDraftContacts = draftContacts.filter((c) =>
         String(c?.nombre || "").trim(),
       );
-      if (selected) {
-        await putJson(`/kam/companies/${selected.id}`, {
-          ...companyForm,
-          actividad_tipo: "Actualización",
-          actividad_observacion: companyForm.observacion,
+      const saved = selected
+        ? await putJson<KamCompany>(`/kam/companies/${selected.id}`, {
+            ...companyForm,
+            actividad_tipo: "Actualización",
+            actividad_observacion: companyForm.observacion,
+          })
+        : await postJson<KamCompany>("/kam/companies", {
+            ...companyForm,
+            contactos: cleanDraftContacts,
+          });
+
+      if (manualKamId && (!wasEditing || manualKamId !== selected?.kam_asignado_id)) {
+        const assigned = await postJson<KamCompany>(`/kam/companies/${saved.id}/assign`, {
+          kam_asignado_id: manualKamId,
+          motivo_asignacion: wasEditing
+            ? "Asignación manual desde popup de edición"
+            : "Asignación manual al crear empresa",
+          observacion: companyForm.observacion || "Asignación manual desde popup",
         });
-      } else {
-        await postJson<KamCompany>("/kam/companies", {
-          ...companyForm,
-          contactos: cleanDraftContacts,
-        });
+        setCompanies((prev) => prev.map((item) => item.id === assigned.id ? { ...item, ...assigned } : item));
       }
+
       setCompanyForm(emptyCompany);
       setSelected(null);
       setContacts([]);
       setDraftContacts([]);
       setContactForm(emptyContact);
       setEditingContactId(null);
+      setManualKamId("");
       setCompanyModalOpen(false);
-      setSaveMessage(
+      await loadAll();
+      notifySuccess(
         wasEditing
           ? "Empresa actualizada correctamente."
           : `Empresa creada correctamente${cleanDraftContacts.length ? ` con ${cleanDraftContacts.length} contacto(s).` : "."}`,
       );
-      await loadAll();
     } catch (error: any) {
       alert(error?.message || "No se pudo guardar la empresa.");
     }
@@ -831,20 +848,40 @@ export default function KamAssignmentPage() {
       alert("Para registrar pérdida debes indicar motivo u observación.");
       return;
     }
-    await postJson(`/kam/companies/${selected.id}/activities`, {
-      ...activityForm,
-      motivo_perdida: companyForm.motivo_perdida,
-    });
-    const rows = await fetchJson<KamActivity[]>(
-      `/kam/companies/${selected.id}/activities`,
-    ).catch(() => [] as KamActivity[]);
-    setActivities(rows);
-    setActivityForm(emptyActivity);
-    setActivityModalOpen(false);
-    await loadAll();
-    setSaveMessage(
-      "Gestión registrada correctamente en la bitácora comercial.",
-    );
+    try {
+      await postJson(`/kam/companies/${selected.id}/activities`, {
+        ...activityForm,
+        motivo_perdida: companyForm.motivo_perdida,
+      });
+      const rows = await fetchJson<KamActivity[]>(
+        `/kam/companies/${selected.id}/activities`,
+      ).catch(() => [] as KamActivity[]);
+      setActivities(rows);
+      const updatedCompany: KamCompany = {
+        ...selected,
+        estado: activityForm.estado_venta || selected.estado,
+        resultado_gestion: activityForm.resultado || selected.resultado_gestion,
+        proxima_gestion: activityForm.proxima_gestion || selected.proxima_gestion,
+        probabilidad_cierre: activityForm.probabilidad_cierre || selected.probabilidad_cierre,
+        observacion: activityForm.observacion || selected.observacion,
+      };
+      setSelected(updatedCompany);
+      setCompanyForm((prev: any) => ({
+        ...prev,
+        estado: updatedCompany.estado || prev.estado,
+        resultado_gestion: updatedCompany.resultado_gestion || prev.resultado_gestion,
+        proxima_gestion: updatedCompany.proxima_gestion ? String(updatedCompany.proxima_gestion).slice(0, 10) : prev.proxima_gestion,
+        probabilidad_cierre: updatedCompany.probabilidad_cierre || prev.probabilidad_cierre,
+        observacion: updatedCompany.observacion || prev.observacion,
+      }));
+      setCompanies((prev) => prev.map((item) => item.id === updatedCompany.id ? { ...item, ...updatedCompany } : item));
+      setActivityForm(emptyActivity);
+      setActivityModalOpen(false);
+      await loadAll();
+      notifySuccess("Gestión registrada correctamente en la bitácora comercial.");
+    } catch (error: any) {
+      alert(error?.message || "No se pudo registrar la gestión.");
+    }
   }
 
   async function refreshContacts(companyId?: string) {
@@ -937,7 +974,7 @@ export default function KamAssignmentPage() {
       setContactForm(emptyContact);
       setEditingContactId(null);
       await refreshContacts(selected.id);
-      setSaveMessage(
+      notifySuccess(
         editingContactId
           ? "Contacto actualizado correctamente."
           : "Contacto agregado correctamente.",
@@ -966,7 +1003,7 @@ export default function KamAssignmentPage() {
     try {
       await deleteJson(`/kam/contacts/${contact.id}`);
       await refreshContacts(selected?.id);
-      setSaveMessage("Contacto eliminado correctamente.");
+      notifySuccess("Contacto eliminado correctamente.");
       await loadAll();
     } catch (error: any) {
       alert(error?.message || "No se pudo eliminar el contacto.");
@@ -987,7 +1024,7 @@ export default function KamAssignmentPage() {
       setCompanyForm(emptyCompany);
       setContacts([]);
       setActivities([]);
-      setSaveMessage("Empresa eliminada correctamente.");
+      notifySuccess("Empresa eliminada correctamente.");
       await loadAll();
     } catch (error: any) {
       alert(error?.message || "No se pudo eliminar la empresa.");
@@ -1012,7 +1049,7 @@ export default function KamAssignmentPage() {
     });
     setRecommendations([]);
     await loadAll();
-    setSaveMessage("Empresa asignada correctamente.");
+    notifySuccess("Empresa asignada correctamente.");
   }
 
   async function assignManual() {
@@ -1024,14 +1061,23 @@ export default function KamAssignmentPage() {
       alert("Debes seleccionar un KAM vendedor.");
       return;
     }
-    await postJson(`/kam/companies/${selected.id}/assign`, {
-      kam_asignado_id: manualKamId,
-      motivo_asignacion: "Asignación manual por KAM administrador",
-      observacion: companyForm.observacion || "Asignación manual",
-    });
-    setRecommendations([]);
-    await loadAll();
-    setSaveMessage("Asignación manual guardada correctamente.");
+    try {
+      const assigned = await postJson<KamCompany>(`/kam/companies/${selected.id}/assign`, {
+        kam_asignado_id: manualKamId,
+        motivo_asignacion: "Asignación manual por KAM administrador",
+        observacion: companyForm.observacion || "Asignación manual",
+      });
+      const kamName = users.find((u) => u.id === manualKamId)?.full_name || users.find((u) => u.id === manualKamId)?.email || assigned.kam_asignado_nombre || "KAM asignado";
+      const updated = { ...selected, ...assigned, kam_asignado_id: manualKamId, kam_asignado_nombre: kamName, estado: assigned.estado || "Asignada" };
+      setSelected(updated);
+      setCompanyForm((prev: any) => ({ ...prev, estado: updated.estado || prev.estado }));
+      setCompanies((prev) => prev.map((item) => item.id === selected.id ? { ...item, ...updated } : item));
+      setRecommendations([]);
+      await loadAll();
+      notifySuccess("Asignación manual guardada correctamente.");
+    } catch (error: any) {
+      alert(error?.message || "No se pudo asignar el vendedor KAM.");
+    }
   }
 
   function editProfile(profile: KamProfile) {
@@ -1060,7 +1106,7 @@ export default function KamAssignmentPage() {
     await postJson("/kam/profiles", profileForm);
     setProfileForm(emptyProfile);
     await loadAll();
-    setSaveMessage("Perfil KAM guardado correctamente.");
+    notifySuccess("Perfil KAM guardado correctamente.");
   }
 
   async function saveRule() {
@@ -1071,7 +1117,7 @@ export default function KamAssignmentPage() {
     await postJson("/kam/rules", ruleForm);
     setRuleForm(emptyRule);
     await loadAll();
-    setSaveMessage("Regla guardada correctamente.");
+    notifySuccess("Regla guardada correctamente.");
   }
 
   async function saveCampaign() {
@@ -1089,7 +1135,7 @@ export default function KamAssignmentPage() {
       objetivo_monto: "",
     });
     await loadAll();
-    setSaveMessage("Campaña guardada correctamente.");
+    notifySuccess("Campaña guardada correctamente.");
   }
 
   async function importExcel(event: React.ChangeEvent<HTMLInputElement>) {
@@ -1100,7 +1146,7 @@ export default function KamAssignmentPage() {
     if (importCampaignId) form.append("campaign_id", importCampaignId);
     try {
       const result = await uploadForm<any>("/kam/companies/import-excel", form);
-      setSaveMessage(
+      notifySuccess(
         `Importación lista: ${result.creadas || 0} creadas, ${result.duplicadas || 0} duplicadas, ${result.conError || 0} con error.`,
       );
       await loadAll();
@@ -1129,7 +1175,7 @@ export default function KamAssignmentPage() {
       },
       "empresas_kam_filtradas.xlsx",
     );
-    setSaveMessage(
+    notifySuccess(
       `Exportación generada con ${filteredCompanies.length} empresa(s) filtrada(s).`,
     );
   }
@@ -1182,7 +1228,7 @@ export default function KamAssignmentPage() {
         ),
       );
       await loadAll();
-      setSaveMessage("Estado actualizado correctamente desde Kanban.");
+      notifySuccess("Estado actualizado correctamente desde Kanban.");
     } catch (error: any) {
       alert(error?.message || "No se pudo cambiar el estado desde el Kanban.");
     } finally {
@@ -1454,7 +1500,7 @@ export default function KamAssignmentPage() {
         </section>
 
         {tab === "companies" && (
-          <div className="mandantes-layout">
+          <div className="mandantes-layout kam-companies-layout">
             <aside className="zoho-filter-panel">
               <h2>{selected ? "Editar empresa" : "Nueva empresa"}</h2>
               {!canAdmin &&
@@ -3711,6 +3757,22 @@ export default function KamAssignmentPage() {
                     ))}
                   </select>
                 </Field>
+                {canConfigure && (
+                  <Field label="Asignar vendedor KAM">
+                    <select
+                      className="zoho-input"
+                      value={manualKamId}
+                      onChange={(e) => setManualKamId(e.target.value)}
+                    >
+                      <option value="">Sin asignar</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.full_name || u.email}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                )}
                 <Field label="Próxima gestión">
                   <input
                     className="zoho-input"
@@ -3982,6 +4044,24 @@ export default function KamAssignmentPage() {
                 {selected ? "Guardar cambios" : "Crear empresa"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+
+      {successPopup && (
+        <div className="kam-success-backdrop" role="dialog" aria-modal="true">
+          <div className="kam-success-modal">
+            <div className="kam-success-icon">✓</div>
+            <h3>Guardado exitosamente</h3>
+            <p>{successPopup}</p>
+            <button
+              className="zoho-btn zoho-btn-primary"
+              type="button"
+              onClick={() => setSuccessPopup("")}
+            >
+              Aceptar
+            </button>
           </div>
         </div>
       )}

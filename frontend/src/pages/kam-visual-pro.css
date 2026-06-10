@@ -325,3 +325,55 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* V109 - CRM UX fixes: eliminar panel lateral duplicado y popups profesionales */
+.kam-companies-layout {
+  display: block;
+}
+.kam-companies-layout > .zoho-filter-panel {
+  display: none !important;
+}
+.kam-companies-layout > .zoho-table-wrap {
+  width: 100%;
+}
+.kam-success-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(2px);
+}
+.kam-success-modal {
+  width: min(420px, calc(100vw - 32px));
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+  padding: 28px;
+  text-align: center;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+.kam-success-icon {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 12px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #dcfce7;
+  color: #15803d;
+  font-weight: 900;
+  font-size: 26px;
+}
+.kam-success-modal h3 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  color: #0f172a;
+}
+.kam-success-modal p {
+  margin: 0 0 18px;
+  color: #475467;
+  line-height: 1.45;
+}
