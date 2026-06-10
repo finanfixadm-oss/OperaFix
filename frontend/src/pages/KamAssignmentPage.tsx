@@ -411,6 +411,18 @@ function formatDashboardValue(value: number, metric: DashboardMetric, measureKey
 function dashboardColumnsFor(source: DashboardSource) {
   return source === "activities" ? ACTIVITY_DASHBOARD_COLUMNS : DASHBOARD_COLUMNS;
 }
+function normalizeDateForApi(value: unknown) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return raw;
+  const cl = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  if (cl) {
+    return `${cl[3]}-${cl[2].padStart(2, "0")}-${cl[1].padStart(2, "0")}`;
+  }
+  return raw;
+}
+
 
 export default function KamAssignmentPage() {
   const location = useLocation();
@@ -1104,14 +1116,18 @@ export default function KamAssignmentPage() {
       const cleanDraftContacts = draftContacts.filter((c) =>
         String(c?.nombre || "").trim(),
       );
+      const companyPayloadForSave = {
+        ...companyForm,
+        proxima_gestion: normalizeDateForApi(companyForm.proxima_gestion),
+      };
       const saved = selected
         ? await putJson<KamCompany>(`/kam/companies/${selected.id}`, {
-            ...companyForm,
+            ...companyPayloadForSave,
             actividad_tipo: "Actualización",
             actividad_observacion: companyForm.observacion,
           })
         : await postJson<KamCompany>("/kam/companies", {
-            ...companyForm,
+            ...companyPayloadForSave,
             contactos: cleanDraftContacts,
           });
 
@@ -1178,6 +1194,7 @@ export default function KamAssignmentPage() {
     try {
       await postJson(`/kam/companies/${selected.id}/activities`, {
         ...activityForm,
+        proxima_gestion: normalizeDateForApi(activityForm.proxima_gestion),
         motivo_perdida: companyForm.motivo_perdida,
       });
       const rows = await fetchJson<KamActivity[]>(
@@ -1780,22 +1797,24 @@ export default function KamAssignmentPage() {
         </div>
       )}
 
-      <section className="zoho-card kam-dashboard-builder-shell">
-        <div className="zoho-table-toolbar kam-dashboard-builder-toolbar">
-          <div>
-            <strong>Paneles personalizados</strong>
-            <span className="zoho-help-text">
-              Crea tablas, gráficos, listas y KPI usando las columnas comerciales del módulo KAM.
-            </span>
+      {tab === "tracking" && (
+        <section className="zoho-card kam-dashboard-builder-shell">
+          <div className="zoho-table-toolbar kam-dashboard-builder-toolbar">
+            <div>
+              <strong>Paneles personalizados</strong>
+              <span className="zoho-help-text">
+                Crea tablas, gráficos, listas y KPI usando las columnas comerciales del módulo KAM.
+              </span>
+            </div>
+            <button className="zoho-small-btn primary" type="button" onClick={() => openDashboardBuilder()}>
+              Agregar componente
+            </button>
           </div>
-          <button className="zoho-small-btn primary" type="button" onClick={() => openDashboardBuilder()}>
-            Agregar componente
-          </button>
-        </div>
-        <div className="kam-dashboard-builder-grid">
-          {dashboardWidgets.map((widget) => renderDashboardWidget(widget))}
-        </div>
-      </section>
+          <div className="kam-dashboard-builder-grid">
+            {dashboardWidgets.map((widget) => renderDashboardWidget(widget))}
+          </div>
+        </section>
+      )}
 
       <div className="kam-workspace-main kam-workspace-main-full">
         <section className="zoho-card kam-dashboard-card kam-filter-card">

@@ -155,6 +155,29 @@ function strOrNull(value: unknown) {
   return s ? s : null;
 }
 
+function normalizeDateOrNull(value: unknown) {
+  const raw = strOrNull(value);
+  if (!raw) return null;
+
+  // HTML date input: yyyy-mm-dd
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+
+  // Usuario suele ingresar dd-mm-aaaa o dd/mm/aaaa
+  const cl = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  if (cl) {
+    const dd = cl[1].padStart(2, "0");
+    const mm = cl[2].padStart(2, "0");
+    const yyyy = cl[3];
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+
+  return null;
+}
+
 function normalizeRutForDelete(value: unknown) {
   return String(value || '').toLowerCase().replace(/[^0-9k]/g, '');
 }
@@ -771,7 +794,7 @@ function companyPayload(body: any) {
     canal_origen: strOrNull(body.canal_origen),
     campaign_id: strOrNull(body.campaign_id),
     probabilidad_cierre: integerOrNull(body.probabilidad_cierre),
-    proxima_gestion: strOrNull(body.proxima_gestion),
+    proxima_gestion: normalizeDateOrNull(body.proxima_gestion),
     resultado_gestion: strOrNull(body.resultado_gestion),
     motivo_perdida: strOrNull(body.motivo_perdida),
   };
@@ -892,13 +915,13 @@ kamRouter.put("/companies/:id", async (req, res) => {
     }
     const rows = await prisma.$queryRawUnsafe<any[]>(`
       update operafix_kam_companies set
-        rut=$2, razon_social=$3, nro_empleados=$4, monto_devolucion=$5, nombre_contacto=$6, cargo_contacto=$7,
-        correo=$8, telefono=$9, telefono_central=$10, linkedin_url=$11, estado=$12, observacion=$13, rubro=$14, region=$15, prioridad=$16,
-        score_empresa=$17, segmento_empresa=$18, segmento_monto=$19, tipo_oportunidad=$20, origen=$21,
-        proxima_gestion=$22, resultado_gestion=$23, motivo_perdida=$24, probabilidad_cierre=$25, canal_origen=$26, campaign_id=$27,
+        rut=$2::text, razon_social=$3::text, nro_empleados=$4::int, monto_devolucion=$5::numeric, nombre_contacto=$6::text, cargo_contacto=$7::text,
+        correo=$8::text, telefono=$9::text, telefono_central=$10::text, linkedin_url=$11::text, estado=$12::text, observacion=$13::text, rubro=$14::text, region=$15::text, prioridad=$16::text,
+        score_empresa=$17::int, segmento_empresa=$18::text, segmento_monto=$19::text, tipo_oportunidad=$20::text, origen=$21::text,
+        proxima_gestion=$22::date, resultado_gestion=$23::text, motivo_perdida=$24::text, probabilidad_cierre=$25::int, canal_origen=$26::text, campaign_id=$27::text,
         fecha_ultimo_contacto=case when $28::boolean then now() else fecha_ultimo_contacto end,
         updated_at=now()
-      where id=$1 returning *
+      where id=$1::text returning *
     `,
       req.params.id, data.rut, data.razon_social, data.nro_empleados, data.monto_devolucion, data.nombre_contacto,
       data.cargo_contacto, data.correo, data.telefono, data.telefono_central, data.linkedin_url, data.estado, data.observacion, data.rubro, data.region,
@@ -929,7 +952,7 @@ kamRouter.put("/companies/:id", async (req, res) => {
     console.error('[KAM] Error actualizando empresa:', error);
     res.status(500).json({
       message: 'No se pudo actualizar la empresa KAM.',
-      detail: process.env.NODE_ENV === 'production' ? undefined : String(error?.message || error),
+      detail: String(error?.message || error),
     });
   }
 });
