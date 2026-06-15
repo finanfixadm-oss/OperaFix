@@ -16,44 +16,55 @@ type ReportField = {
 const reportFields: ReportField[] = [
   { key: "mandante", label: "Mandante", type: "text" },
   { key: "management_type", label: "Tipo gestión", type: "text" },
-  { key: "grupo_empresa", label: "Grupo empresa", type: "text" },
+  { key: "estado_contrato_cliente", label: "Estado contrato con cliente", type: "text" },
+  { key: "fecha_termino_contrato", label: "Fecha término de contrato", type: "date" },
+  { key: "motivo_tipo_exceso", label: "Motivo (Tipo de exceso)", type: "text" },
+  { key: "entidad", label: "Entidad", type: "text" },
+  { key: "envio_afp", label: "Envío AFP", type: "text" },
+  { key: "estado_gestion", label: "Estado Gestión", type: "text" },
+  { key: "fecha_presentacion_afp", label: "Fecha Presentación AFP", type: "date" },
+  { key: "fecha_ingreso_afp", label: "Fecha ingreso AFP", type: "date" },
+  { key: "fecha_pago_afp", label: "Fecha Pago AFP", type: "date" },
+  { key: "numero_solicitud", label: "N° Solicitud", type: "text" },
+  { key: "grupo_empresa", label: "Holding", type: "text" },
   { key: "razon_social", label: "Razón Social", type: "text" },
   { key: "rut", label: "RUT", type: "text" },
-  { key: "entidad", label: "Entidad / AFP", type: "text" },
-  { key: "estado_gestion", label: "Estado Gestión", type: "text" },
-  { key: "monto_devolucion", label: "Monto Devolución", type: "money" },
+  { key: "monto_devolucion", label: "Monto estimado", type: "money" },
+  { key: "monto_cliente", label: "Monto estimado cliente", type: "money" },
   { key: "monto_pagado", label: "Monto Real Pagado", type: "money" },
-  { key: "monto_cliente", label: "Monto cliente", type: "money" },
-  { key: "monto_finanfix_solutions", label: "Monto Finanfix", type: "money" },
-  { key: "numero_solicitud", label: "N° Solicitud", type: "text" },
-  { key: "numero_factura", label: "N° Factura", type: "text" },
-  { key: "numero_oc", label: "N° OC", type: "text" },
+  { key: "monto_real_cliente", label: "Monto real cliente", type: "money" },
+  { key: "fee", label: "FEE", type: "money" },
+  { key: "monto_real_finanfix_solutions", label: "Monto real Finanfix Solutions", type: "money" },
   { key: "banco", label: "Banco", type: "text" },
   { key: "tipo_cuenta", label: "Tipo de Cuenta", type: "text" },
   { key: "numero_cuenta", label: "Número cuenta", type: "text" },
   { key: "confirmacion_cc", label: "Confirmación CC", type: "boolean" },
-  { key: "confirmacion_poder", label: "Confirmación Poder", type: "boolean" },
+  { key: "confirmacion_poder", label: "Confirmación Poder Notarial", type: "boolean" },
   { key: "acceso_portal", label: "Acceso portal", type: "text" },
   { key: "porcentaje_liquidaciones", label: "Porcentaje de liquidaciones", type: "text" },
-  { key: "estado_trabajador", label: "Estado Trabajador", type: "text" },
-  { key: "motivo_tipo_exceso", label: "Motivo (Tipo de exceso)", type: "text" },
-  { key: "motivo_rechazo", label: "Motivo rechazo/anulación", type: "text" },
-  { key: "consulta_cen", label: "Consulta CEN", type: "text" },
-  { key: "respuesta_cen", label: "Respuesta CEN", type: "text" },
-  { key: "facturado_cliente", label: "Facturado cliente", type: "text" },
   { key: "facturado_finanfix", label: "Facturado Finanfix", type: "text" },
-  { key: "fecha_presentacion_afp", label: "Fecha Presentación AFP", type: "date" },
-  { key: "fecha_ingreso_afp", label: "Fecha ingreso AFP", type: "date" },
-  { key: "fecha_pago_afp", label: "Fecha Pago AFP", type: "date" },
+  { key: "facturado_cliente", label: "Facturado cliente", type: "text" },
   { key: "fecha_factura_finanfix", label: "Fecha Factura Finanfix", type: "date" },
   { key: "fecha_pago_factura_finanfix", label: "Fecha pago factura Finanfix", type: "date" },
+  { key: "numero_factura", label: "N° Factura", type: "text" },
+  { key: "numero_oc", label: "N° OC", type: "text" },
   { key: "fecha_rechazo", label: "Fecha Rechazo", type: "date" },
+  { key: "motivo_rechazo", label: "Motivo del rechazo", type: "text" },
+  { key: "consulta_cen", label: "Consulta CEN", type: "text" },
+  { key: "contenido_cen", label: "Contenido CEN", type: "text" },
+  { key: "respuesta_cen", label: "Respuesta CEN", type: "text" },
+  { key: "estado_trabajador", label: "Estado Trabajador", type: "text" },
+  { key: "comment", label: "Comentario", type: "text" },
+  { key: "mes_ingreso_solicitud", label: "Mes de ingreso solicitud", type: "text" },
+  { key: "mes_produccion_2026", label: "Mes de producción 2026", type: "text" },
   { key: "created_at", label: "Hora de creación", type: "date" },
   { key: "updated_at", label: "Hora de modificación", type: "date" },
   { key: "last_activity_at", label: "Hora de la última actividad", type: "date" },
 ];
 
 const fieldByKey = new Map(reportFields.map((field) => [field.key, field]));
+
+type TableColumnMap = Record<string, Set<string>>;
 
 function getSession(req: any) {
   const token = req.headers.authorization?.replace("Bearer ", "");
@@ -63,7 +74,7 @@ function getSession(req: any) {
 
 function isInternal(session: any) {
   const role = String(session?.role || "").toLowerCase();
-  return ["admin", "interno", "kam"].includes(role);
+  return ["admin", "interno", "kam_admin", "kam"].includes(role);
 }
 
 function normalizeDecimal(value: any) {
@@ -79,22 +90,170 @@ function iso(value: any) {
   return d.toISOString();
 }
 
-function normalizeLm(row: any) {
+function quoteIdent(identifier: string) {
+  return `"${identifier.replace(/"/g, '""')}"`;
+}
+
+async function tableExists(tableName: string) {
+  const rows = await prisma.$queryRawUnsafe<Array<{ exists: boolean }>>(
+    `select exists (
+      select 1
+      from information_schema.tables
+      where table_schema = current_schema()
+        and table_name = $1
+    ) as exists`,
+    tableName
+  );
+  return Boolean(rows[0]?.exists);
+}
+
+async function getColumns(tableName: string) {
+  const rows = await prisma.$queryRawUnsafe<Array<{ column_name: string }>>(
+    `select column_name
+     from information_schema.columns
+     where table_schema = current_schema()
+       and table_name = $1`,
+    tableName
+  );
+  return new Set<string>(rows.map((row: { column_name: string }) => row.column_name));
+}
+
+function expr(columns: Set<string>, column: string, alias = column, fallback = "null") {
+  return columns.has(column)
+    ? `r.${quoteIdent(column)} as ${quoteIdent(alias)}`
+    : `${fallback} as ${quoteIdent(alias)}`;
+}
+
+function relationExpr(
+  tableColumns: TableColumnMap,
+  relationAlias: "m" | "c" | "a",
+  relationTable: string,
+  column: string,
+  alias: string,
+  fallback = "null"
+) {
+  return tableColumns[relationTable]?.has(column)
+    ? `${relationAlias}.${quoteIdent(column)} as ${quoteIdent(alias)}`
+    : `${fallback} as ${quoteIdent(alias)}`;
+}
+
+async function loadRecordTable(tableName: "lm_records" | "tp_records", type: "LM" | "TP") {
+  if (!(await tableExists(tableName))) return [] as any[];
+
+  const tableColumns: TableColumnMap = {};
+  tableColumns[tableName] = await getColumns(tableName);
+
+  const hasMandantes = await tableExists("mandantes");
+  const hasCompanies = await tableExists("companies");
+  const hasLineAfps = await tableExists("management_line_afps");
+  if (hasMandantes) tableColumns.mandantes = await getColumns("mandantes");
+  if (hasCompanies) tableColumns.companies = await getColumns("companies");
+  if (hasLineAfps) tableColumns.management_line_afps = await getColumns("management_line_afps");
+
+  const cols = tableColumns[tableName];
+  const joins: string[] = [];
+  if (hasMandantes && cols.has("mandante_id") && tableColumns.mandantes?.has("id")) {
+    joins.push(`left join mandantes m on m.id = r.mandante_id`);
+  }
+  if (hasCompanies && cols.has("company_id") && tableColumns.companies?.has("id")) {
+    joins.push(`left join companies c on c.id = r.company_id`);
+  }
+  if (hasLineAfps && cols.has("line_afp_id") && tableColumns.management_line_afps?.has("id")) {
+    joins.push(`left join management_line_afps a on a.id = r.line_afp_id`);
+  }
+
+  const select = [
+    `'${type}'::text as "management_type"`,
+    expr(cols, "id"),
+    expr(cols, "management_id"),
+    expr(cols, "mandante_id"),
+    expr(cols, "mandante"),
+    relationExpr(tableColumns, "m", "mandantes", "name", "mandante_rel_name"),
+    expr(cols, "company_id"),
+    relationExpr(tableColumns, "c", "companies", "razon_social", "company_razon_social"),
+    relationExpr(tableColumns, "c", "companies", "rut", "company_rut"),
+    relationExpr(tableColumns, "a", "management_line_afps", "afp_name", "line_afp_name"),
+    expr(cols, "search_group"),
+    expr(cols, "business_name"),
+    expr(cols, "rut"),
+    expr(cols, "entity"),
+    expr(cols, "management_status"),
+    expr(cols, "refund_amount"),
+    expr(cols, "actual_paid_amount"),
+    expr(cols, "monto_cliente"),
+    expr(cols, "monto_finanfix_solutions"),
+    expr(cols, "monto_real_cliente"),
+    expr(cols, "monto_real_finanfix_solutions"),
+    expr(cols, "fee"),
+    expr(cols, "request_number"),
+    expr(cols, "numero_factura"),
+    expr(cols, "invoice_number"),
+    expr(cols, "numero_oc"),
+    expr(cols, "oc_number"),
+    expr(cols, "bank_name"),
+    expr(cols, "account_type"),
+    expr(cols, "account_number"),
+    expr(cols, "confirmation_cc"),
+    expr(cols, "confirmation_power"),
+    expr(cols, "portal_access"),
+    expr(cols, "acceso_portal"),
+    expr(cols, "porcentaje_liquidaciones"),
+    expr(cols, "worker_status"),
+    expr(cols, "motivo_tipo_exceso"),
+    expr(cols, "excess_type_reason"),
+    expr(cols, "estado_contrato_cliente"),
+    expr(cols, "fecha_termino_contrato"),
+    expr(cols, "mes_ingreso_solicitud"),
+    expr(cols, "mes_produccion_2026"),
+    expr(cols, "envio_afp"),
+    expr(cols, "motivo_rechazo"),
+    expr(cols, "consulta_cen"),
+    expr(cols, "contenido_cen"),
+    expr(cols, "respuesta_cen"),
+    expr(cols, "facturado_cliente"),
+    expr(cols, "facturado_finanfix"),
+    expr(cols, "fecha_presentacion_afp"),
+    expr(cols, "fecha_ingreso_afp"),
+    expr(cols, "fecha_pago_afp"),
+    expr(cols, "fecha_factura_finanfix"),
+    expr(cols, "fecha_pago_factura_finanfix"),
+    expr(cols, "fecha_rechazo"),
+    expr(cols, "comment"),
+    expr(cols, "created_at"),
+    expr(cols, "updated_at"),
+    expr(cols, "last_activity_at"),
+  ];
+
+  const orderColumn = cols.has("created_at") ? "created_at" : cols.has("updated_at") ? "updated_at" : "id";
+  const sql = `
+    select ${select.join(",\n           ")}
+    from ${quoteIdent(tableName)} r
+    ${joins.join("\n")}
+    order by r.${quoteIdent(orderColumn)} desc nulls last
+    limit 10000
+  `;
+  return prisma.$queryRawUnsafe<any[]>(sql);
+}
+
+function normalizeRow(row: any) {
   return {
     id: row.management_id || row.id,
     source_id: row.id,
-    management_type: "LM",
+    management_type: row.management_type || "",
     mandante_id: row.mandante_id || null,
-    mandante: row.mandante_rel?.name || row.mandante || "Sin mandante",
+    mandante: row.mandante_rel_name || row.mandante || "Sin mandante",
     grupo_empresa: row.search_group || "",
-    razon_social: row.business_name || row.company_rel?.razon_social || "",
-    rut: row.rut || row.company_rel?.rut || "",
-    entidad: row.entity || row.line_afp_rel?.afp_name || "",
+    razon_social: row.business_name || row.company_razon_social || "",
+    rut: row.rut || row.company_rut || "",
+    entidad: row.entity || row.line_afp_name || "",
     estado_gestion: row.management_status || "",
     monto_devolucion: normalizeDecimal(row.refund_amount),
     monto_pagado: normalizeDecimal(row.actual_paid_amount),
     monto_cliente: normalizeDecimal(row.monto_cliente),
     monto_finanfix_solutions: normalizeDecimal(row.monto_finanfix_solutions),
+    monto_real_cliente: normalizeDecimal(row.monto_real_cliente),
+    monto_real_finanfix_solutions: normalizeDecimal(row.monto_real_finanfix_solutions),
+    fee: normalizeDecimal(row.fee),
     numero_solicitud: row.request_number || "",
     numero_factura: row.numero_factura || row.invoice_number || "",
     numero_oc: row.numero_oc || row.oc_number || "",
@@ -103,12 +262,18 @@ function normalizeLm(row: any) {
     numero_cuenta: row.account_number || "",
     confirmacion_cc: Boolean(row.confirmation_cc),
     confirmacion_poder: Boolean(row.confirmation_power),
-    acceso_portal: row.portal_access || "",
+    acceso_portal: row.portal_access || row.acceso_portal || "",
     porcentaje_liquidaciones: row.porcentaje_liquidaciones || "",
     estado_trabajador: row.worker_status || "",
-    motivo_tipo_exceso: row.motivo_tipo_exceso || row.excess_type_reason || "",
+    motivo_tipo_exceso: row.motivo_tipo_exceso || row.excess_type_reason || (row.management_type === "TP" ? "Trabajo Pesado (TP)" : ""),
+    estado_contrato_cliente: row.estado_contrato_cliente || "",
+    fecha_termino_contrato: iso(row.fecha_termino_contrato),
+    mes_ingreso_solicitud: row.mes_ingreso_solicitud || "",
+    mes_produccion_2026: row.mes_produccion_2026 || "",
+    envio_afp: row.envio_afp || "",
     motivo_rechazo: row.motivo_rechazo || "",
     consulta_cen: row.consulta_cen || "",
+    contenido_cen: row.contenido_cen || "",
     respuesta_cen: row.respuesta_cen || "",
     facturado_cliente: row.facturado_cliente || "",
     facturado_finanfix: row.facturado_finanfix || "",
@@ -118,50 +283,7 @@ function normalizeLm(row: any) {
     fecha_factura_finanfix: iso(row.fecha_factura_finanfix),
     fecha_pago_factura_finanfix: iso(row.fecha_pago_factura_finanfix),
     fecha_rechazo: iso(row.fecha_rechazo),
-    created_at: iso(row.created_at),
-    updated_at: iso(row.updated_at),
-    last_activity_at: iso(row.last_activity_at),
-  };
-}
-
-function normalizeTp(row: any) {
-  return {
-    id: row.management_id || row.id,
-    source_id: row.id,
-    management_type: "TP",
-    mandante_id: row.mandante_id || null,
-    mandante: row.mandante_rel?.name || row.mandante || "Sin mandante",
-    grupo_empresa: row.search_group || "",
-    razon_social: row.business_name || row.company_rel?.razon_social || "",
-    rut: row.rut || row.company_rel?.rut || "",
-    entidad: row.entity || row.line_afp_rel?.afp_name || "",
-    estado_gestion: row.management_status || "",
-    monto_devolucion: normalizeDecimal(row.refund_amount),
-    monto_pagado: normalizeDecimal(row.actual_paid_amount),
-    monto_cliente: 0,
-    monto_finanfix_solutions: 0,
-    numero_solicitud: row.request_number || "",
-    numero_factura: "",
-    numero_oc: "",
-    banco: row.bank_name || "",
-    tipo_cuenta: row.account_type || "",
-    numero_cuenta: row.account_number || "",
-    confirmacion_cc: false,
-    confirmacion_poder: false,
-    acceso_portal: row.portal_access || row.acceso_portal || "",
-    estado_trabajador: row.worker_status || "",
-    motivo_tipo_exceso: "Trabajo Pesado TP",
-    motivo_rechazo: "",
-    consulta_cen: row.consulta_cen || "",
-    respuesta_cen: row.respuesta_cen || "",
-    facturado_cliente: "",
-    facturado_finanfix: "",
-    fecha_presentacion_afp: null,
-    fecha_ingreso_afp: null,
-    fecha_pago_afp: null,
-    fecha_factura_finanfix: null,
-    fecha_pago_factura_finanfix: null,
-    fecha_rechazo: null,
+    comment: row.comment || "",
     created_at: iso(row.created_at),
     updated_at: iso(row.updated_at),
     last_activity_at: iso(row.last_activity_at),
@@ -170,11 +292,10 @@ function normalizeTp(row: any) {
 
 async function loadRows(session: any) {
   const [lm, tp] = await Promise.all([
-    prisma.lmRecord.findMany({ include: { mandante_rel: true, company_rel: true, line_afp_rel: true }, orderBy: { created_at: "desc" }, take: 10000 }),
-    prisma.tpRecord.findMany({ include: { mandante_rel: true, company_rel: true, line_afp_rel: true }, orderBy: { created_at: "desc" }, take: 10000 }),
+    loadRecordTable("lm_records", "LM"),
+    loadRecordTable("tp_records", "TP"),
   ]);
-
-  return filterRowsBySession([...lm.map(normalizeLm), ...tp.map(normalizeTp)] as any[], session as any);
+  return filterRowsBySession([...lm, ...tp].map(normalizeRow) as any[], session as any);
 }
 
 type Filter = { field: string; operator: string; value: string; value2?: string };
