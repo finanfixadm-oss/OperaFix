@@ -222,7 +222,7 @@ export default function CompanyRecordDetailPage() {
           <Info label="Mandante" text={data.mandante?.name || data.mandante?.nombre} />
           <Info label="Estado contrato con cliente" text={data.estado_contrato_cliente} />
           <Info label="Fecha término de contrato" text={date(data.fecha_termino_contrato)} />
-          <Info label="Buscar Grupo" text={data.grupo_empresa} />
+          <Info label="Holding / Grupo empresa" text={data.grupo_empresa} />
           <Info label="Razón Social" text={companyName} />
           <Info label="RUT" text={data.rut || data.company?.rut} />
           <Info label="Dirección" text={data.direccion || data.company?.direccion} />
@@ -245,7 +245,7 @@ export default function CompanyRecordDetailPage() {
         <Card title="INFORMACIÓN DE GESTIÓN">
           <Info label="Mes de producción 2026" text={data.mes_produccion_2026} />
           <Info label="Motivo (Tipo de exceso)" text={data.motivo_tipo_exceso} />
-          <Info label="Confirmación Poder" text={value(data.confirmacion_poder)} />
+          <Info label="Confirmación Poder Notarial" text={value(data.confirmacion_poder)} />
           <Info label="Estado Gestión" text={data.estado_gestion} />
           <Info label="Consulta CEN" text={data.consulta_cen} />
           <Info label="Mes de ingreso solicitud" text={data.mes_ingreso_solicitud} />

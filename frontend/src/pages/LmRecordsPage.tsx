@@ -233,7 +233,7 @@ export default function LmRecordsPage() {
             </select>
           </label>
           <label className="field-block">
-            <span>Confirmación Poder</span>
+            <span>Confirmación Poder Notarial</span>
             <select name="confirmation_power" value={filters.confirmation_power} onChange={handleFilterChange}>
               <option value="">Todos</option>
               <option value="true">Sí</option>
@@ -252,13 +252,13 @@ export default function LmRecordsPage() {
             <table className="crm-table enhanced">
               <thead>
                 <tr>
-                  <th>Buscar Grupo</th>
+                  <th>Holding / Grupo empresa</th>
                   <th>RUT</th>
                   <th>Entidad</th>
                   <th>Estado Gestión</th>
                   <th>Monto Devolución</th>
                   <th>Confirmación CC</th>
-                  <th>Confirmación Poder</th>
+                  <th>Confirmación Poder Notarial</th>
                 </tr>
               </thead>
               <tbody>
@@ -317,14 +317,14 @@ export default function LmRecordsPage() {
 
               {activeTab === "summary" ? (
                 <div className="detail-grid">
-                  <Info label="Buscar Grupo" value={detail.record.search_group} />
+                  <Info label="Holding / Grupo empresa" value={detail.record.search_group} />
                   <Info label="Razón Social" value={detail.record.business_name} />
                   <Info label="Mandante" value={detail.record.mandante} />
                   <Info label="N° Solicitud" value={detail.record.request_number} />
                   <Info label="Estado Trabajador" value={detail.record.worker_status} />
                   <Info label="Tipo de exceso" value={detail.record.excess_type_reason} />
                   <Info label="Confirmación CC" value={boolText(detail.record.confirmation_cc)} />
-                  <Info label="Confirmación Poder" value={boolText(detail.record.confirmation_power)} />
+                  <Info label="Confirmación Poder Notarial" value={boolText(detail.record.confirmation_power)} />
                   <Info label="Acceso portal" value={detail.record.portal_access} />
                   <Info label="Última modificación" value={dateText(detail.record.updated_at)} />
                   <Info label="Comentario" value={detail.record.comment || "-"} full />
@@ -376,7 +376,7 @@ export default function LmRecordsPage() {
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="panel-title-row"><h3>{form.id ? "Editar registro" : "Nuevo registro"}</h3><button className="link-btn" onClick={() => setIsFormOpen(false)}>Cerrar</button></div>
             <form className="form-grid" onSubmit={handleSave}>
-              <label className="field-block"><span>Buscar Grupo</span><input name="search_group" value={form.search_group || ""} onChange={handleFormChange} /></label>
+              <label className="field-block"><span>Holding / Grupo empresa</span><input name="search_group" value={form.search_group || ""} onChange={handleFormChange} /></label>
               <label className="field-block"><span>RUT</span><input name="rut" value={form.rut || ""} onChange={handleFormChange} required /></label>
               <label className="field-block"><span>Razón Social</span><input name="business_name" value={form.business_name || ""} onChange={handleFormChange} /></label>
               <label className="field-block"><span>Entidad</span><input name="entity" value={form.entity || ""} onChange={handleFormChange} /></label>
@@ -393,7 +393,7 @@ export default function LmRecordsPage() {
               <label className="field-block"><span>Mandante</span><input name="mandante" value={form.mandante || ""} onChange={handleFormChange} /></label>
               <label className="field-block"><span>N° Solicitud</span><input name="request_number" value={form.request_number || ""} onChange={handleFormChange} /></label>
               <label className="field-block checkbox"><input name="confirmation_cc" type="checkbox" checked={Boolean(form.confirmation_cc)} onChange={handleFormChange} /><span>Confirmación CC</span></label>
-              <label className="field-block checkbox"><input name="confirmation_power" type="checkbox" checked={Boolean(form.confirmation_power)} onChange={handleFormChange} /><span>Confirmación Poder</span></label>
+              <label className="field-block checkbox"><input name="confirmation_power" type="checkbox" checked={Boolean(form.confirmation_power)} onChange={handleFormChange} /><span>Confirmación Poder Notarial</span></label>
               <label className="field-block form-full"><span>Comentario</span><textarea name="comment" rows={4} value={form.comment || ""} onChange={handleFormChange} /></label>
               <div className="modal-actions form-full">
                 <button type="button" className="ghost-btn" onClick={() => setIsFormOpen(false)}>Cancelar</button>

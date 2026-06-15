@@ -131,10 +131,10 @@ export default function CompanyRecordsPage() {
           {[
             "Acceso portal",
             "Banco",
-            "Buscar Grupo",
+            "Holding / Grupo empresa",
             "Comentario",
             "Confirmación CC",
-            "Confirmación Poder",
+            "Confirmación Poder Notarial",
             "Entidad",
             "Estado Gestión",
             "Razón Social",
@@ -157,7 +157,7 @@ export default function CompanyRecordsPage() {
                 <tr>
                   <th><input type="checkbox" /></th>
                   <th>Entidad</th>
-                  <th>Buscar Grupo</th>
+                  <th>Holding / Grupo empresa</th>
                   <th>Confirmación CC</th>
                   <th>RUT</th>
                   <th>Estado Gestión</th>

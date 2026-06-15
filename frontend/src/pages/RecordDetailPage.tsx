@@ -690,7 +690,7 @@ export default function RecordDetailPage() {
           />
           <EditableInfo label="Estado contrato con cliente" value={record.estado_contrato_cliente} field="estado_contrato_cliente" onEdit={openEdit} />
           <EditableInfo label="Fecha término de contrato" value={toDateInput(record.fecha_termino_contrato)} displayValue={formatDate(record.fecha_termino_contrato)} field="fecha_termino_contrato" type="date" onEdit={openEdit} />
-          <EditableInfo label="Buscar Grupo" value={record.grupo_empresa || record.group?.name} field="grupo_empresa" onEdit={openEdit} />
+          <EditableInfo label="Holding / Grupo empresa" value={record.grupo_empresa || record.group?.name} field="grupo_empresa" onEdit={openEdit} />
           <EditableInfo label="Razón Social" value={companyName} field="razon_social" onEdit={openEdit} />
           <EditableInfo label="RUT" value={record.rut || record.company?.rut} field="rut" onEdit={openEdit} />
           <EditableInfo label="Dirección" value={record.direccion} field="direccion" onEdit={openEdit} />

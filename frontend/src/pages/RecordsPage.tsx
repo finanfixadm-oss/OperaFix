@@ -79,9 +79,9 @@ const emptyForm: FormState = {
   rut: "",
   direccion: "",
   entidad: "",
-  estado_gestion: "Pendiente Gestión",
+  estado_gestion: "Pendiente gestión",
   numero_solicitud: "",
-  envio_afp: "Pendiente",
+  envio_afp: "",
   estado_contrato_cliente: "",
   fecha_termino_contrato: "",
   estado_trabajador: "",
@@ -135,6 +135,16 @@ const MONTH_OPTIONS = [
   "Noviembre",
   "Diciembre",
 ];
+
+const ESTADO_CONTRATO_CLIENTE_OPTIONS = ["Activo", "Estudio inicial", "Inactivo", "Por vencer"];
+const MOTIVO_TIPO_EXCESO_OPTIONS = ["Licencias Médicas (LM)", "Seguro de invalidez y sobrevivencia (SIS)", "Trabajo Pesado (TP)"];
+const ENTIDAD_OPTIONS = ["AFP CAPITAL", "AFP CUPRUM", "AFP HABITAT", "AFP MODELO", "AFP PLANVITAL", "AFP PROVIDA", "AFP UNO", "Pendiente de asignación"];
+const ENVIO_AFP_OPTIONS = ["PRIMERO", "SEGUNDO", "TERCERO"];
+const ESTADO_GESTION_OPTIONS = ["Anulada", "Gestionado", "Pagado", "Pendiente gestión", "Rechazada AFP CAPITAL", "Rechazada AFP MODELO", "Rechazo bancario"];
+const SI_NO_NO_APLICA_OPTIONS = ["Si", "No", "No aplica"];
+const SI_NO_OPTIONS = ["Si", "No"];
+const FACTURADO_FINANFIX_OPTIONS = ["Facturado", "Pagado", "Pendiente"];
+const FACTURADO_CLIENTE_OPTIONS = ["Facturado", "Pendiente"];
 
 function matchRule(value: unknown, rule: FilterRule) {
   const normalized = String(value ?? "").toLowerCase();
@@ -1073,13 +1083,16 @@ export default function RecordsPage() {
           <Field label="Mes de producción 2026"><SelectStatus value={form.mes_produccion_2026} onChange={(v) => updateForm("mes_produccion_2026", v)} options={MONTH_OPTIONS} /></Field>
           <Field label="Mes de ingreso solicitud"><SelectStatus value={form.mes_ingreso_solicitud} onChange={(v) => updateForm("mes_ingreso_solicitud", v)} options={MONTH_OPTIONS} /></Field>
           <Field label="Acceso portal"><SelectYesNo value={form.acceso_portal} onChange={(v) => updateForm("acceso_portal", v)} /></Field>
-          <Field label="Envío AFP"><SelectStatus value={form.envio_afp} onChange={(v) => updateForm("envio_afp", v)} options={["Pendiente", "Enviado", "Respondido", "Rechazado"]} /></Field>
-          <Field label="Estado contrato con cliente"><SelectStatus value={form.estado_contrato_cliente} onChange={(v) => updateForm("estado_contrato_cliente", v)} options={["Vigente", "No vigente", "Pendiente"]} /></Field>
-          <Field label="Estado Gestión"><SelectStatus value={form.estado_gestion} onChange={(v) => updateForm("estado_gestion", v)} options={["Pendiente Gestión", "En preparación", "Enviada AFP", "Respondida AFP", "Pagada", "Facturada", "Cerrada", "Rechazada"]} /></Field>
+          <Field label="Envío AFP"><SelectStatus value={form.envio_afp} onChange={(v) => updateForm("envio_afp", v)} options={ENVIO_AFP_OPTIONS} /></Field>
+          <Field label="Estado contrato con cliente"><SelectStatus value={form.estado_contrato_cliente} onChange={(v) => updateForm("estado_contrato_cliente", v)} options={ESTADO_CONTRATO_CLIENTE_OPTIONS} /></Field>
+          <Field label="Estado Gestión"><SelectStatus value={form.estado_gestion} onChange={(v) => updateForm("estado_gestion", v)} options={ESTADO_GESTION_OPTIONS} /></Field>
+          <Field label="Fecha término de contrato"><input className="zoho-input" type="date" value={form.fecha_termino_contrato} onChange={(e) => updateForm("fecha_termino_contrato", e.target.value)} /></Field>
+          <Field label="Fecha Presentación AFP"><input className="zoho-input" type="date" value={form.fecha_presentacion_afp} onChange={(e) => updateForm("fecha_presentacion_afp", e.target.value)} /></Field>
+          <Field label="Fecha ingreso AFP"><input className="zoho-input" type="date" value={form.fecha_ingreso_afp} onChange={(e) => updateForm("fecha_ingreso_afp", e.target.value)} /></Field>
           <Field label="N° Solicitud"><input className="zoho-input" value={form.numero_solicitud} onChange={(e) => updateForm("numero_solicitud", e.target.value)} /></Field>
           <Field label="Motivo del rechazo/anulación"><input className="zoho-input" value={form.motivo_rechazo} onChange={(e) => updateForm("motivo_rechazo", e.target.value)} /></Field>
           <Field label="Fecha rechazo"><input className="zoho-input" type="date" value={form.fecha_rechazo} onChange={(e) => updateForm("fecha_rechazo", e.target.value)} /></Field>
-          <Field label="Buscar Grupo"><input className="zoho-input" value={form.grupo_empresa} onChange={(e) => updateForm("grupo_empresa", e.target.value)} /></Field>
+          <Field label="Holding / Grupo empresa"><input className="zoho-input" value={form.grupo_empresa} onChange={(e) => updateForm("grupo_empresa", e.target.value)} /></Field>
           <Field label="Propietario"><input className="zoho-input" value={form.owner_name} onChange={(e) => updateForm("owner_name", e.target.value)} /></Field>
         </FormSection>
 
@@ -1087,7 +1100,7 @@ export default function RecordsPage() {
           <Field label="Razón Social"><input className="zoho-input" value={form.razon_social} onChange={(e) => updateForm("razon_social", e.target.value)} /></Field>
           <Field label="RUT"><input className="zoho-input" value={form.rut} onChange={(e) => updateForm("rut", e.target.value)} /></Field>
           <Field label="Dirección"><input className="zoho-input" value={form.direccion} onChange={(e) => updateForm("direccion", e.target.value)} /></Field>
-          <Field label="Entidad (AFP)"><input className="zoho-input" value={form.entidad} onChange={(e) => updateForm("entidad", e.target.value)} /></Field>
+          <Field label="Entidad"><SelectStatus value={form.entidad} onChange={(v) => updateForm("entidad", v)} options={ENTIDAD_OPTIONS} /></Field>
           <Field label="Banco"><input className="zoho-input" value={form.banco} onChange={(e) => updateForm("banco", e.target.value)} /></Field>
           <Field label="Tipo de Cuenta"><input className="zoho-input" value={form.tipo_cuenta} onChange={(e) => updateForm("tipo_cuenta", e.target.value)} /></Field>
           <Field label="Número cuenta"><input className="zoho-input" value={form.numero_cuenta} onChange={(e) => updateForm("numero_cuenta", e.target.value)} /></Field>
@@ -1097,11 +1110,11 @@ export default function RecordsPage() {
         </FormSection>
 
         <FormSection title="3. CEN, montos y facturación">
-          <Field label="Consulta CEN"><SelectYesNo value={form.consulta_cen} onChange={(v) => updateForm("consulta_cen", v)} /></Field>
-          <Field label="Contenido CEN"><SelectYesNo value={form.contenido_cen} onChange={(v) => updateForm("contenido_cen", v)} /></Field>
-          <Field label="Respuesta CEN"><SelectYesNo value={form.respuesta_cen} onChange={(v) => updateForm("respuesta_cen", v)} /></Field>
+          <Field label="Consulta CEN"><SelectStatus value={form.consulta_cen} onChange={(v) => updateForm("consulta_cen", v)} options={SI_NO_OPTIONS} /></Field>
+          <Field label="Contenido CEN"><SelectStatus value={form.contenido_cen} onChange={(v) => updateForm("contenido_cen", v)} options={SI_NO_OPTIONS} /></Field>
+          <Field label="Respuesta CEN"><SelectStatus value={form.respuesta_cen} onChange={(v) => updateForm("respuesta_cen", v)} options={SI_NO_OPTIONS} /></Field>
           <Field label="Estado Trabajador"><SelectStatus value={form.estado_trabajador} onChange={(v) => updateForm("estado_trabajador", v)} options={["Vigente", "No vigente", "Sin información"]} /></Field>
-          <Field label="Motivo Tipo de exceso"><SelectStatus value={form.motivo_tipo_exceso} onChange={(v) => updateForm("motivo_tipo_exceso", v)} options={["LM", "TP", "LM + TP", "Otro"]} /></Field>
+          <Field label="Motivo (Tipo de exceso)"><SelectStatus value={form.motivo_tipo_exceso} onChange={(v) => updateForm("motivo_tipo_exceso", v)} options={MOTIVO_TIPO_EXCESO_OPTIONS} /></Field>
           <Field label="Monto estimado"><input className="zoho-input" type="number" value={form.monto_devolucion} onChange={(e) => updateForm("monto_devolucion", e.target.value)} /></Field>
           <Field label="Monto Real Pagado"><input className="zoho-input" type="number" value={form.monto_pagado} onChange={(e) => updateForm("monto_pagado", e.target.value)} /></Field>
           <Field label="Monto estimado cliente"><input className="zoho-input" type="number" value={form.monto_cliente} onChange={(e) => updateForm("monto_cliente", e.target.value)} /></Field>
@@ -1109,8 +1122,8 @@ export default function RecordsPage() {
           <Field label="Monto real cliente"><input className="zoho-input" type="number" value={form.monto_real_cliente} onChange={(e) => updateForm("monto_real_cliente", e.target.value)} /></Field>
           <Field label="Monto real Finanfix Solutions"><input className="zoho-input" type="number" value={form.monto_real_finanfix_solutions} onChange={(e) => updateForm("monto_real_finanfix_solutions", e.target.value)} /></Field>
           <Field label="FEE"><input className="zoho-input" type="number" value={form.fee} onChange={(e) => updateForm("fee", e.target.value)} /></Field>
-          <Field label="Facturado cliente"><SelectYesNo value={form.facturado_cliente} onChange={(v) => updateForm("facturado_cliente", v)} /></Field>
-          <Field label="Facturado Finanfix"><SelectYesNo value={form.facturado_finanfix} onChange={(v) => updateForm("facturado_finanfix", v)} /></Field>
+          <Field label="Facturado cliente"><SelectStatus value={form.facturado_cliente} onChange={(v) => updateForm("facturado_cliente", v)} options={FACTURADO_CLIENTE_OPTIONS} /></Field>
+          <Field label="Facturado Finanfix"><SelectStatus value={form.facturado_finanfix} onChange={(v) => updateForm("facturado_finanfix", v)} options={FACTURADO_FINANFIX_OPTIONS} /></Field>
           <Field label="Fecha Pago AFP"><input className="zoho-input" type="date" value={form.fecha_pago_afp} onChange={(e) => updateForm("fecha_pago_afp", e.target.value)} /></Field>
           <Field label="Fecha Factura Finanfix"><input className="zoho-input" type="date" value={form.fecha_factura_finanfix} onChange={(e) => updateForm("fecha_factura_finanfix", e.target.value)} /></Field>
           <Field label="Fecha pago factura Finanfix"><input className="zoho-input" type="date" value={form.fecha_pago_factura_finanfix} onChange={(e) => updateForm("fecha_pago_factura_finanfix", e.target.value)} /></Field>
@@ -1145,9 +1158,9 @@ function SelectStatus({ value, onChange, options }: { value: string; onChange: (
 }
 
 function SelectYesNo({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return <SelectStatus value={value} onChange={onChange} options={["Sí", "No", "Pendiente"]} />;
+  return <SelectStatus value={value} onChange={onChange} options={SI_NO_NO_APLICA_OPTIONS} />;
 }
 
 function SelectBool({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return <select className="zoho-select" value={value} onChange={(e) => onChange(e.target.value)}><option value="false">No</option><option value="true">Sí</option></select>;
+  return <select className="zoho-select" value={value} onChange={(e) => onChange(e.target.value)}><option value="false">No</option><option value="true">Si</option></select>;
 }

@@ -384,7 +384,7 @@ export default function ManagementsPage() {
     { field: "estado_gestion", label: "Estado Gestión", type: "text" },
     { field: "motivo_rechazo", label: "Motivo rechazo/anulación", type: "text" },
     { field: "numero_solicitud", label: "N° Solicitud", type: "text" },
-    { field: "grupo_empresa", label: "Buscar Grupo", type: "text" },
+    { field: "grupo_empresa", label: "Holding / Grupo empresa", type: "text" },
     { field: "owner_name", label: "Propietario de Registro", type: "text" },
     { field: "respuesta_cen", label: "Respuesta CEN", type: "text" },
     { field: "consulta_cen", label: "Consulta CEN", type: "text" },
@@ -400,7 +400,7 @@ export default function ManagementsPage() {
     { field: "tipo_cuenta", label: "Tipo de Cuenta", type: "text" },
     { field: "numero_cuenta", label: "Número cuenta", type: "text" },
     { field: "confirmacion_cc", label: "Confirmación CC", type: "boolean" },
-    { field: "confirmacion_poder", label: "Confirmación Poder", type: "boolean" },
+    { field: "confirmacion_poder", label: "Confirmación Poder Notarial", type: "boolean" },
 
     { field: "monto_devolucion", label: "Monto Devolución", type: "number" },
     { field: "monto_cliente", label: "Monto cliente", type: "number" },
@@ -782,7 +782,7 @@ export default function ManagementsPage() {
               </select>
             </Field>
 
-            <Field label="Confirmación Poder">
+            <Field label="Confirmación Poder Notarial">
               <select
                 className="zoho-select"
                 value={form.confirmacion_poder}
