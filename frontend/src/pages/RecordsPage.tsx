@@ -41,6 +41,7 @@ type FormState = {
   mes_ingreso_solicitud: string;
   grupo_empresa: string;
   acceso_portal: string;
+  porcentaje_liquidaciones: string;
   banco: string;
   tipo_cuenta: string;
   numero_cuenta: string;
@@ -91,6 +92,7 @@ const emptyForm: FormState = {
   mes_ingreso_solicitud: "",
   grupo_empresa: "",
   acceso_portal: "",
+  porcentaje_liquidaciones: "",
   banco: "",
   tipo_cuenta: "",
   numero_cuenta: "",
@@ -1090,7 +1092,8 @@ export default function RecordsPage() {
           <Field label="Tipo de Cuenta"><input className="zoho-input" value={form.tipo_cuenta} onChange={(e) => updateForm("tipo_cuenta", e.target.value)} /></Field>
           <Field label="Número cuenta"><input className="zoho-input" value={form.numero_cuenta} onChange={(e) => updateForm("numero_cuenta", e.target.value)} /></Field>
           <Field label="Confirmación CC"><SelectBool value={form.confirmacion_cc} onChange={(v) => updateForm("confirmacion_cc", v)} /></Field>
-          <Field label="Confirmación Poder"><SelectBool value={form.confirmacion_poder} onChange={(v) => updateForm("confirmacion_poder", v)} /></Field>
+          <Field label="Confirmación Poder Notarial"><SelectBool value={form.confirmacion_poder} onChange={(v) => updateForm("confirmacion_poder", v)} /></Field>
+          <Field label="Porcentaje de liquidaciones"><SelectYesNo value={form.porcentaje_liquidaciones} onChange={(v) => updateForm("porcentaje_liquidaciones", v)} /></Field>
         </FormSection>
 
         <FormSection title="3. CEN, montos y facturación">
@@ -1099,9 +1102,9 @@ export default function RecordsPage() {
           <Field label="Respuesta CEN"><SelectYesNo value={form.respuesta_cen} onChange={(v) => updateForm("respuesta_cen", v)} /></Field>
           <Field label="Estado Trabajador"><SelectStatus value={form.estado_trabajador} onChange={(v) => updateForm("estado_trabajador", v)} options={["Vigente", "No vigente", "Sin información"]} /></Field>
           <Field label="Motivo Tipo de exceso"><SelectStatus value={form.motivo_tipo_exceso} onChange={(v) => updateForm("motivo_tipo_exceso", v)} options={["LM", "TP", "LM + TP", "Otro"]} /></Field>
-          <Field label="Monto Devolución"><input className="zoho-input" type="number" value={form.monto_devolucion} onChange={(e) => updateForm("monto_devolucion", e.target.value)} /></Field>
+          <Field label="Monto estimado"><input className="zoho-input" type="number" value={form.monto_devolucion} onChange={(e) => updateForm("monto_devolucion", e.target.value)} /></Field>
           <Field label="Monto Real Pagado"><input className="zoho-input" type="number" value={form.monto_pagado} onChange={(e) => updateForm("monto_pagado", e.target.value)} /></Field>
-          <Field label="Monto cliente"><input className="zoho-input" type="number" value={form.monto_cliente} onChange={(e) => updateForm("monto_cliente", e.target.value)} /></Field>
+          <Field label="Monto estimado cliente"><input className="zoho-input" type="number" value={form.monto_cliente} onChange={(e) => updateForm("monto_cliente", e.target.value)} /></Field>
           <Field label="Monto Finanfix"><input className="zoho-input" type="number" value={form.monto_finanfix_solutions} onChange={(e) => updateForm("monto_finanfix_solutions", e.target.value)} /></Field>
           <Field label="Monto real cliente"><input className="zoho-input" type="number" value={form.monto_real_cliente} onChange={(e) => updateForm("monto_real_cliente", e.target.value)} /></Field>
           <Field label="Monto real Finanfix Solutions"><input className="zoho-input" type="number" value={form.monto_real_finanfix_solutions} onChange={(e) => updateForm("monto_real_finanfix_solutions", e.target.value)} /></Field>

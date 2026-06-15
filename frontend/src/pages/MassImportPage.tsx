@@ -83,6 +83,7 @@ const PRIORITY_FIELDS = [
   "fecha_presentacion_afp",
   "fecha_ingreso_afp",
   "fecha_pago_afp",
+  "porcentaje_liquidaciones",
   "facturado_finanfix",
   "facturado_cliente",
 ];

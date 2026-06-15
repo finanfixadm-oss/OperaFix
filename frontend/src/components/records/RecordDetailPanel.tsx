@@ -149,6 +149,7 @@ export default function RecordDetailPanel({
               <Field label="Propietario" value={record.owner_name} />
               <Field label="Mes producción" value={record.mes_produccion_2026} />
               <Field label="Acceso portal" value={(record as any).acceso_portal} />
+              <Field label="Porcentaje de liquidaciones" value={(record as any).porcentaje_liquidaciones} />
               <Field label="Envío AFP" value={(record as any).envio_afp} />
             </div>
           </section>
@@ -157,7 +158,7 @@ export default function RecordDetailPanel({
             <h3>Montos y facturación</h3>
             <div className="record-panel-grid">
               <Field label="Monto pagado" value={formatMoney(record.monto_pagado)} />
-              <Field label="Monto cliente" value={formatMoney(record.monto_cliente)} />
+              <Field label="Monto estimado cliente" value={formatMoney(record.monto_cliente)} />
               <Field label="Monto Finanfix" value={formatMoney(record.monto_finanfix_solutions)} />
               <Field label="Monto real cliente" value={formatMoney(record.monto_real_cliente)} />
               <Field label="Monto real Finanfix" value={formatMoney(record.monto_real_finanfix_solutions)} />

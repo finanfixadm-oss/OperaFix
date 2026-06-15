@@ -218,6 +218,7 @@ model Management {
   confirmacion_cc             Boolean?  @default(false)
   confirmacion_poder          Boolean?  @default(false)
   acceso_portal               String?
+  porcentaje_liquidaciones    String?
   facturado_finanfix          String?
   facturado_cliente           String?
   fecha_factura_finanfix      DateTime?
@@ -288,6 +289,7 @@ model LmRecord {
   comment            String?
   mandante           String?
   portal_access      String?
+  porcentaje_liquidaciones String?
   direccion          String?
 
 
@@ -359,6 +361,7 @@ model TpRecord {
   comment            String?
   mandante           String?
   portal_access      String?
+  porcentaje_liquidaciones String?
   direccion          String?
 
 

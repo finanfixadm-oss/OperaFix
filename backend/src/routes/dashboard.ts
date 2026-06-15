@@ -161,6 +161,7 @@ const DASHBOARD_FIELDS: DashboardFieldDefinition[] = [
   { field: "mes_produccion_2026", label: "Mes de producción 2026 (materializado/pagado)", type: "text", sourceTable: "lm_records", sourceColumn: "production_months", groupable: true },
   { field: "mes_ingreso_solicitud", label: "Mes de ingreso solicitud (proyección)", type: "text", sourceTable: "lm_records", sourceColumn: "request_entry_month", groupable: true },
   { field: "acceso_portal", label: "Acceso portal", type: "text", sourceTable: "lm_records", sourceColumn: "portal_access", groupable: true },
+  { field: "porcentaje_liquidaciones", label: "Porcentaje de liquidaciones", type: "text", sourceTable: "lm_records", sourceColumn: "porcentaje_liquidaciones", groupable: true },
   { field: "envio_afp", label: "Envío AFP", type: "text", sourceTable: "lm_records", sourceColumn: "afp_shipment", groupable: true },
   { field: "estado_contrato_cliente", label: "Estado contrato cliente", type: "text", sourceTable: "lm_records", sourceColumn: "client_contract_status", groupable: true },
   { field: "estado_gestion", label: "Estado Gestión", type: "text", sourceTable: "lm_records", sourceColumn: "management_status", groupable: true },

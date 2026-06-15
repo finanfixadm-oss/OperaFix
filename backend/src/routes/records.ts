@@ -127,6 +127,7 @@ const fieldParsers: Record<string, (value: unknown) => unknown> = {
   confirmacion_cc: toBoolean,
   confirmacion_poder: toBoolean,
   acceso_portal: nullableString,
+  porcentaje_liquidaciones: nullableString,
   facturado_finanfix: nullableString,
   facturado_cliente: nullableString,
   fecha_factura_finanfix: nullableDate,
@@ -249,6 +250,7 @@ function legacyRowToRecord(row: any, managementType: "LM" | "TP") {
     tipo_cuenta: row.account_type || row.tipo_cuenta || null,
     numero_cuenta: row.account_number || row.numero_cuenta || null,
     acceso_portal: row.portal_access || row.acceso_portal || null,
+    porcentaje_liquidaciones: row.porcentaje_liquidaciones || null,
     motivo_tipo_exceso: row.excess_type_reason || row.motivo_tipo_exceso || null,
     mes_produccion_2026: row.production_months || row.mes_produccion_2026 || null,
     mes_ingreso_solicitud: row.request_entry_month || row.mes_ingreso_solicitud || null,
@@ -332,6 +334,7 @@ function legacyPatchCandidates(body: any) {
   put("tipo_cuenta", "account_type");
   put("numero_cuenta", "account_number");
   put("acceso_portal", "portal_access");
+  put("porcentaje_liquidaciones", "porcentaje_liquidaciones");
   put("motivo_tipo_exceso", "excess_type_reason");
   put("mes_produccion_2026", "production_months");
   put("estado_contrato_cliente", "client_contract_status");
@@ -879,6 +882,7 @@ async function createLegacyRecord(body: any) {
       account_number: nullableString(body.numero_cuenta),
       account_type: nullableString(body.tipo_cuenta),
       portal_access: nullableString(body.acceso_portal),
+      porcentaje_liquidaciones: nullableString(body.porcentaje_liquidaciones),
       production_months: nullableString(body.mes_produccion_2026),
       comment: nullableString(body.comment) || `Registro TP creado desde Registros de empresas. RUT: ${rut}. Razón Social: ${razonSocial}. AFP/Entidad: ${nullableString(body.entidad) || ""}. Estado: ${estadoGestion}. Monto: ${nullableString(body.monto_devolucion) || ""}.`,
       client_contract_status: nullableString(body.estado_contrato_cliente),
@@ -927,6 +931,7 @@ async function createLegacyRecord(body: any) {
     mandante: mandanteName,
     mandante_id: nullableString(body.mandante_id),
     portal_access: nullableString(body.acceso_portal),
+    porcentaje_liquidaciones: nullableString(body.porcentaje_liquidaciones),
     cen_response: nullableString(body.respuesta_cen),
     cen_query: nullableString(body.consulta_cen),
     request_entry_month: nullableString(body.mes_ingreso_solicitud),
@@ -1121,6 +1126,7 @@ recordsRouter.get("/", async (req, res) => {
         tipo_cuenta: row.account_type,
         numero_cuenta: row.account_number,
         acceso_portal: row.portal_access,
+        porcentaje_liquidaciones: row.porcentaje_liquidaciones,
         motivo_tipo_exceso: row.excess_type_reason,
         mes_produccion_2026: row.production_months,
         estado_contrato_cliente: row.client_contract_status,
@@ -1171,6 +1177,7 @@ recordsRouter.get("/", async (req, res) => {
         tipo_cuenta: row.account_type,
         numero_cuenta: row.account_number,
         acceso_portal: row.portal_access,
+        porcentaje_liquidaciones: row.porcentaje_liquidaciones,
         mes_produccion_2026: row.production_months,
         created_at: row.created_at,
         updated_at: row.updated_at,

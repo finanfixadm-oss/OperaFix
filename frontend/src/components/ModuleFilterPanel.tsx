@@ -96,7 +96,7 @@ export default function ModuleFilterPanel({ title, fields, onApply, initialRules
 
   function getFieldGroup(field: FilterFieldDefinition) {
     if (["mandante.name", "grupo_empresa", "group.name", "razon_social", "company.razon_social", "rut", "direccion"].includes(field.field)) return "Empresa y mandante";
-    if (["entidad", "lineAfp.afp_name", "management_type", "estado_gestion", "envio_afp", "estado_contrato_cliente", "estado_trabajador", "motivo_tipo_exceso", "motivo_rechazo", "numero_solicitud", "owner_name", "acceso_portal"].includes(field.field)) return "Gestión";
+    if (["entidad", "lineAfp.afp_name", "management_type", "estado_gestion", "envio_afp", "estado_contrato_cliente", "estado_trabajador", "motivo_tipo_exceso", "motivo_rechazo", "numero_solicitud", "owner_name", "acceso_portal", "porcentaje_liquidaciones"].includes(field.field)) return "Gestión";
     if (["confirmacion_cc", "confirmacion_poder", "consulta_cen", "contenido_cen", "respuesta_cen"].includes(field.field)) return "Confirmaciones y CEN";
     if (field.type === "number" || ["monto_devolucion", "monto_pagado", "monto_cliente", "monto_finanfix_solutions", "monto_real_cliente", "monto_real_finanfix_solutions", "fee"].includes(field.field)) return "Montos";
     if (field.type === "date" || field.field.includes("fecha") || field.field.includes("created_at") || field.field.includes("updated_at") || field.field.includes("last_activity_at")) return "Fechas";

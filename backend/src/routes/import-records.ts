@@ -43,6 +43,7 @@ type NormalizedImportRow = {
   confirmacion_cc: boolean;
   confirmacion_poder: boolean;
   acceso_portal: string | null;
+  porcentaje_liquidaciones: string | null;
   facturado_finanfix: string | null;
   facturado_cliente: string | null;
   fecha_factura_finanfix: string | null;
@@ -93,6 +94,7 @@ const CRM_IMPORT_FIELDS: FieldDef[] = [
   { field: "mes_produccion_2026", label: "Mes de producción", type: "text", aliases: ["mes de produccion", "mes produccion", "mes de produccion 2026", "mes produccion 2026"], managementColumn: "mes_produccion_2026", lmColumn: "mes_produccion_2026", tpColumn: "mes_produccion_2026" },
   { field: "mes_ingreso_solicitud", label: "Mes de ingreso solicitud", type: "text", aliases: ["mes de ingreso solicitud", "mes ingreso solicitud"], managementColumn: "mes_ingreso_solicitud", lmColumn: "mes_ingreso_solicitud", tpColumn: "mes_ingreso_solicitud" },
   { field: "acceso_portal", label: "Acceso portal", type: "enum", aliases: ["acceso portal", "portal"], managementColumn: "acceso_portal", lmColumn: "portal_access", tpColumn: "portal_access" },
+  { field: "porcentaje_liquidaciones", label: "Porcentaje de liquidaciones", type: "enum", aliases: ["porcentaje de liquidaciones", "porcentaje liquidaciones", "% liquidaciones", "liquidaciones"], managementColumn: "porcentaje_liquidaciones", lmColumn: "porcentaje_liquidaciones", tpColumn: "porcentaje_liquidaciones" },
   { field: "envio_afp", label: "Envío AFP", type: "enum", aliases: ["envio afp", "envío afp"], managementColumn: "envio_afp", lmColumn: "envio_afp", tpColumn: "envio_afp" },
   { field: "estado_contrato_cliente", label: "Estado contrato con cliente", type: "enum", aliases: ["estado contrato con cliente", "estado contrato cliente"], managementColumn: "estado_contrato_cliente", lmColumn: "estado_contrato_cliente", tpColumn: "estado_contrato_cliente" },
   { field: "fecha_termino_contrato", label: "Fecha término de contrato", type: "date", aliases: ["fecha termino de contrato", "fecha término de contrato", "fecha termino contrato"], managementColumn: "fecha_termino_contrato", lmColumn: "fecha_termino_contrato", tpColumn: "fecha_termino_contrato" },
@@ -100,7 +102,7 @@ const CRM_IMPORT_FIELDS: FieldDef[] = [
   { field: "numero_solicitud", label: "N° Solicitud", type: "text", aliases: ["n solicitud", "n° solicitud", "numero solicitud", "nro solicitud", "solicitud", "ticket", "caso"], managementColumn: "numero_solicitud", lmColumn: "request_number", tpColumn: "request_number" },
   { field: "motivo_rechazo", label: "Motivo del rechazo/anulación", type: "text", aliases: ["motivo del rechazo", "motivo rechazo", "motivo de rechazo", "motivo anulacion", "motivo anulación"], managementColumn: "motivo_rechazo", lmColumn: "motivo_rechazo", tpColumn: "motivo_rechazo" },
   { field: "fecha_rechazo", label: "Fecha Rechazo", type: "date", aliases: ["fecha rechazo"], managementColumn: "fecha_rechazo", lmColumn: "fecha_rechazo", tpColumn: "fecha_rechazo" },
-  { field: "grupo_empresa", label: "Buscar Grupo", type: "text", aliases: ["buscar grupo", "grupo", "grupo empresa", "nombre grupo", "grupo de empresa"], managementColumn: "grupo_empresa", lmColumn: "search_group", tpColumn: "search_group" },
+  { field: "grupo_empresa", label: "Buscar Grupo", type: "text", aliases: ["buscar grupo", "grupo", "grupo empresa", "nombre grupo", "grupo de empresa", "holding"], managementColumn: "grupo_empresa", lmColumn: "search_group", tpColumn: "search_group" },
   { field: "razon_social", label: "Razón Social", type: "text", aliases: ["razon social", "razón social", "empresa", "nombre empresa", "rs"], managementColumn: "razon_social", lmColumn: "business_name", tpColumn: "business_name" },
   { field: "rut", label: "RUT", type: "text", aliases: ["rut", "rut empresa", "rut rs"], managementColumn: "rut", lmColumn: "rut", tpColumn: "rut" },
   { field: "direccion", label: "Dirección", type: "text", aliases: ["direccion", "dirección"], managementColumn: "direccion", lmColumn: "direccion", tpColumn: "direccion" },
@@ -109,15 +111,15 @@ const CRM_IMPORT_FIELDS: FieldDef[] = [
   { field: "tipo_cuenta", label: "Tipo de Cuenta", type: "enum", aliases: ["tipo de cuenta", "tipo cuenta"], managementColumn: "tipo_cuenta", lmColumn: "account_type", tpColumn: "account_type" },
   { field: "numero_cuenta", label: "Número cuenta", type: "text", aliases: ["numero cuenta", "número cuenta", "n cuenta", "cuenta"], managementColumn: "numero_cuenta", lmColumn: "account_number", tpColumn: "account_number" },
   { field: "confirmacion_cc", label: "Confirmación CC", type: "boolean", aliases: ["confirmacion cc", "confirmación cc", "cc", "cuenta corriente"], managementColumn: "confirmacion_cc", lmColumn: "confirmation_cc", tpColumn: "confirmation_cc" },
-  { field: "confirmacion_poder", label: "Confirmación Poder", type: "boolean", aliases: ["confirmacion poder", "confirmación poder", "poder"], managementColumn: "confirmacion_poder", lmColumn: "confirmation_power", tpColumn: "confirmation_power" },
+  { field: "confirmacion_poder", label: "Confirmación Poder", type: "boolean", aliases: ["confirmacion poder", "confirmación poder", "confirmacion poder notarial", "confirmación poder notarial", "poder notarial", "poder"], managementColumn: "confirmacion_poder", lmColumn: "confirmation_power", tpColumn: "confirmation_power" },
   { field: "consulta_cen", label: "Consulta CEN", type: "enum", aliases: ["consulta cen"], managementColumn: "consulta_cen", lmColumn: "consulta_cen", tpColumn: "consulta_cen" },
   { field: "contenido_cen", label: "Contenido CEN", type: "enum", aliases: ["contenido cen"], managementColumn: "contenido_cen", lmColumn: "contenido_cen", tpColumn: "contenido_cen" },
   { field: "respuesta_cen", label: "Respuesta CEN", type: "enum", aliases: ["respuesta cen"], managementColumn: "respuesta_cen", lmColumn: "respuesta_cen", tpColumn: "respuesta_cen" },
   { field: "estado_trabajador", label: "Estado Trabajador", type: "enum", aliases: ["estado trabajador"], managementColumn: "estado_trabajador", lmColumn: "worker_status", tpColumn: "worker_status" },
   { field: "motivo_tipo_exceso", label: "Motivo Tipo de exceso", type: "enum", aliases: ["motivo tipo de exceso", "motivo (tipo de exceso)", "tipo de exceso", "motivo", "motivo tipo exceso"], managementColumn: "motivo_tipo_exceso", lmColumn: "motivo_tipo_exceso", tpColumn: "motivo_tipo_exceso" },
-  { field: "monto_devolucion", label: "Monto Devolución", type: "money", aliases: ["monto devolucion", "monto devolución", "monto de devolucion", "monto de devolución", "monto recuperacion", "monto recuperar", "devolucion", "monto"], managementColumn: "monto_devolucion", lmColumn: "refund_amount", tpColumn: "refund_amount" },
+  { field: "monto_devolucion", label: "Monto Devolución", type: "money", aliases: ["monto devolucion", "monto devolución", "monto de devolucion", "monto de devolución", "monto recuperacion", "monto recuperar", "devolucion", "monto", "monto estimado"], managementColumn: "monto_devolucion", lmColumn: "refund_amount", tpColumn: "refund_amount" },
   { field: "monto_pagado", label: "Monto Real Pagado", type: "money", aliases: ["monto real pagado", "monto pagado", "pagado entidad"], managementColumn: "monto_pagado", lmColumn: "actual_paid_amount", tpColumn: "actual_paid_amount" },
-  { field: "monto_cliente", label: "Monto cliente", type: "money", aliases: ["monto cliente"], managementColumn: "monto_cliente", lmColumn: "monto_cliente", tpColumn: "monto_cliente" },
+  { field: "monto_cliente", label: "Monto cliente", type: "money", aliases: ["monto cliente", "monto estimado cliente"], managementColumn: "monto_cliente", lmColumn: "monto_cliente", tpColumn: "monto_cliente" },
   { field: "monto_finanfix_solutions", label: "Monto Finanfix", type: "money", aliases: ["monto finanfix", "monto finanfix solutions"], managementColumn: "monto_finanfix_solutions", lmColumn: "monto_finanfix_solutions", tpColumn: "monto_finanfix_solutions" },
   { field: "monto_real_cliente", label: "Monto real cliente", type: "money", aliases: ["monto real cliente"], managementColumn: "monto_real_cliente", lmColumn: "monto_real_cliente", tpColumn: "monto_real_cliente" },
   { field: "monto_real_finanfix_solutions", label: "Monto real Finanfix Solutions", type: "money", aliases: ["monto real finanfix", "monto real finanfix solutions"], managementColumn: "monto_real_finanfix_solutions", lmColumn: "monto_real_finanfix_solutions", tpColumn: "monto_real_finanfix_solutions" },
@@ -172,13 +174,17 @@ function detectHeaderAlias(header: string): keyof NormalizedImportRow | undefine
     [["rut"], "rut"],
     [["mandante"], "mandante"],
     [["estado", "gestion"], "estado_gestion"],
+    [["monto", "estimado", "cliente"], "monto_cliente"],
+    [["monto", "estimado"], "monto_devolucion"],
     [["monto", "devolucion"], "monto_devolucion"],
     [["monto", "real", "pagado"], "monto_pagado"],
     [["numero", "solicitud"], "numero_solicitud"],
     [["solicitud"], "numero_solicitud"],
     [["entidad"], "entidad"],
     [["afp"], "entidad"],
+    [["holding"], "grupo_empresa"],
     [["grupo"], "grupo_empresa"],
+    [["porcentaje", "liquidaciones"], "porcentaje_liquidaciones"],
     [["confirmacion", "cc"], "confirmacion_cc"],
     [["confirmacion", "poder"], "confirmacion_poder"],
     [["fecha", "pago", "afp"], "fecha_pago_afp"],
@@ -308,6 +314,34 @@ function normalizeByField(field: keyof NormalizedImportRow, value: unknown) {
   return stringValue(value);
 }
 
+const STRICT_IMPORT_OPTIONS: Partial<Record<keyof NormalizedImportRow, string[]>> = {
+  estado_contrato_cliente: ["Activo", "Estudio inicial", "Inactivo", "Por vencer"],
+  motivo_tipo_exceso: ["Licencias Médicas (LM)", "Seguro de invalidez y sobrevivencia (SIS)", "Trabajo Pesado (TP)"],
+  entidad: ["AFP CAPITAL", "AFP CUPRUM", "AFP HABITAT", "AFP MODELO", "AFP PLANVITAL", "AFP PROVIDA", "AFP UNO", "Pendiente de asignación"],
+  envio_afp: ["PRIMERO", "SEGUNDO", "TERCERO"],
+  estado_gestion: ["Anulada", "Gestionado", "Pagado", "Pendiente gestión", "Rechazada AFP CAPITAL", "Rechazada AFP MODELO", "Rechazo bancario"],
+  acceso_portal: ["No", "Si", "No aplica"],
+  porcentaje_liquidaciones: ["Si", "No", "No aplica"],
+  facturado_finanfix: ["Facturado", "Pagado", "Pendiente"],
+  facturado_cliente: ["Facturado", "Pendiente"],
+  consulta_cen: ["No", "Si"],
+  contenido_cen: ["Si", "No"],
+  respuesta_cen: ["Si", "No"],
+};
+
+function validateStrictOptions(row: NormalizedImportRow, messages: string[]) {
+  for (const [field, options] of Object.entries(STRICT_IMPORT_OPTIONS) as Array<[keyof NormalizedImportRow, string[]]>) {
+    const value = row[field];
+    if (value === null || value === undefined || value === "") continue;
+    const normalizedValue = normHeader(value);
+    const valid = options.some((option) => normHeader(option) === normalizedValue);
+    if (!valid) {
+      const label = FIELD_BY_INTERNAL.get(field)?.label || String(field);
+      messages.push(`${label} inválido: "${String(value)}". Opciones permitidas: ${options.join(", ")}`);
+    }
+  }
+}
+
 function validate(row: NormalizedImportRow) {
   const messages: string[] = [];
   if (!row.mandante) messages.push("Falta Mandante");
@@ -317,6 +351,7 @@ function validate(row: NormalizedImportRow) {
   if (row.monto_devolucion === null) messages.push("Monto Devolución vacío o inválido");
   if (row.rut && !/^\d{6,9}-[0-9K]$/i.test(row.rut)) messages.push("RUT normalizado con formato no estándar");
   if (row.rut && /^\d{6,9}-[0-9K]$/i.test(row.rut) && !validateRutDv(row.rut)) messages.push("RUT con dígito verificador inválido");
+  validateStrictOptions(row, messages);
   row.validation_messages = messages;
   row.validation_status = messages.some((m) => m.includes("Falta RUT") || m.includes("Falta Mandante") || m.includes("Falta Razón"))
     ? "ERROR"
@@ -359,6 +394,7 @@ function emptyRow(rowNumber: number): NormalizedImportRow {
     confirmacion_cc: false,
     confirmacion_poder: false,
     acceso_portal: null,
+    porcentaje_liquidaciones: null,
     facturado_finanfix: null,
     facturado_cliente: null,
     fecha_factura_finanfix: null,
@@ -649,6 +685,7 @@ function buildManagementData(row: NormalizedImportRow, context: Awaited<ReturnTy
     confirmacion_cc: row.confirmacion_cc,
     confirmacion_poder: row.confirmacion_poder,
     acceso_portal: row.acceso_portal,
+    porcentaje_liquidaciones: row.porcentaje_liquidaciones,
     facturado_finanfix: row.facturado_finanfix,
     facturado_cliente: row.facturado_cliente,
     fecha_factura_finanfix: dateOrNull(row.fecha_factura_finanfix),
@@ -722,6 +759,7 @@ function buildLegacyData(row: NormalizedImportRow, context: Awaited<ReturnType<t
     comment: row.comment || "Creado por carga masiva inteligente",
     mandante: context.mandante.name,
     portal_access: row.acceso_portal,
+    porcentaje_liquidaciones: row.porcentaje_liquidaciones,
     direccion: row.direccion,
     confirmation_cc: row.confirmacion_cc,
     confirmation_power: row.confirmacion_poder,

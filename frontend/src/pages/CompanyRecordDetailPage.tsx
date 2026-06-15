@@ -51,6 +51,7 @@ type RecordDetail = {
   respuesta_cen?: string | null;
   numero_solicitud?: string | null;
   acceso_portal?: string | null;
+  porcentaje_liquidaciones?: string | null;
   fecha_ingreso_afp?: string | null;
   estado_trabajador?: string | null;
   monto_devolucion?: number | null;
@@ -268,8 +269,8 @@ export default function CompanyRecordDetailPage() {
         </Card>
 
         <Card title="MONTOS RECUPERACIÓN">
-          <Info label="Monto Devolución" text={money(data.monto_devolucion)} />
-          <Info label="Monto cliente" text={money(data.monto_cliente)} />
+          <Info label="Monto estimado" text={money(data.monto_devolucion)} />
+          <Info label="Monto estimado cliente" text={money(data.monto_cliente)} />
           <Info label="Monto Finanfix" text={money(data.monto_finanfix_solutions)} />
           <Info label="Monto Real Pagado" text={money(data.monto_pagado)} />
           <Info label="Monto real cliente" text={money(data.monto_real_cliente)} />
@@ -279,6 +280,7 @@ export default function CompanyRecordDetailPage() {
 
         <Card title="DATOS FACTURACIÓN">
           <Info label="Facturado Finanfix" text={data.facturado_finanfix} />
+          <Info label="Porcentaje de liquidaciones" text={data.porcentaje_liquidaciones} />
           <Info label="Facturado cliente" text={data.facturado_cliente} />
           <Info label="Fecha Pago AFP" text={date(data.fecha_pago_afp)} />
           <Info label="Fecha Factura Finanfix" text={date(data.fecha_factura_finanfix)} />

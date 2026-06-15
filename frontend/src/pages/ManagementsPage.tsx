@@ -34,6 +34,7 @@ type Management = {
   mes_produccion_2026?: string | null;
   grupo_empresa?: string | null;
   acceso_portal?: string | null;
+  porcentaje_liquidaciones?: string | null;
 
   banco?: string | null;
   tipo_cuenta?: string | null;
@@ -92,6 +93,7 @@ const emptyForm = {
   mes_produccion_2026: "",
   grupo_empresa: "",
   acceso_portal: "",
+  porcentaje_liquidaciones: "",
 
   banco: "",
   tipo_cuenta: "",
@@ -317,6 +319,7 @@ export default function ManagementsPage() {
         mes_produccion_2026: form.mes_produccion_2026,
         grupo_empresa: form.grupo_empresa,
         acceso_portal: form.acceso_portal,
+        porcentaje_liquidaciones: form.porcentaje_liquidaciones,
 
         banco: form.banco,
         tipo_cuenta: form.tipo_cuenta,
@@ -368,6 +371,7 @@ export default function ManagementsPage() {
     },
     { field: "mes_produccion_2026", label: "Mes de producción", type: "text" },
     { field: "acceso_portal", label: "Acceso portal", type: "text" },
+    { field: "porcentaje_liquidaciones", label: "Porcentaje de liquidaciones", type: "text" },
     { field: "mandante.name", label: "Mandante", type: "text" },
     { field: "envio_afp", label: "Envío AFP", type: "text" },
     {
@@ -435,6 +439,7 @@ export default function ManagementsPage() {
           row.mes_produccion_2026,
           row.grupo_empresa,
           row.acceso_portal,
+          row.porcentaje_liquidaciones,
           row.banco,
           row.tipo_cuenta,
           row.numero_cuenta,

@@ -237,6 +237,7 @@ function buildBulkForm(record: RecordItem) {
     respuesta_cen: String(record.respuesta_cen || ""),
     numero_solicitud: String(record.numero_solicitud || ""),
     entidad: String(record.entidad || record.lineAfp?.afp_name || ""),
+    porcentaje_liquidaciones: String(record.porcentaje_liquidaciones || ""),
     acceso_portal: String(record.acceso_portal || ""),
     fecha_ingreso_afp: toDateInput(record.fecha_ingreso_afp),
     estado_trabajador: String(record.estado_trabajador || ""),
@@ -712,7 +713,7 @@ export default function RecordDetailPage() {
         <DetailSection title="INFORMACIÓN DE GESTIÓN">
           <EditableInfo label="Mes de producción 2026" value={record.mes_produccion_2026} field="mes_produccion_2026" type="select" options={MONTH_OPTIONS} onEdit={openEdit} />
           <EditableInfo label="Motivo (Tipo de exceso)" value={record.motivo_tipo_exceso} field="motivo_tipo_exceso" onEdit={openEdit} />
-          <EditableInfo label="Confirmación Poder" value={boolString(record.confirmacion_poder)} displayValue={valueOrDash(record.confirmacion_poder)} field="confirmacion_poder" type="select" options={[{label:"Sí", value:"true"}, {label:"No", value:"false"}]} onEdit={openEdit} />
+          <EditableInfo label="Confirmación Poder Notarial" value={boolString(record.confirmacion_poder)} displayValue={valueOrDash(record.confirmacion_poder)} field="confirmacion_poder" type="select" options={[{label:"Sí", value:"true"}, {label:"No", value:"false"}]} onEdit={openEdit} />
           <EditableInfo label="Estado Gestión" value={record.estado_gestion} field="estado_gestion" type="select" options={["Pendiente Gestión","En preparación","Enviada AFP","Respondida AFP","Pagada","Facturada","Cerrada","Rechazada"].map(x => ({label:x,value:x}))} onEdit={openEdit} />
           <EditableInfo label="Consulta CEN" value={record.consulta_cen} field="consulta_cen" onEdit={openEdit} />
           <EditableInfo label="Mes de ingreso solicitud" value={record.mes_ingreso_solicitud || record.mes_produccion_2026} field="mes_ingreso_solicitud" type="select" options={MONTH_OPTIONS} onEdit={openEdit} />
@@ -732,8 +733,8 @@ export default function RecordDetailPage() {
         </DetailSection>
 
         <DetailSection title="MONTOS RECUPERACIÓN">
-          <EditableInfo label="Monto Devolución" value={String(record.monto_devolucion ?? "")} displayValue={formatMoney(record.monto_devolucion)} field="monto_devolucion" type="number" onEdit={openEdit} />
-          <EditableInfo label="Monto cliente" value={String(record.monto_cliente ?? "")} displayValue={formatMoney(record.monto_cliente)} field="monto_cliente" type="number" onEdit={openEdit} />
+          <EditableInfo label="Monto estimado" value={String(record.monto_devolucion ?? "")} displayValue={formatMoney(record.monto_devolucion)} field="monto_devolucion" type="number" onEdit={openEdit} />
+          <EditableInfo label="Monto estimado cliente" value={String(record.monto_cliente ?? "")} displayValue={formatMoney(record.monto_cliente)} field="monto_cliente" type="number" onEdit={openEdit} />
           <EditableInfo label="Monto Finanfix" value={String(record.monto_finanfix_solutions ?? "")} displayValue={formatMoney(record.monto_finanfix_solutions)} field="monto_finanfix_solutions" type="number" onEdit={openEdit} />
           <EditableInfo label="Monto Real Pagado" value={String(record.monto_pagado ?? "")} displayValue={formatMoney(record.monto_pagado)} field="monto_pagado" type="number" onEdit={openEdit} />
           <EditableInfo label="Monto real cliente" value={String(record.monto_real_cliente ?? "")} displayValue={formatMoney(record.monto_real_cliente)} field="monto_real_cliente" type="number" onEdit={openEdit} />
@@ -743,6 +744,7 @@ export default function RecordDetailPage() {
 
         <DetailSection title="DATOS FACTURACIÓN">
           <EditableInfo label="Facturado Finanfix" value={record.facturado_finanfix} field="facturado_finanfix" type="select" options={["Sí","No","Pendiente"].map(x => ({label:x,value:x}))} onEdit={openEdit} />
+          <EditableInfo label="Porcentaje de liquidaciones" value={record.porcentaje_liquidaciones} field="porcentaje_liquidaciones" type="select" options={["Si","No","No aplica"].map(x => ({label:x,value:x}))} onEdit={openEdit} />
           <EditableInfo label="Facturado cliente" value={record.facturado_cliente} field="facturado_cliente" type="select" options={["Sí","No","Pendiente"].map(x => ({label:x,value:x}))} onEdit={openEdit} />
           <EditableInfo label="Fecha Pago AFP" value={toDateInput(record.fecha_pago_afp)} displayValue={formatDate(record.fecha_pago_afp)} field="fecha_pago_afp" type="date" onEdit={openEdit} />
           <EditableInfo label="Fecha Factura Finanfix" value={toDateInput(record.fecha_factura_finanfix)} displayValue={formatDate(record.fecha_factura_finanfix)} field="fecha_factura_finanfix" type="date" onEdit={openEdit} />

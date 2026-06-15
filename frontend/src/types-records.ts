@@ -48,6 +48,7 @@ export type RecordItem = {
   mes_produccion_2026?: string | null;
   grupo_empresa?: string | null;
   acceso_portal?: string | null;
+  porcentaje_liquidaciones?: string | null;
   banco?: string | null;
   tipo_cuenta?: string | null;
   numero_cuenta?: string | null;
