@@ -212,6 +212,49 @@ function normalizeMandanteName(value: unknown) {
   return text.replace(/\s+/g, " ").trim();
 }
 
+function canonicalMandanteKey(value: unknown) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\b(s\.?p\.?a\.?|spa|s\.?a\.?|sa|ltda|limitada|sociedad anonima|sociedad por acciones)\b/gi, "")
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+async function resolveMandanteByName(rawName: string) {
+  const cleanName = normalizeMandanteName(rawName) || "Sin mandante";
+  const cacheKey = canonicalMandanteKey(cleanName) || cleanName.toLowerCase();
+  const cached = mandanteCache.get(cacheKey) || mandanteCache.get(cleanName);
+  if (cached) return cached;
+
+  const exact = await prisma.mandante.findFirst({
+    where: { name: { equals: cleanName, mode: "insensitive" as any } },
+  }).catch(() => null);
+  if (exact) {
+    mandanteCache.set(cacheKey, exact);
+    mandanteCache.set(exact.name, exact);
+    return exact;
+  }
+
+  const allMandantes = await prisma.mandante.findMany({ select: { id: true, name: true } }).catch(() => [] as any[]);
+  const matched = allMandantes.find((item: any) => {
+    const itemKey = canonicalMandanteKey(item.name);
+    return itemKey === cacheKey || itemKey.includes(cacheKey) || cacheKey.includes(itemKey);
+  });
+  if (matched) {
+    mandanteCache.set(cacheKey, matched);
+    mandanteCache.set(matched.name, matched);
+    return matched;
+  }
+
+  const created = await prisma.mandante.create({ data: { name: cleanName } });
+  mandanteCache.set(cacheKey, created);
+  mandanteCache.set(cleanName, created);
+  return created;
+}
+
 function numberValue(value: unknown) {
   if (value === undefined || value === null || value === "") return null;
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -576,11 +619,8 @@ const afpCache = new Map<string, any>();
 
 async function ensureContext(row: NormalizedImportRow) {
   const mandanteName = row.mandante || "Sin mandante";
-  let mandante = mandanteCache.get(mandanteName);
-  if (!mandante) {
-    mandante = await prisma.mandante.upsert({ where: { name: mandanteName }, update: {}, create: { name: mandanteName } });
-    mandanteCache.set(mandanteName, mandante);
-  }
+  const mandante = await resolveMandanteByName(mandanteName);
+  row.mandante = mandante.name;
 
   const groupName = row.grupo_empresa || "Grupo general";
   const groupKey = `${mandante.id}|${row.management_type}|${groupName}`;

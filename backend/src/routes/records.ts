@@ -1085,7 +1085,7 @@ recordsRouter.get("/", async (req, res) => {
         ? req.query.search.trim().toLowerCase()
         : "";
 
-    const [lmRows, tpRows] = await Promise.all([
+    const [lmRows, tpRows, mandanteRows] = await Promise.all([
       prisma.$queryRawUnsafe<any[]>(`
         SELECT *
         FROM lm_records
@@ -1099,13 +1099,25 @@ recordsRouter.get("/", async (req, res) => {
         ORDER BY created_at DESC NULLS LAST
         LIMIT 5000
       `),
+
+      prisma.$queryRawUnsafe<any[]>(`
+        SELECT id, name
+        FROM mandantes
+      `).catch(() => [] as any[]),
     ]);
+
+    const mandanteById = new Map((mandanteRows || []).map((item: any) => [String(item.id), item.name]));
+    const resolveRowMandante = (row: any) => {
+      const id = row.mandante_id || null;
+      const name = (id ? mandanteById.get(String(id)) : null) || row.mandante || row.mandante_name || row.client_name || null;
+      return name ? { id, name } : null;
+    };
 
     let rows = [
       ...lmRows.map((row: any) => ({
         id: row.management_id || row.id,
         management_type: "LM",
-        mandante: row.mandante ? { name: row.mandante } : null,
+        mandante: resolveRowMandante(row),
         mandante_id: row.mandante_id || null,
         entidad: row.entity,
         rut: row.rut,
@@ -1164,7 +1176,7 @@ recordsRouter.get("/", async (req, res) => {
       ...tpRows.map((row: any) => ({
         id: row.management_id || row.id,
         management_type: "TP",
-        mandante: row.mandante ? { name: row.mandante } : null,
+        mandante: resolveRowMandante(row),
         mandante_id: row.mandante_id || null,
         entidad: row.entity,
         rut: row.rut,

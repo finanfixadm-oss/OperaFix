@@ -177,7 +177,11 @@ function normalizeMandanteText(value?: string | null) {
     .trim()
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\b(s\.?p\.?a\.?|spa|s\.?a\.?|sa|ltda|limitada|sociedad anonima|sociedad por acciones)\b/gi, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function rowMatchesMandante(row: RecordItem, mandante: MandanteOption) {
@@ -187,8 +191,11 @@ function rowMatchesMandante(row: RecordItem, mandante: MandanteOption) {
   if (possibleIds.includes(String(mandante.id))) return true;
 
   const targetName = normalizeMandanteText(mandante.name);
-  const possibleNames = [rowMandante.name, rowAny.mandante_name, rowAny.mandante].map((value) => normalizeMandanteText(value));
-  return possibleNames.includes(targetName);
+  const possibleNames = [rowMandante.name, rowAny.mandante_name, rowAny.mandante, rowAny.client_name, rowAny.mandanteNombre]
+    .map((value) => normalizeMandanteText(value))
+    .filter(Boolean);
+
+  return possibleNames.some((name) => name === targetName || name.includes(targetName) || targetName.includes(name));
 }
 
 type SortDirection = "asc" | "desc";
