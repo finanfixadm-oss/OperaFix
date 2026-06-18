@@ -37,7 +37,7 @@ export default function Layout({ children }: PropsWithChildren) {
     <div className="crm-shell">
       <header className="crm-topbar">
         <div className="crm-topbar-left">
-          <button className="crm-brand crm-brand-pro" type="button" onClick={() => navigate(defaultPathForUser(user))}><img src="/operafix-icon-white.png" alt="OperaFix" /><span>OperaFix</span></button>
+          <button className="crm-brand crm-brand-pro" type="button" onClick={() => navigate(defaultPathForUser(user))}><img src="/finanfix-logo.png" alt="Finanfix" /><span>Finanfix CRM</span></button>
           <nav className="crm-main-nav">
             {visibleItems.map((item) => <NavLink key={item.to} to={item.to}>{item.label}</NavLink>)}
           </nav>
@@ -62,7 +62,7 @@ export default function Layout({ children }: PropsWithChildren) {
 
       <div className="crm-body">
         <aside className="crm-sidebar">
-          <div className="crm-sidebar-logo"><img src="/operafix-icon-color.png" alt="OperaFix" /><div><strong>OperaFix CRM</strong><span>Gestión comercial</span></div></div>
+          <div className="crm-sidebar-logo"><img src="/finanfix-logo.png" alt="Finanfix" /><div><strong>Finanfix CRM</strong><span>OperaFix Suite</span></div></div>
           <div className="crm-sidebar-search">
             <input className="zoho-input" placeholder="Buscar módulo" />
           </div>
