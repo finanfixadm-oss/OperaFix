@@ -472,6 +472,7 @@ export default function KamAssignmentPage() {
   const [draftContacts, setDraftContacts] = useState<any[]>([]);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [activityForm, setActivityForm] = useState<any>(emptyActivity);
+  const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
   const [companyForm, setCompanyForm] = useState<any>(emptyCompany);
   const [profileForm, setProfileForm] = useState<any>(emptyProfile);
   const [ruleForm, setRuleForm] = useState<any>(emptyRule);
@@ -990,6 +991,7 @@ export default function KamAssignmentPage() {
     });
     setManualKamId(row.kam_asignado_id || "");
     setRecommendations([]);
+    setEditingActivityId(null);
     setActivityForm({
       ...emptyActivity,
       estado_venta: row.estado || "Contactada",
@@ -1021,6 +1023,8 @@ export default function KamAssignmentPage() {
     setEditingContactId(null);
     setRecommendations([]);
     setManualKamId("");
+    setEditingActivityId(null);
+    setActivityForm(emptyActivity);
     setCompanyModalOpen(true);
   }
 
@@ -1051,6 +1055,7 @@ export default function KamAssignmentPage() {
       ).catch(() => [] as KamActivity[]);
       setActivities(rows);
     }
+    setEditingActivityId(null);
     setActivityForm({
       ...emptyActivity,
       estado_venta: target.estado || "Contactada",
@@ -1192,11 +1197,16 @@ export default function KamAssignmentPage() {
       return;
     }
     try {
-      await postJson(`/kam/companies/${selected.id}/activities`, {
+      const payload = {
         ...activityForm,
         proxima_gestion: normalizeDateForApi(activityForm.proxima_gestion),
         motivo_perdida: companyForm.motivo_perdida,
-      });
+      };
+      if (editingActivityId) {
+        await putJson(`/kam/companies/${selected.id}/activities/${editingActivityId}`, payload);
+      } else {
+        await postJson(`/kam/companies/${selected.id}/activities`, payload);
+      }
       const rows = await fetchJson<KamActivity[]>(
         `/kam/companies/${selected.id}/activities`,
       ).catch(() => [] as KamActivity[]);
@@ -1220,11 +1230,46 @@ export default function KamAssignmentPage() {
       }));
       setCompanies((prev) => prev.map((item) => item.id === updatedCompany.id ? { ...item, ...updatedCompany } : item));
       setActivityForm(emptyActivity);
+      setEditingActivityId(null);
       setActivityModalOpen(false);
       await loadAll();
-      notifySuccess("Gestión registrada correctamente en la bitácora comercial.");
+      notifySuccess(editingActivityId ? "Gestión modificada correctamente." : "Gestión registrada correctamente en la bitácora comercial.");
     } catch (error: any) {
       notifyError(error?.message || "No se pudo registrar la gestión.");
+    }
+  }
+
+  function editActivity(activity: KamActivity) {
+    setEditingActivityId(activity.id);
+    setActivityForm({
+      ...emptyActivity,
+      tipo_gestion: activity.tipo_gestion || emptyActivity.tipo_gestion,
+      estado_venta: activity.estado_venta || selected?.estado || emptyActivity.estado_venta,
+      resultado: activity.resultado || "",
+      proxima_accion: activity.proxima_accion || "",
+      proxima_gestion: activity.proxima_gestion ? String(activity.proxima_gestion).slice(0, 10) : "",
+      probabilidad_cierre: activity.probabilidad_cierre ?? "",
+      observacion: activity.observacion || "",
+    });
+    setActivityModalOpen(true);
+  }
+
+  async function deleteActivity(activity: KamActivity) {
+    if (!selected) return;
+    const ok = window.confirm("¿Eliminar esta gestión de la bitácora? Esta acción no se puede deshacer.");
+    if (!ok) return;
+    try {
+      await deleteJson(`/kam/companies/${selected.id}/activities/${activity.id}`);
+      const rows = await fetchJson<KamActivity[]>(`/kam/companies/${selected.id}/activities`).catch(() => [] as KamActivity[]);
+      setActivities(rows);
+      if (editingActivityId === activity.id) {
+        setEditingActivityId(null);
+        setActivityForm(emptyActivity);
+      }
+      await loadAll();
+      notifySuccess("Gestión eliminada correctamente de la bitácora.");
+    } catch (error: any) {
+      notifyError(error?.message || "No se pudo eliminar la gestión.");
     }
   }
 
@@ -3096,7 +3141,7 @@ export default function KamAssignmentPage() {
                           type="button"
                           onClick={saveActivity}
                         >
-                          Registrar gestión
+                          {editingActivityId ? "Guardar cambios" : "Registrar gestión"}
                         </button>
                       </div>
                     </div>
@@ -3113,6 +3158,7 @@ export default function KamAssignmentPage() {
                             <th>Próxima gestión</th>
                             <th>Prob.</th>
                             <th>Observación</th>
+                            <th>Acciones</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -3135,11 +3181,21 @@ export default function KamAssignmentPage() {
                               </td>
                               <td>{a.probabilidad_cierre ?? "—"}</td>
                               <td>{a.observacion || "—"}</td>
+                              <td>
+                                <div className="kam-inline-actions">
+                                  <button className="zoho-small-btn" type="button" onClick={() => editActivity(a)}>
+                                    Editar
+                                  </button>
+                                  <button className="zoho-small-btn danger" type="button" onClick={() => deleteActivity(a)}>
+                                    Eliminar
+                                  </button>
+                                </div>
+                              </td>
                             </tr>
                           ))}
                           {!activities.length && (
                             <tr>
-                              <td colSpan={9}>
+                              <td colSpan={10}>
                                 Sin gestiones registradas para esta empresa.
                               </td>
                             </tr>
@@ -4833,13 +4889,13 @@ export default function KamAssignmentPage() {
             <div className="kam-modal-header">
               <div>
                 <span className="kam-pro-eyebrow">Bitácora comercial</span>
-                <h2>Registrar gestión</h2>
+                <h2>{editingActivityId ? "Modificar gestión" : "Registrar gestión"}</h2>
                 <p>{selected.razon_social}</p>
               </div>
               <button
                 className="kam-modal-close"
                 type="button"
-                onClick={() => setActivityModalOpen(false)}
+                onClick={() => { setActivityModalOpen(false); setEditingActivityId(null); setActivityForm(emptyActivity); }}
               >
                 ×
               </button>
@@ -4963,6 +5019,10 @@ export default function KamAssignmentPage() {
                     <small>
                       {a.resultado || a.observacion || "Sin detalle"}
                     </small>
+                    <div className="kam-inline-actions">
+                      <button className="zoho-small-btn" type="button" onClick={() => editActivity(a)}>Editar</button>
+                      <button className="zoho-small-btn danger" type="button" onClick={() => deleteActivity(a)}>Eliminar</button>
+                    </div>
                   </div>
                 ))}
                 {!activities.length && (
@@ -4976,7 +5036,7 @@ export default function KamAssignmentPage() {
               <button
                 className="zoho-btn"
                 type="button"
-                onClick={() => setActivityModalOpen(false)}
+                onClick={() => { setActivityModalOpen(false); setEditingActivityId(null); setActivityForm(emptyActivity); }}
               >
                 Cancelar
               </button>
@@ -4985,7 +5045,7 @@ export default function KamAssignmentPage() {
                 type="button"
                 onClick={saveActivity}
               >
-                Guardar en bitácora
+                {editingActivityId ? "Guardar cambios" : "Guardar en bitácora"}
               </button>
             </div>
           </div>

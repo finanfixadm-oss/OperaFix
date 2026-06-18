@@ -1365,6 +1365,101 @@ kamRouter.post("/companies/:id/activities", async (req, res) => {
   }
 });
 
+kamRouter.put("/companies/:id/activities/:activityId", async (req, res) => {
+  const session = requireKamAccess(req, res);
+  if (!session) return;
+
+  try {
+    const company = await fetchCompany(req.params.id);
+    if (!company) return res.status(404).json({ message: "Empresa KAM no encontrada." });
+    if (isKam(session) && company.kam_asignado_id !== sessionUserId(session)) {
+      return res.status(403).json({ message: "Solo puedes modificar gestiones de tu cartera." });
+    }
+
+    const existing = await prisma.$queryRawUnsafe<any[]>(`
+      select * from operafix_kam_activities
+      where id = $1 and company_id = $2
+      limit 1
+    `, req.params.activityId, req.params.id);
+    if (!existing.length) return res.status(404).json({ message: "Gestión de bitácora no encontrada." });
+
+    const tipo = strOrNull(req.body.tipo_gestion) || existing[0].tipo_gestion || 'Seguimiento';
+    const estadoVenta = strOrNull(req.body.estado_venta) || existing[0].estado_venta || company.estado || 'Asignada';
+    const motivoPerdida = strOrNull(req.body.motivo_perdida);
+    if (estadoVenta === 'Perdida' && !motivoPerdida && !strOrNull(req.body.observacion)) {
+      return res.status(400).json({ message: 'Para registrar una pérdida debes indicar motivo u observación.' });
+    }
+
+    const proxima = normalizeDateOrNull(req.body.proxima_gestion);
+    const prob = integerOrNull(req.body.probabilidad_cierre);
+    const resultado = strOrNull(req.body.resultado);
+    const observacion = strOrNull(req.body.observacion);
+    const proximaAccion = strOrNull(req.body.proxima_accion);
+
+    const rows = await prisma.$queryRawUnsafe<any[]>(`
+      update operafix_kam_activities set
+        tipo_gestion = $3,
+        resultado = $4,
+        proxima_accion = $5,
+        proxima_gestion = $6::date,
+        estado_venta = $7,
+        probabilidad_cierre = $8,
+        observacion = $9
+      where id = $1 and company_id = $2
+      returning *
+    `, req.params.activityId, req.params.id, tipo, resultado, proximaAccion, proxima, estadoVenta, prob, observacion);
+
+    await prisma.$executeRawUnsafe(`
+      update operafix_kam_companies set
+        estado=$2,
+        resultado_gestion=coalesce($3, resultado_gestion),
+        proxima_gestion=coalesce($4::date, proxima_gestion),
+        probabilidad_cierre=coalesce($5, probabilidad_cierre),
+        motivo_perdida=coalesce($6, motivo_perdida),
+        observacion=coalesce($7, observacion),
+        fecha_ultimo_contacto=now(),
+        updated_at=now()
+      where id=$1
+    `, req.params.id, estadoVenta, resultado, proxima, prob, motivoPerdida, observacion).catch((error: any) => console.error('[KAM] No se pudo actualizar empresa desde edición de actividad:', error));
+
+    res.json(rows[0]);
+  } catch (error: any) {
+    console.error('[KAM] Error editando actividad en bitácora:', error);
+    res.status(500).json({
+      message: 'No se pudo modificar la gestión de la bitácora KAM.',
+      detail: process.env.NODE_ENV === 'production' ? undefined : String(error?.message || error),
+    });
+  }
+});
+
+kamRouter.delete("/companies/:id/activities/:activityId", async (req, res) => {
+  const session = requireKamAccess(req, res);
+  if (!session) return;
+
+  try {
+    const company = await fetchCompany(req.params.id);
+    if (!company) return res.status(404).json({ message: "Empresa KAM no encontrada." });
+    if (isKam(session) && company.kam_asignado_id !== sessionUserId(session)) {
+      return res.status(403).json({ message: "Solo puedes eliminar gestiones de tu cartera." });
+    }
+
+    const rows = await prisma.$queryRawUnsafe<any[]>(`
+      delete from operafix_kam_activities
+      where id = $1 and company_id = $2
+      returning id
+    `, req.params.activityId, req.params.id);
+    if (!rows.length) return res.status(404).json({ message: "Gestión de bitácora no encontrada." });
+
+    res.status(204).send();
+  } catch (error: any) {
+    console.error('[KAM] Error eliminando actividad en bitácora:', error);
+    res.status(500).json({
+      message: 'No se pudo eliminar la gestión de la bitácora KAM.',
+      detail: process.env.NODE_ENV === 'production' ? undefined : String(error?.message || error),
+    });
+  }
+});
+
 kamRouter.get("/history/:companyId", async (req, res) => {
   const session = requireKamAccess(req, res);
   if (!session) return;
