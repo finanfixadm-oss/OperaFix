@@ -1236,29 +1236,65 @@ kamRouter.post("/companies/:id/assign", async (req, res) => {
   const session = requireKamAccess(req, res);
   if (!session) return;
   if (isKam(session)) return res.status(403).json({ message: "El KAM vendedor no puede reasignar empresas." });
-  const company = await fetchCompany(req.params.id);
-  if (!company) return res.status(404).json({ message: "Empresa KAM no encontrada." });
-  const kamId = String(req.body.kam_asignado_id || req.body.kam_id || "").trim();
-  if (!kamId) return res.status(400).json({ message: "Debes seleccionar el KAM asignado." });
-  const targetRows = await prisma.$queryRawUnsafe<any[]>(`select id, role, active from operafix_users where id=$1 limit 1`, kamId).catch(() => [] as any[]);
-  if (!targetRows[0] || String(targetRows[0].role || "").toLowerCase() !== "kam" || targetRows[0].active === false) {
-    return res.status(400).json({ message: "Solo puedes asignar empresas a usuarios con rol KAM activo." });
+
+  try {
+    const company = await fetchCompany(req.params.id);
+    if (!company) return res.status(404).json({ message: "Empresa KAM no encontrada." });
+
+    const rawKamId = req.body.kam_asignado_id ?? req.body.kam_id ?? null;
+    const kamId = rawKamId === null || rawKamId === undefined ? "" : String(rawKamId).trim();
+    const shouldUnassign = !kamId || req.body.desasignar === true || req.body.unassign === true;
+    const scoreMatch = integerOrNull(req.body.score_match) || null;
+    const adminId = isKamAdmin(session) ? sessionUserId(session) : strOrNull(req.body.kam_admin_id) || sessionUserId(session);
+
+    if (shouldUnassign) {
+      const rows = await prisma.$queryRawUnsafe<any[]>(`
+        update operafix_kam_companies
+        set kam_asignado_id=null,
+            kam_admin_id=$2,
+            estado='Sin asignar',
+            fecha_asignacion=null,
+            updated_at=now()
+        where id=$1
+        returning *
+      `, req.params.id, adminId);
+
+      const updated = rows[0];
+      if (!updated) return res.status(404).json({ message: "Empresa KAM no encontrada." });
+
+      await prisma.$executeRawUnsafe(`
+        insert into operafix_kam_assignment_history (id, empresa_id, kam_anterior_id, kam_nuevo_id, kam_admin_id, motivo_asignacion, score_match, observacion)
+        values ($1,$2,$3,$4,$5,$6,$7,$8)
+      `, id("kah"), req.params.id, company.kam_asignado_id || null, null, adminId, strOrNull(req.body.motivo_asignacion) || "Desasignación manual desde módulo KAM", scoreMatch, strOrNull(req.body.observacion));
+
+      return res.json({ ...updated, kam_asignado_nombre: null, kam_admin_nombre: null });
+    }
+
+    const targetRows = await prisma.$queryRawUnsafe<any[]>(`select id, role, active from operafix_users where id=$1 limit 1`, kamId).catch(() => [] as any[]);
+    if (!targetRows[0] || String(targetRows[0].role || "").toLowerCase() !== "kam" || targetRows[0].active === false) {
+      return res.status(400).json({ message: "Solo puedes asignar empresas a usuarios con rol KAM activo." });
+    }
+
+    const rows = await prisma.$queryRawUnsafe<any[]>(`
+      update operafix_kam_companies
+      set kam_asignado_id=$2, kam_admin_id=$3, estado='Asignada', fecha_asignacion=now(), updated_at=now()
+      where id=$1 returning *
+    `, req.params.id, kamId, adminId);
+
+    const updated = rows[0];
+    if (!updated) return res.status(404).json({ message: "Empresa KAM no encontrada." });
+
+    await prisma.$executeRawUnsafe(`
+      insert into operafix_kam_assignment_history (id, empresa_id, kam_anterior_id, kam_nuevo_id, kam_admin_id, motivo_asignacion, score_match, observacion)
+      values ($1,$2,$3,$4,$5,$6,$7,$8)
+    `, id("kah"), req.params.id, company.kam_asignado_id || null, kamId, adminId, strOrNull(req.body.motivo_asignacion) || "Asignación manual desde módulo KAM", scoreMatch, strOrNull(req.body.observacion));
+
+    const nameRows = await prisma.$queryRawUnsafe<any[]>(`select coalesce(full_name,email) as kam_asignado_nombre from operafix_users where id=$1 limit 1`, kamId).catch(() => [] as any[]);
+    res.json({ ...updated, kam_asignado_nombre: nameRows[0]?.kam_asignado_nombre || null });
+  } catch (error: any) {
+    console.error('[KAM] Error asignando/desasignando empresa:', error);
+    res.status(500).json({ message: 'No se pudo actualizar la asignación KAM.', detail: String(error?.message || error) });
   }
-  const scoreMatch = integerOrNull(req.body.score_match) || null;
-  const adminId = isKamAdmin(session) ? sessionUserId(session) : strOrNull(req.body.kam_admin_id) || sessionUserId(session);
-
-  const rows = await prisma.$queryRawUnsafe<any[]>(`
-    update operafix_kam_companies
-    set kam_asignado_id=$2, kam_admin_id=$3, estado='Asignada', fecha_asignacion=now(), updated_at=now()
-    where id=$1 returning *
-  `, req.params.id, kamId, adminId);
-
-  await prisma.$executeRawUnsafe(`
-    insert into operafix_kam_assignment_history (id, empresa_id, kam_anterior_id, kam_nuevo_id, kam_admin_id, motivo_asignacion, score_match, observacion)
-    values ($1,$2,$3,$4,$5,$6,$7,$8)
-  `, id("kah"), req.params.id, company.kam_asignado_id || null, kamId, adminId, strOrNull(req.body.motivo_asignacion) || "Asignación manual desde módulo KAM", scoreMatch, strOrNull(req.body.observacion));
-
-  res.json(rows[0]);
 });
 
 kamRouter.get("/rules", async (req, res) => {

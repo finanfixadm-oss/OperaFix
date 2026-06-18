@@ -1137,22 +1137,32 @@ export default function KamAssignmentPage() {
           });
 
       let assignedFromPopup = false;
-      if (manualKamId && (!wasEditing || manualKamId !== selected?.kam_asignado_id)) {
+      let unassignedFromPopup = false;
+      const selectedKamBeforeSave = selected?.kam_asignado_id || "";
+      const shouldSyncKamFromPopup = wasEditing
+        ? manualKamId !== selectedKamBeforeSave
+        : Boolean(manualKamId);
+      if (shouldSyncKamFromPopup) {
         try {
           const assigned = await postJson<KamCompany>(`/kam/companies/${saved.id}/assign`, {
-            kam_asignado_id: manualKamId,
-            motivo_asignacion: wasEditing
-              ? "Asignación manual desde popup de edición"
-              : "Asignación manual al crear empresa",
-            observacion: companyForm.observacion || "Asignación manual desde popup",
+            kam_asignado_id: manualKamId || null,
+            desasignar: !manualKamId,
+            motivo_asignacion: !manualKamId
+              ? "Desasignación manual desde popup de edición"
+              : wasEditing
+                ? "Asignación manual desde popup de edición"
+                : "Asignación manual al crear empresa",
+            observacion: companyForm.observacion || (!manualKamId ? "KAM desasignado desde popup" : "Asignación manual desde popup"),
           });
-          assignedFromPopup = true;
+          assignedFromPopup = Boolean(manualKamId);
+          unassignedFromPopup = !manualKamId;
           setCompanies((prev) => prev.map((item) => item.id === assigned.id ? { ...item, ...assigned } : item));
         } catch (assignError) {
           const rows = await fetchJson<KamCompany[]>("/kam/companies").catch(() => [] as KamCompany[]);
           const refreshed = rows.find((item) => item.id === saved.id);
-          if (refreshed && refreshed.kam_asignado_id === manualKamId) {
-            assignedFromPopup = true;
+          if (refreshed && ((manualKamId && refreshed.kam_asignado_id === manualKamId) || (!manualKamId && !refreshed.kam_asignado_id))) {
+            assignedFromPopup = Boolean(manualKamId);
+            unassignedFromPopup = !manualKamId;
             setCompanies(rows);
           } else {
             throw assignError;
@@ -1171,7 +1181,7 @@ export default function KamAssignmentPage() {
       await loadAll();
       notifySuccess(
         wasEditing
-          ? `Empresa actualizada correctamente${assignedFromPopup ? " y KAM asignado." : "."}`
+          ? `Empresa actualizada correctamente${assignedFromPopup ? " y KAM asignado." : unassignedFromPopup ? " y KAM desasignado." : "."}`
           : `Empresa creada correctamente${cleanDraftContacts.length ? ` con ${cleanDraftContacts.length} contacto(s)` : ""}${assignedFromPopup ? " y KAM asignado." : "."}`,
       );
     } catch (error: any) {
@@ -1446,35 +1456,43 @@ export default function KamAssignmentPage() {
       notifyError("Primero selecciona una empresa.");
       return;
     }
-    if (!manualKamId) {
-      notifyError("Debes seleccionar un KAM vendedor.");
+    const isUnassigning = !manualKamId;
+    if (isUnassigning && !selected.kam_asignado_id) {
+      notifyError("La empresa ya está sin asignar. Selecciona un KAM vendedor para asignarla.");
       return;
     }
     try {
       const assigned = await postJson<KamCompany>(`/kam/companies/${selected.id}/assign`, {
-        kam_asignado_id: manualKamId,
-        motivo_asignacion: "Asignación manual por KAM administrador",
-        observacion: companyForm.observacion || "Asignación manual",
+        kam_asignado_id: manualKamId || null,
+        desasignar: isUnassigning,
+        motivo_asignacion: isUnassigning ? "Desasignación manual por KAM administrador" : "Asignación manual por KAM administrador",
+        observacion: companyForm.observacion || (isUnassigning ? "KAM desasignado manualmente" : "Asignación manual"),
       });
-      const kamName = users.find((u) => u.id === manualKamId)?.full_name || users.find((u) => u.id === manualKamId)?.email || assigned.kam_asignado_nombre || "KAM asignado";
-      const updated = { ...selected, ...assigned, kam_asignado_id: manualKamId, kam_asignado_nombre: kamName, estado: assigned.estado || "Asignada" };
+      const kamName = isUnassigning
+        ? null
+        : users.find((u) => u.id === manualKamId)?.full_name || users.find((u) => u.id === manualKamId)?.email || assigned.kam_asignado_nombre || "KAM asignado";
+      const updated = isUnassigning
+        ? { ...selected, ...assigned, kam_asignado_id: null, kam_asignado_nombre: null, estado: assigned.estado || "Sin asignar" }
+        : { ...selected, ...assigned, kam_asignado_id: manualKamId, kam_asignado_nombre: kamName || undefined, estado: assigned.estado || "Asignada" };
       setSelected(updated);
       setCompanyForm((prev: any) => ({ ...prev, estado: updated.estado || prev.estado }));
       setCompanies((prev) => prev.map((item) => item.id === selected.id ? { ...item, ...updated } : item));
       setRecommendations([]);
       await loadAll();
-      notifySuccess("Asignación manual guardada correctamente.");
+      notifySuccess(isUnassigning ? "Empresa desasignada correctamente." : "Asignación manual guardada correctamente.");
     } catch (error: any) {
       try {
         const rows = await fetchJson<KamCompany[]>("/kam/companies");
         const refreshed = rows.find((item) => item.id === selected.id);
         const kamName = users.find((u) => u.id === manualKamId)?.full_name || users.find((u) => u.id === manualKamId)?.email || "KAM asignado";
-        if (refreshed && (refreshed.kam_asignado_id === manualKamId || refreshed.kam_asignado_nombre === kamName)) {
-          const updated = { ...selected, ...refreshed, kam_asignado_id: manualKamId, kam_asignado_nombre: refreshed.kam_asignado_nombre || kamName };
+        if (refreshed && ((isUnassigning && !refreshed.kam_asignado_id) || (!isUnassigning && (refreshed.kam_asignado_id === manualKamId || refreshed.kam_asignado_nombre === kamName)))) {
+          const updated = isUnassigning
+            ? { ...selected, ...refreshed, kam_asignado_id: null, kam_asignado_nombre: null }
+            : { ...selected, ...refreshed, kam_asignado_id: manualKamId, kam_asignado_nombre: refreshed.kam_asignado_nombre || kamName };
           setCompanies(rows);
           setSelected(updated);
           setCompanyForm((prev: any) => ({ ...prev, estado: updated.estado || prev.estado }));
-          notifySuccess("Empresa asignada correctamente. La tabla fue actualizada.");
+          notifySuccess(isUnassigning ? "Empresa desasignada correctamente. La tabla fue actualizada." : "Empresa asignada correctamente. La tabla fue actualizada.");
           return;
         }
       } catch {
@@ -2602,7 +2620,7 @@ export default function KamAssignmentPage() {
                           value={manualKamId}
                           onChange={(e) => setManualKamId(e.target.value)}
                         >
-                          <option value="">Seleccionar KAM</option>
+                          <option value="">Sin asignar / quitar asignación</option>
                           {users.map((u) => (
                             <option key={u.id} value={u.id}>
                               {u.full_name || u.email}
@@ -2614,7 +2632,7 @@ export default function KamAssignmentPage() {
                           type="button"
                           onClick={assignManual}
                         >
-                          Asignar
+                          {!manualKamId && selected?.kam_asignado_id ? "Desasignar" : "Asignar"}
                         </button>
                       </div>
                     </Field>
