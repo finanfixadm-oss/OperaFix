@@ -912,3 +912,119 @@ button[type="submit"] {
     width: min(330px, calc(100vw - 28px));
   }
 }
+
+/* V127 - Corrección topbar OperaFix y hero KAM */
+.crm-topbar {
+  min-height: 64px !important;
+  padding: 0 18px !important;
+}
+.crm-topbar-inner {
+  width: 100%;
+  max-width: 1680px;
+  margin: 0 auto;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.crm-topbar-left {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.crm-brand,
+.crm-brand-pro {
+  padding: 0 !important;
+  min-height: 42px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+.crm-brand img {
+  width: auto !important;
+  height: 28px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  object-fit: contain;
+}
+.crm-brand span {
+  display: none !important;
+}
+.crm-sidebar-logo strong {
+  font-size: 18px !important;
+}
+.crm-sidebar-logo span {
+  font-size: 13px !important;
+}
+
+.kam-visual-pro {
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 12px 28px !important;
+}
+.kam-visual-pro .kam-pro-hero {
+  max-width: 100% !important;
+  width: 100% !important;
+  margin: 0 auto 22px !important;
+  min-height: 128px !important;
+  padding: 26px 30px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: linear-gradient(90deg, #0900CC 0%, #1723D5 52%, #3368E8 100%) !important;
+}
+.kam-visual-pro .kam-pro-hero > div:first-child {
+  width: 100%;
+  max-width: 1460px;
+  margin: 0 auto;
+}
+.kam-visual-pro .kam-pro-hero h1,
+.kam-visual-pro .kam-pro-hero p,
+.kam-visual-pro .kam-pro-eyebrow,
+.kam-visual-pro .kam-pro-hero .eyebrow {
+  color: #ffffff !important;
+}
+.kam-visual-pro .kam-pro-hero h1 {
+  font-size: clamp(28px, 3vw, 42px) !important;
+  line-height: 1.05 !important;
+  margin: 6px 0 10px !important;
+  text-shadow: 0 1px 0 rgba(0,0,0,.08);
+}
+.kam-visual-pro .kam-pro-hero p {
+  max-width: 980px;
+  font-size: 16px;
+  line-height: 1.45;
+  opacity: .96;
+}
+.kam-visual-pro .kam-pro-eyebrow,
+.kam-visual-pro .kam-pro-hero .eyebrow {
+  opacity: .82;
+  font-size: 11px;
+  letter-spacing: .18em;
+}
+
+@media (max-width: 980px) {
+  .crm-topbar {
+    padding: 8px 14px !important;
+  }
+  .crm-topbar-inner {
+    min-height: auto;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .crm-user-box {
+    width: 100%;
+    margin-left: 0 !important;
+    justify-content: flex-start !important;
+  }
+  .kam-visual-pro {
+    padding: 0 6px 22px !important;
+  }
+  .kam-visual-pro .kam-pro-hero {
+    padding: 22px 18px !important;
+    border-radius: 22px !important;
+  }
+  .kam-visual-pro .kam-pro-hero h1 {
+    font-size: 28px !important;
+  }
+}
