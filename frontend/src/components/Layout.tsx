@@ -24,6 +24,20 @@ export default function Layout({ children }: PropsWithChildren) {
   const isLogin = location.pathname === "/login";
   const currentKamTab = new URLSearchParams(location.search).get("tab") || "tracking";
   const kamTabClass = (value: string) => location.pathname === "/kam-asignacion" && currentKamTab === value ? "active" : "";
+  const displayName = user?.full_name || user?.email || "Usuario";
+  const displayEmail = user?.email || "";
+  const roleLabel = user ? ROLE_LABELS[String(user.role)] || user.role : "";
+  const mandanteLabel = Array.isArray(user?.assigned_mandante_names) && user.assigned_mandante_names.length > 0
+    ? user.assigned_mandante_names.length === 1
+      ? user.assigned_mandante_names[0]
+      : `${user.assigned_mandante_names.length} mandantes asignados`
+    : user?.mandante_name || "Sin mandante asignado";
+  const userInitials = displayName
+    .split(/[\s@._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("") || "U";
 
   const logout = () => {
     localStorage.removeItem("token");
@@ -44,18 +58,38 @@ export default function Layout({ children }: PropsWithChildren) {
         </div>
         <div className="crm-user-box">
           {user ? (
-            <>
-              <span>{user.full_name || user.email}</span>
-              <span className="role-chip">{ROLE_LABELS[String(user.role)] || user.role}</span>
-              {Array.isArray(user.assigned_mandante_names) && user.assigned_mandante_names.length > 0 ? (
-                <span className="role-chip soft">{user.assigned_mandante_names.length === 1 ? user.assigned_mandante_names[0] : `${user.assigned_mandante_names.length} mandantes`}</span>
-              ) : user.mandante_name ? (
-                <span className="role-chip soft">{user.mandante_name}</span>
-              ) : null}
-              <button className="zoho-btn subtle" onClick={logout}>Salir</button>
-            </>
+            <details className="crm-user-menu">
+              <summary aria-label="Abrir menú de usuario">
+                <span className="crm-user-avatar">{userInitials}</span>
+                <span className="crm-user-summary-text">
+                  <strong>{displayName}</strong>
+                  <small>{roleLabel}</small>
+                </span>
+                <span className="crm-user-chevron">⌄</span>
+              </summary>
+              <div className="crm-user-dropdown">
+                <div className="crm-user-card-head">
+                  <span className="crm-user-avatar large">{userInitials}</span>
+                  <div>
+                    <strong>{displayName}</strong>
+                    {displayEmail ? <small>{displayEmail}</small> : null}
+                  </div>
+                </div>
+                <div className="crm-user-meta-grid">
+                  <div>
+                    <span>Perfil</span>
+                    <strong>{roleLabel}</strong>
+                  </div>
+                  <div>
+                    <span>Mandante</span>
+                    <strong>{mandanteLabel}</strong>
+                  </div>
+                </div>
+                <button className="crm-user-logout" onClick={logout}>Cerrar sesión</button>
+              </div>
+            </details>
           ) : (
-            <NavLink to="/login">Ingresar</NavLink>
+            <NavLink className="crm-login-link" to="/login">Ingresar</NavLink>
           )}
         </div>
       </header>
