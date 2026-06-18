@@ -3143,6 +3143,15 @@ export default function KamAssignmentPage() {
                         >
                           {editingActivityId ? "Guardar cambios" : "Registrar gestión"}
                         </button>
+                        {editingActivityId && (
+                          <button
+                            className="zoho-btn zoho-btn-secondary"
+                            type="button"
+                            onClick={() => { setEditingActivityId(null); setActivityForm(emptyActivity); }}
+                          >
+                            Cancelar edición
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div className="zoho-table-scroll-x">
@@ -3150,6 +3159,7 @@ export default function KamAssignmentPage() {
                         <thead>
                           <tr>
                             <th>Fecha</th>
+                            <th>Acciones</th>
                             <th>KAM</th>
                             <th>Tipo</th>
                             <th>Estado</th>
@@ -3158,7 +3168,6 @@ export default function KamAssignmentPage() {
                             <th>Próxima gestión</th>
                             <th>Prob.</th>
                             <th>Observación</th>
-                            <th>Acciones</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -3168,6 +3177,16 @@ export default function KamAssignmentPage() {
                                 {a.created_at
                                   ? String(a.created_at).slice(0, 10)
                                   : "—"}
+                              </td>
+                              <td>
+                                <div className="kam-inline-actions kam-inline-actions-visible">
+                                  <button className="zoho-small-btn" type="button" onClick={() => editActivity(a)}>
+                                    Editar
+                                  </button>
+                                  <button className="zoho-small-btn danger" type="button" onClick={() => deleteActivity(a)}>
+                                    Eliminar
+                                  </button>
+                                </div>
                               </td>
                               <td>{a.kam_nombre || "—"}</td>
                               <td>{a.tipo_gestion}</td>
@@ -3181,16 +3200,6 @@ export default function KamAssignmentPage() {
                               </td>
                               <td>{a.probabilidad_cierre ?? "—"}</td>
                               <td>{a.observacion || "—"}</td>
-                              <td>
-                                <div className="kam-inline-actions">
-                                  <button className="zoho-small-btn" type="button" onClick={() => editActivity(a)}>
-                                    Editar
-                                  </button>
-                                  <button className="zoho-small-btn danger" type="button" onClick={() => deleteActivity(a)}>
-                                    Eliminar
-                                  </button>
-                                </div>
-                              </td>
                             </tr>
                           ))}
                           {!activities.length && (
