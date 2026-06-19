@@ -1028,3 +1028,38 @@ button[type="submit"] {
     font-size: 28px !important;
   }
 }
+
+/* V129 - Barra horizontal superior sincronizada en módulos con tablas e información */
+.crm-top-scrollbar {
+  display: none;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  height: 16px;
+  margin: 0 0 8px 0;
+  border: 1px solid rgba(51,104,232,.14);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(240,247,255,.95), rgba(255,255,255,.98));
+  box-shadow: inset 0 1px 2px rgba(9,0,204,.04);
+}
+.crm-top-scrollbar__inner {
+  height: 1px;
+}
+.crm-top-scrollbar::-webkit-scrollbar {
+  height: 12px;
+}
+.crm-top-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.crm-top-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(90deg, var(--ff-sky), var(--ff-blue-2));
+  border-radius: 999px;
+  border: 2px solid rgba(240,247,255,.95);
+}
+.zoho-table-wrap > .crm-top-scrollbar,
+.table-scroll > .crm-top-scrollbar,
+.import-table-scroll > .crm-top-scrollbar,
+.ai-report-table-wrap > .crm-top-scrollbar,
+.custom-panel-table-scroll > .crm-top-scrollbar {
+  margin-bottom: 10px;
+}

@@ -15,6 +15,7 @@ import { defaultPathForUser, getCurrentUser } from "./auth";
 import V66AutomationPage from "./pages/V66AutomationPage";
 import AICommandCenterPage from "./pages/AICommandCenterPage";
 import KamAssignmentPage from "./pages/KamAssignmentPage";
+import GlobalTopScrollSync from "./components/GlobalTopScrollSync";
 
 function RootRedirect() {
   return <Navigate to={defaultPathForUser(getCurrentUser())} replace />;
@@ -23,6 +24,7 @@ function RootRedirect() {
 export default function App() {
   return (
     <BrowserRouter>
+      <GlobalTopScrollSync />
       <Layout>
         <Routes>
           <Route path="/" element={<RootRedirect />} />
